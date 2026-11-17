@@ -57,11 +57,15 @@
   .savebtns button:hover{background:rgba(255,255,255,.2)}
   #err{position:fixed;left:16px;right:16px;bottom:16px;color:#ffb4a8;font-size:13px;display:none}
 </style>
-<script type="importmap">
-{"imports":{
-  "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
-}}
+<script>
+/* Three.js is served from ./vendor when the page is hosted. A page opened straight from disk
+   (file://) cannot import local modules, so it falls back to the same version on the CDN. */
+(function(){
+  var base=location.protocol==='file:'?'https://cdn.jsdelivr.net/npm/three@0.170.0/':'./vendor/three/';
+  var m=document.createElement('script');m.type='importmap';
+  m.textContent=JSON.stringify({imports:{'three':base+'build/three.module.js','three/addons/':base+'examples/jsm/'}});
+  document.currentScript.after(m);
+})();
 </script>
 </head>
 <body>
