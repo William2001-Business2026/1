@@ -5,8 +5,15 @@
 <title>Hale Moku</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
+  /* Fonts: Pacifico for titles, Quicksand for everything else. Both are bundled in vendor/fonts (SIL Open Font License). */
+  @font-face{font-family:'Pacifico';font-style:normal;font-weight:400;font-display:swap;src:url(vendor/fonts/pacifico-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  @font-face{font-family:'Pacifico';font-style:normal;font-weight:400;font-display:swap;src:url(vendor/fonts/pacifico-latin-ext-400-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+  @font-face{font-family:'Quicksand';font-style:normal;font-weight:400;font-display:swap;src:url(vendor/fonts/quicksand-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  @font-face{font-family:'Quicksand';font-style:normal;font-weight:400;font-display:swap;src:url(vendor/fonts/quicksand-latin-ext-400-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+  @font-face{font-family:'Quicksand';font-style:normal;font-weight:600;font-display:swap;src:url(vendor/fonts/quicksand-latin-600-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  @font-face{font-family:'Quicksand';font-style:normal;font-weight:600;font-display:swap;src:url(vendor/fonts/quicksand-latin-ext-600-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
   html,body{margin:0;height:100%;overflow:hidden;background:#0b0f16;color:#f3efe6;
-    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+    font-family:Quicksand,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
   canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
   #hud{position:fixed;inset:0;pointer-events:none;transition:opacity .4s}
   #dot{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;border-radius:50%;
@@ -17,8 +24,8 @@
   #label.on{opacity:1}
   #hint{position:absolute;left:0;right:0;bottom:34px;text-align:center;font-size:13px;letter-spacing:.06em;
     text-shadow:0 1px 6px rgba(0,0,0,.85);opacity:.8}
-  #toast{position:absolute;left:0;right:0;top:16%;text-align:center;font-family:Georgia,"Times New Roman",serif;
-    font-size:20px;font-style:italic;text-shadow:0 1px 10px rgba(0,0,0,.8);opacity:0;transition:opacity 1s}
+  #toast{position:absolute;left:0;right:0;top:16%;text-align:center;font-family:Pacifico,Georgia,serif;
+    font-size:22px;letter-spacing:.02em;text-shadow:0 1px 10px rgba(0,0,0,.8);opacity:0;transition:opacity 1s}
   #toast.on{opacity:.95}
   #mask{position:fixed;inset:0;pointer-events:none;opacity:0;
     background:radial-gradient(circle at 50% 50%,rgba(0,0,0,0) 0,rgba(0,0,0,0) 36vh,rgba(0,0,0,.97) 40vh,#000 100%)}
@@ -27,10 +34,10 @@
   #menu.hidden{opacity:0;pointer-events:none}
   .panel{display:none;width:min(440px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;text-align:center}
   .panel.on{display:block}
-  h1{white-space:nowrap;font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:clamp(34px,7vw,58px);letter-spacing:.14em;
-    margin:0 0 6px;text-shadow:0 2px 24px rgba(0,0,0,.5)}
-  .sub{font-family:Georgia,serif;font-style:italic;opacity:.85;margin-bottom:34px;letter-spacing:.05em}
-  h2{font-family:Georgia,serif;font-weight:400;font-size:26px;letter-spacing:.1em;margin:0 0 18px}
+  h1{white-space:nowrap;font-family:Pacifico,Georgia,serif;font-weight:400;font-size:clamp(44px,9vw,76px);letter-spacing:.02em;line-height:1.25;
+    margin:0 0 2px;text-shadow:0 2px 24px rgba(0,0,0,.5)}
+  .sub{font-size:17px;opacity:.9;margin-bottom:34px;letter-spacing:.08em;text-shadow:0 1px 10px rgba(0,0,0,.5)}
+  h2{font-family:Pacifico,Georgia,serif;font-weight:400;font-size:32px;letter-spacing:.02em;margin:0 0 16px;text-shadow:0 2px 16px rgba(0,0,0,.45)}
   h3{font-size:11px;letter-spacing:.22em;text-transform:uppercase;opacity:.6;margin:20px 0 8px;font-weight:600}
   button.m{display:block;width:230px;margin:9px auto;padding:11px 0;font:inherit;font-size:15px;letter-spacing:.14em;
     color:#f3efe6;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.28);border-radius:26px;cursor:pointer;
@@ -57,6 +64,7 @@
   .savebtns button:hover{background:rgba(255,255,255,.2)}
   #err{position:fixed;left:16px;right:16px;bottom:16px;color:#ffb4a8;font-size:13px;display:none}
 </style>
+<link rel="stylesheet" href="chat.css">
 <script>
 /* Three.js is served from ./vendor when the page is hosted. A page opened straight from disk
    (file://) cannot import local modules, so it falls back to the same version on the CDN. */
@@ -77,7 +85,7 @@
 
 <div id="menu">
   <div class="panel on" id="p-main">
-    <h1>HALE MOKU</h1>
+    <h1>Hale Moku</h1>
     <div class="sub">an evening on a small island</div>
     <button class="m" id="b-begin">Begin</button>
     <button class="m" id="b-restart" style="display:none">Restart evening</button>
@@ -2051,5 +2059,9 @@ applyTime(true);applyGraphics();
 window.__hm={settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
 frame();
 </script>
+<!-- Player chat. Stays hidden until chat-config.js is filled in. -->
+<script src="vendor/supabase/supabase.js"></script>
+<script src="chat-config.js"></script>
+<script src="chat.js"></script>
 </body>
 </html>
