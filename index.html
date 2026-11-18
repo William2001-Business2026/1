@@ -136,6 +136,7 @@
       <b>W A S D</b><span>Walk</span>
       <b>Mouse</b><span>Look around</span>
       <b>Shift</b><span>Walk slowly</span>
+      <b>Space</b><span>Jump</span>
       <b>E</b><span>Interact: pick up, sit, lie down, stand up</span>
       <b>Left click</b><span>Use what you are holding</span>
       <b>G</b><span>Put down, or drop one of what you carry (Shift+G drops them all)</span>
@@ -1039,7 +1040,7 @@ const _fwd=new THREE.Vector3(),_v=new THREE.Vector3(),_v2=new THREE.Vector3();
 
 /* ───────────────────────── player ───────────────────────── */
 const START={x:0,z:44.6};
-const player={x:START.x,z:START.z,y:0,yaw:Math.PI,pitch:0,mode:'walk',baseYaw:0,stride:0,bobT:0,trans:1,from:new THREE.Vector3(),zoom:0};
+const player={x:START.x,z:START.z,y:0,yaw:Math.PI,pitch:0,mode:'walk',baseYaw:0,stride:0,bobT:0,trans:1,from:new THREE.Vector3(),zoom:0,vy:0,air:false,land:0};
 player.y=groundAt(player.x,player.z);
 let held=null,looked=null,state='title',locked=false,mouseDown=false,useAnim=0,rippleI=0;
 const keys={};
@@ -1113,7 +1114,7 @@ function interactE(){
 function restartEvening(){
   evening.s=0;evening.running=false;W.clock={phase:'golden',dayT:1,fast:false};applyTime(true);$('s-time').value=2;$('v-time').textContent='· golden hour';
   if(held){scene.add(held.group);held=null;}
-  player.mode='walk';player.x=START.x;player.z=START.z;player.yaw=Math.PI;player.pitch=0;player.trans=1;player.y=groundAt(player.x,player.z);
+  player.mode='walk';player.x=START.x;player.z=START.z;player.yaw=Math.PI;player.pitch=0;player.trans=1;player.vy=0;player.air=false;player.y=groundAt(player.x,player.z);
   for(const s of slots)s.item=null;
   cup.sips=3;cup.rinsed=false;cup.water=false;coffee.visible=true;coffee.position.y=.078;cupG.position.copy(slots[0].pos);cupG.rotation.set(0,1,0);slots[0].item=cup;
   lantern.lit=true;lantern.hung=true;lanternG.position.set(HOOK.x,HOOK.y-.33,HOOK.z);lanternG.rotation.set(0,0,0);
@@ -1129,6 +1130,9 @@ addEventListener('keydown',e=>{
   if(state!=='play')return;
   if(bookOpen){if(['KeyE','Escape','KeyG','Space'].includes(e.code))closeBook();return;}
   if(sysKey(e))return;
+  if(e.code==='Space'){e.preventDefault();
+    if(player.mode==='walk'&&!player.air&&player.trans>=1&&heightAt(player.x,player.z)>-.55){player.vy=4.2;player.air=true;} // about 0.9 m high
+    return;}
   if(e.code==='KeyE')interactE();
   else if(e.code==='KeyG'){held?putDown():sysDrop();}
   else if(e.code==='KeyP')savePhoto();
@@ -1153,6 +1157,7 @@ document.addEventListener('pointerlockchange',()=>{const was=locked;locked=docum
 function showPanel(id){document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on',p.id===id));}
 document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>showPanel(b.dataset.go)));
 function begin(){
+  if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
   initAudio();initAudio2();try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist();}catch(e){}state='play';menu.classList.add('hidden');lock();
   if(!introHint){introHint=12;player.from.copy(camera.position);player.trans=0;}
 }
@@ -1246,7 +1251,7 @@ function update(dt){
         moving=Math.hypot(nx-player.x,nz-player.z)/dt;player.x=nx;player.z=nz;}
       if(deep>1){const k=(deep-1)*1.6*dt,r=Math.hypot(player.x,player.z);player.x-=player.x/r*k;player.z-=player.z/r*k;
         const want=Math.atan2(player.x,player.z);let dy=want-player.yaw;dy=Math.atan2(Math.sin(dy),Math.cos(dy));player.yaw+=dy*Math.min(1,(deep-1)*.9*dt);}
-      player.stride+=moving*dt;
+      if(!player.air)player.stride+=moving*dt;
       if(player.stride>.78){player.stride=0;const sf=floorY(player.x,player.z,player.y)!=null?'wood':surfaceAt(player.x,player.z);SFX.step(sf,keys.ShiftLeft?.45:.8);
         if(sf==='water'&&U.uBio.value>.1)U.uRipples.value[rippleI++%8].set(player.x,player.z,time);}
       player.pitch=clamp(player.pitch,-1.5,1.5);
@@ -1256,9 +1261,16 @@ function update(dt){
     // camera pose
     let roll=0;
     if(player.mode==='walk'){
-      let gy=Math.max(groundAt(player.x,player.z),-1.12);const fy=floorY(player.x,player.z,player.y);if(fy!=null&&fy>gy)gy=fy;player.y=lerp(player.y,gy,1-Math.exp(-dt*12));
-      player.bobT+=moving*dt*2.1;const amp=settings.bob?Math.min(moving/3,1):0;
-      _v.set(player.x,player.y+1.65+Math.sin(player.bobT*2)*.028*amp,player.z);roll=Math.sin(player.bobT)*.004*amp;
+      let gy=Math.max(groundAt(player.x,player.z),-1.12);const fy=floorY(player.x,player.z,player.y);if(fy!=null&&fy>gy)gy=fy;
+      if(player.air){ // ballistic jump under gravity; land on ground, the deck or built floors
+        player.vy-=9.81*dt;player.y+=player.vy*dt;
+        if(player.y<=gy&&player.vy<=0){const hit=-player.vy;player.y=gy;player.vy=0;player.air=false;player.land=Math.min(1,hit/5);
+          const sf=fy!=null&&fy>=gy-.01?'wood':surfaceAt(player.x,player.z);if(sf==='water')SFX.splash(.4+.4*player.land);else SFX.step(sf,.6+.5*player.land);}
+      }else if(gy<player.y-.35){player.air=true;player.vy=0;} // stepped off an edge: fall instead of gliding down
+      else player.y=lerp(player.y,gy,1-Math.exp(-dt*12));
+      player.land=Math.max(0,player.land-dt*4);
+      player.bobT+=(player.air?0:moving)*dt*2.1;const amp=settings.bob&&!player.air?Math.min(moving/3,1):0;
+      _v.set(player.x,player.y+1.65+Math.sin(player.bobT*2)*.028*amp-Math.sin(player.land*Math.PI)*.07*(settings.bob?1:.4),player.z);roll=Math.sin(player.bobT)*.004*amp;
     }else if(player.mode==='sit'){_v.set(CHAIR.x-SUN_AZ.x*.12,DECK_Y+1.0+Math.sin(time*.9)*.004,CHAIR.z-SUN_AZ.y*.12);roll=Math.sin(time*.5)*.004;}
     else{_v.set(-.42,-.52,0);hamSwing.localToWorld(_v);roll=hamSwing.rotation.x*.7;}
     if(player.trans<1){player.trans=Math.min(1,player.trans+dt/.9);const k=player.trans*player.trans*(3-2*player.trans);camera.position.lerpVectors(player.from,_v,k);}
@@ -2198,7 +2210,7 @@ function sysUpdate(dt){
 /* ───────────────────────── go ───────────────────────── */
 cupG.position.copy(slots[0].pos);cupG.rotation.y=1;slots[0].item=cup;
 applyTime(true);applyGraphics();
-window.__hm={settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
+window.__hm={player,settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
 // diagnostics, for testing: which renderer is drawing, at what size and quality level
 window.__gfx=()=>({api:GFX_API,buffer:[canvas.width,canvas.height],css:[canvas.clientWidth,canvas.clientHeight],scale:scenePass.getResolutionScale(),samples:scenePass.renderTarget.samples,quality:settings.quality,level:activeGfx().name,fps:Math.round(perf.fps)});
 requestAnimationFrame(frame);

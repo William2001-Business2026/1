@@ -43,6 +43,7 @@ Very old or very weak graphics chips may still fall below 30 FPS at the lowest l
 | W A S D | Walk |
 | Mouse | Look around |
 | Shift | Walk slowly |
+| Space | Jump |
 | E | Interact: pick up, sit, lie down, stand up |
 | Left click | Use what you are holding |
 | G | Put down, or drop one of what you carry (Shift+G drops them all) |
