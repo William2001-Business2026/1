@@ -30,7 +30,7 @@
   #hint{position:absolute;left:0;right:0;bottom:34px;text-align:center;font-size:13px;letter-spacing:.06em;
     text-shadow:0 1px 6px rgba(0,0,0,.85);opacity:.8}
   #air{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;font:600 13px Quicksand,system-ui,sans-serif;color:#eaf6f7;opacity:0;transition:opacity .4s;text-shadow:0 1px 3px #0008}
-  #air.on{opacity:1}#air b{display:block;width:180px;height:8px;border-radius:4px;background:#ffffff30;overflow:hidden}#air i{display:block;height:100%;width:100%;background:#bfeef0;border-radius:4px;transition:background .3s}
+  #air.on{opacity:1}#air.stam{bottom:116px}#air b{display:block;width:180px;height:8px;border-radius:4px;background:#ffffff30;overflow:hidden}#air i{display:block;height:100%;width:100%;background:#bfeef0;border-radius:4px;transition:background .3s}
   #air.low i{background:#ff8a6a}#fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:50}
   #toast{position:absolute;left:0;right:0;top:16%;text-align:center;font-family:Pacifico,Georgia,serif;
     font-size:22px;letter-spacing:.02em;text-shadow:0 1px 10px rgba(0,0,0,.8);opacity:0;transition:opacity 1s}
@@ -597,6 +597,7 @@ const envSkyMat=new THREE.MeshBasicNodeMaterial({side:THREE.BackSide,depthWrite:
 envSkyMat.colorNode=skyColor(false)();
 return {U,uRipplesNode,sstep,hash21,vn,fbmN,grey,skyBase,skyRad,wavePh,waveAmp,skyMat,envSkyMat,SKYU};
 })();
+U.uWet=TSL.uniform(0);U.uSwell=TSL.uniform(0); // how wet the ground is after rain, and how swollen the river
 U.uUnder=TSL.uniform(0);U.uFogCol=TSL.uniform(new THREE.Color()); // under water: 1 while the camera is below the surface, and the colour of the haze
 const sky=new THREE.Mesh(new THREE.SphereGeometry(4800,48,24),skyMat);
 sky.frustumCulled=false; sky.renderOrder=-10; scene.add(sky);
@@ -653,16 +654,17 @@ const TERR=new Float32Array((SEG+1)*(SEG+1)),TGRASS=new Float32Array((SEG+1)*(SE
       for(const L of LAYERS)If(L.w.greaterThan(.002),()=>{acc.addAssign(pick(L,wp.xz.div(L.sc)).mul(L.w));});return acc;})();
     const macro=vn(wp.xz.mul(.045)).mul(.3).add(.85).mul(mix(1,vn(wp.xz.mul(.13)).mul(.5).add(.72),grassM)); // breaks up tiling over large areas; patchier under grass
     const tint=mix(vec3(1),vCol.div(max(dot(vCol,vec3(.2126,.7152,.0722)),.05)),.22); // keep the island's dry/green and sand-warmth variation
-    mat.colorNode=vec4(blend((L,q)=>texture(L.t.a,q).rgb.mul(L.g),vec3(0)).mul(tint).mul(macro).mul(mix(1,.82,wetM)).mul(mix(1,.78,sstep(.5,1,vMat).mul(float(1).sub(lavaM)))),1); // and shaded where the grass is thick
+    const puddle=sstep(.6,.7,vn(wp.xz.mul(.16).add(7)).add(vn(wp.xz.mul(.5)).mul(.15))).mul(sstep(.975,.995,normalWorldGeometry.y)).mul(sstep(.3,.9,U.uWet)).mul(float(1).sub(lavaM)).mul(sstep(.5,1.2,wp.y)); // rain pools in the flat hollows
+    mat.colorNode=vec4(blend((L,q)=>texture(L.t.a,q).rgb.mul(L.g),vec3(0)).mul(tint).mul(macro).mul(mix(1,.82,wetM)).mul(mix(1,.68,U.uWet.mul(sstep(-.2,.4,wp.y)))).mul(mix(1,.45,puddle)).mul(mix(1,.78,sstep(.5,1,vMat).mul(float(1).sub(lavaM)))),1); // and shaded where the grass is thick
     const nr=blend((L,q)=>texture(L.t.n,q).rgb,vec3(0));
     const ph0=U.uTime.mul(.7).add(vn(wp.xz.mul(.045)).mul(7));
     const gloss=clamp(sstep(.25,.07,wp.y).mul(sin(ph0.sub(1.3)).mul(.5).add(.5)),0,1); // the film of water left by each wave
-    mat.roughnessNode=mix(nr.z,.12,gloss.mul(sandM).mul(.9)).mul(mix(1,.7,wetM));
+    mat.roughnessNode=mix(nr.z,.12,gloss.mul(sandM).mul(.9)).mul(mix(1,.7,wetM)).mul(mix(1,.55,U.uWet)).mul(mix(1,.06,puddle));
     mat.normalNode=Fn(()=>{ // tangent space follows the ground: X along world X, Y along world Z
       const N=normalWorldGeometry,T=normalize(vec3(1,0,0).sub(N.mul(N.x))),B=cross(T,N);
       const t=nr.xy.mul(2).sub(1),tz=sqrt(max(float(1).sub(dot(t,t)),0));
       const n=normalize(T.mul(t.x).add(B.mul(t.y)).add(N.mul(tz)));
-      return normalize(cameraViewMatrix.mul(vec4(n,0)).xyz);
+      return normalize(cameraViewMatrix.mul(vec4(mix(n,N,puddle),0)).xyz);                 // a puddle's surface is flat
     })();
     mat.emissiveNode=Fn(()=>{
       const e=vec3(0).toVar(),dist=length(cameraPosition.sub(wp));
@@ -763,7 +765,7 @@ water.frustumCulled=false; scene.add(water);
 const freshMat=new THREE.MeshBasicNodeMaterial({transparent:true,depthWrite:false,fog:false});
 {
   const {Fn,attribute,float,vec2,vec3,vec4,mix,max,pow,abs,dot,normalize,reflect,length,clamp,uv,positionWorld,cameraPosition}=TSL;
-  const aFlow=attribute('aFlow','float'),aFoam=attribute('aFoam','float');
+  const aFlow=attribute('aFlow','float').mul(U.uSwell.mul(.8).add(1)),aFoam=attribute('aFoam','float').add(U.uSwell.mul(.25)).min(1);
   freshMat.colorNode=Fn(()=>{const q=uv(),t=U.uTime,wp=positionWorld,V=normalize(cameraPosition.sub(wp)),dist=length(cameraPosition.sub(wp));
     const a=vec2(q.x.mul(2.2),q.y.mul(.55).sub(t.mul(aFlow).mul(.55))),b=vec2(q.x.mul(5.1).add(3),q.y.mul(1.4).sub(t.mul(aFlow).mul(1.1)));
     const h0=vn(a).add(vn(b).mul(.5)),e=.07;
@@ -781,7 +783,7 @@ const freshMat=new THREE.MeshBasicNodeMaterial({transparent:true,depthWrite:fals
     col.assign(mix(col,vec3(.9,.93,.95).mul(U.uDay.add(.1)),foam.mul(.9)));
     return vec4(col,max(mix(mix(.5,.32,aFoam),.96,foam),F.mul(1.2)));})();                        // clear enough to see the stream bed, opaque where it froths
 }
-const FRESH={pool:null,fallAt:new THREE.Vector3(),mist:null};
+const FRESH={pool:null,fallAt:new THREE.Vector3(),mist:null,meshes:[]};
 {
   const Rv=RIVER,P=Rv.P,n=P.length,COLS=5,pos=[],uvs=[],flow=[],foam=[],idx=[];let v=0;const keep=[];
   const inPool=(x,z)=>Math.hypot(x-POOL.x,z-POOL.z)<POOL.r-.6,inSpring=(x,z)=>Math.hypot(x-SPRING.x,z-SPRING.z)<2.2;
@@ -798,13 +800,13 @@ const FRESH={pool:null,fallAt:new THREE.Vector3(),mist:null};
   for(let i=0;i<end;i++){if(!keep[i]||!keep[i+1])continue;for(let k=0;k<COLS-1;k++){const a=i*COLS+k,b=a+COLS;idx.push(a,a+1,b,a+1,b+1,b);}}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
   g.setAttribute('aFlow',new THREE.Float32BufferAttribute(flow,1));g.setAttribute('aFoam',new THREE.Float32BufferAttribute(foam,1));g.setIndex(idx);g.computeBoundingSphere();
-  const river=new THREE.Mesh(g,freshMat);river.renderOrder=1;scene.add(river);
+  const river=new THREE.Mesh(g,freshMat);river.renderOrder=1;scene.add(river);river.userData.y0=0;FRESH.meshes.push(river);
   // the pool and the spring: discs at their water level, churned white where the waterfall lands and where the spring wells up
   FRESH.fallAt.set(P[Rv.iIn][0],Rv.poolL,P[Rv.iIn][1]);
   const disc=(cx,cz,r,y,foamAt,foamR)=>{const d=new THREE.CircleGeometry(r,64);d.rotateX(-Math.PI/2);const ps=d.attributes.position,fl=[],fm=[],uv=d.attributes.uv;
     for(let i=0;i<ps.count;i++){const x=ps.getX(i)+cx,z=ps.getZ(i)+cz;uv.setXY(i,x/2.5,z/2.5);const f=smooth(foamR,0,Math.hypot(x-foamAt.x,z-foamAt.z));fl.push(.12+f*1.6);fm.push(f);}
     d.setAttribute('aFlow',new THREE.Float32BufferAttribute(fl,1));d.setAttribute('aFoam',new THREE.Float32BufferAttribute(fm,1));
-    const m=new THREE.Mesh(d,freshMat);m.position.set(cx,y+.03,cz);m.renderOrder=1;scene.add(m);return m;};
+    const m=new THREE.Mesh(d,freshMat);m.position.set(cx,y+.03,cz);m.renderOrder=1;scene.add(m);m.userData.y0=m.position.y;FRESH.meshes.push(m);return m;};
   FRESH.pool=disc(POOL.x,POOL.z,POOL.r+.9,Rv.poolL,{x:FRESH.fallAt.x,z:FRESH.fallAt.z},4.5);
   disc(SPRING.x,SPRING.z,2.9,Rv.springL,{x:SPRING.x,z:SPRING.z},1.4);
   // spray rising where the waterfall lands: soft camera-facing puffs, placed on the CPU each frame
@@ -813,7 +815,14 @@ const FRESH={pool:null,fallAt:new THREE.Vector3(),mist:null};
   const NM=40,mist=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1),mm,NM);mist.frustumCulled=false;mist.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(NM*3),3);
   mist.userData.p=Array.from({length:NM},(_,i)=>({t:i/NM*4,ox:(Math.random()-.5)*2,oz:(Math.random()-.5)*2}));scene.add(mist);FRESH.mist=mist;
 }
+// a cap of cloud drifting around the summit: soft puffs, facing the camera
+const SUMMIT=(()=>{const tex=canvasTex(128,128,(c,w,h)=>{const g=c.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);g.addColorStop(0,'rgba(255,255,255,.75)');g.addColorStop(.6,'rgba(255,255,255,.3)');g.addColorStop(1,'rgba(255,255,255,0)');c.fillStyle=g;c.fillRect(0,0,w,h);});
+  const m=new THREE.MeshBasicNodeMaterial({map:tex,transparent:true,depthWrite:false,fog:false,opacity:.3}),N=40,im=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1),m,N);im.frustumCulled=false;scene.add(im);
+  const P=Array.from({length:N},(_,i)=>({a:i/N*6.28,r:8+Math.random()*34,y:PEAK_H-12+Math.random()*22,s:16+Math.random()*20,sp:.008+Math.random()*.018}));const M=new THREE.Matrix4(),S=new THREE.Vector3(),V=new THREE.Vector3();
+  return{update(dt,dl){m.color.setRGB(.95*dl+.05,.95*dl+.05,.97*dl+.05);m.opacity=.22+.3*U.uCover.value;P.forEach((p,i)=>{p.a+=p.sp*dt;V.set(PEAK.x+Math.sin(p.a)*p.r,p.y+Math.sin(p.a*3+i)*2,PEAK.z+Math.cos(p.a)*p.r);
+    S.set(p.s*2.2,p.s*.55,1);M.compose(V,camera.quaternion,S);im.setMatrixAt(i,M);});im.instanceMatrix.needsUpdate=true;}};})();
 function updateFresh(dt){
+  {const sw=U.uSwell.value*.22;for(const m of FRESH.meshes)m.position.y=m.userData.y0+sw;}          // the river rises a little in heavy rain
   const m=FRESH.mist;if(!m)return;const far=camera.position.distanceTo(FRESH.fallAt)>140;m.visible=!far;if(far)return;
   const M=new THREE.Matrix4(),S=new THREE.Vector3(),P=new THREE.Vector3(),c=new THREE.Color(),day=.25+.75*U.uDay.value;
   m.userData.p.forEach((q,i)=>{q.t+=dt;if(q.t>4){q.t-=4;q.ox=(Math.random()-.5)*2;q.oz=(Math.random()-.5)*2;}const k=q.t/4;
@@ -1510,6 +1519,8 @@ const hud=$('hud'),dot=$('dot'),label=$('label'),hint=$('hint'),toastEl=$('toast
 const zoneState={cur:null,next:null,t:0,shown:false};
 // diving: one breath lasts about a minute (longer with shell goggles); run out and you black out and wake on the beach,
 // losing whatever you gathered on that dive
+// climbing strength: drains while you climb, comes back when you stand on easier ground
+const STAM={v:25,max:25,slid:false,tick(){const show=state==='play'&&STAM.v<STAM.max-.3;stamEl.classList.toggle('on',show);stamFill.style.width=(100*clamp(STAM.v/STAM.max,0,1))+'%';stamEl.classList.toggle('low',STAM.v<6);}};
 const DIVE={on:false,air:60,log:{},black:0,warned:false,moved:false,toldReef:false,
   max(){return 60+(have('goggles')>0?25:0);},
   start(){this.on=true;this.log={};this.warned=false;note('dive');},
@@ -1537,6 +1548,7 @@ function swimUnder(f,s,dt,wy){
   const m=Math.hypot(nx-player.x,nz-player.z,ny-player.y)/dt;player.x=nx;player.y=ny;player.z=nz;return m;
 }
 const airEl=document.createElement('div');airEl.id='air';airEl.innerHTML='<span>Air</span><b><i></i></b>';hud.appendChild(airEl);const airFill=airEl.querySelector('i');
+const stamEl=document.createElement('div');stamEl.id='air';stamEl.className='stam';stamEl.innerHTML='<span>Strength</span><b><i></i></b>';hud.appendChild(stamEl);const stamFill=stamEl.querySelector('i');
 const fadeEl=document.createElement('div');fadeEl.id='fade';document.body.appendChild(fadeEl);
 let toastT=0; function toast(msg,secs=4){toastEl.textContent=msg;toastEl.classList.add('on');toastT=secs;}
 let introHint=0;
@@ -1751,19 +1763,24 @@ function update(dt){
       const f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0),s=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
       const h=heightAt(player.x,player.z),fw=freshAt(player.x,player.z),deep=Math.max(0,(fw!=null?fw:0)-h);
       let sp=(keys.ShiftLeft||keys.ShiftRight?1.35:3)*speedMul()*clamp(1-(deep-.5)/.9,.18,1);
-      const wy=fw!=null?fw:water.position.y;
+      const wy=fw!=null?fw:water.position.y;player.climb=false;
       if(!player.uw&&!DIVE.black&&deep>1.7&&!player.air&&player.trans>=1&&keys.KeyC){player.uw=true;player.y=wy-2.15;(player.vel||(player.vel=new THREE.Vector3())).set(0,-.8,0);DIVE.start();SFX.splash(.5);}
       if(player.uw)moving=swimUnder(f,s,dt,wy);
       else{
       if(f||s){const l=Math.hypot(f,s),sy=Math.sin(player.yaw),cy=Math.cos(player.yaw);
         let dx=(-sy*f+cy*s)/l*sp*dt,dz=(-cy*f-sy*s)/l*sp*dt;
-        if(deep<.9&&!player.air){const grade=(heightAt(player.x+dx,player.z+dz)-h)/Math.max(1e-4,Math.hypot(dx,dz)); // steep ground uphill is slow going
-          const k=clamp(1-(grade-.4)*1.1,.22,1);dx*=k;dz*=k;}
+        if(deep<.9&&!player.air){const grade=(heightAt(player.x+dx,player.z+dz)-h)/Math.max(1e-4,Math.hypot(dx,dz));
+          if(grade>.95){if(STAM.v>0&&f>0){player.climb=true;const k=.42/Math.max(1,grade);dx*=k;dz*=k;STAM.v-=dt*(1+Math.min(1.5,grade-.95));} // too steep to walk: climb, hands and feet, while your strength lasts
+            else{dx=0;dz=0;}}
+          else{const k=clamp(1-(grade-.4)*1.1,.3,1);dx*=k;dz*=k;}}                                    // steep ground uphill is slow going
         let nx=player.x+dx,nz=player.z+dz;
         for(const cs of[colliders,pieceCols])for(const c of cs){const ox=nx-c.x,oz=nz-c.z,d=Math.hypot(ox,oz),m=c.r+.3;if(d<m&&d>1e-4){nx=c.x+ox/d*m;nz=c.z+oz/d*m;}}
         moving=Math.hypot(nx-player.x,nz-player.z)/dt;player.x=nx;player.z=nz;}
       if(fw!=null&&deep>.35){const q=riverQ(player.x,player.z);                // the river's current carries you downstream
         if(q&&q.d<q.w+.3){const gr=Math.max(0,RIVER.wl[Math.floor(q.i)]-RIVER.wl[Math.min(RIVER.P.length-1,Math.floor(q.i)+2)])/2;const cs=clamp(.4+gr*30,.4,4)*smooth(.35,1,deep)*dt;player.x+=q.fx*cs;player.z+=q.fz*cs;}}
+      if(deep<.5&&!player.air&&!player.climb){const gx=heightAt(player.x+.4,player.z)-heightAt(player.x-.4,player.z),gz=heightAt(player.x,player.z+.4)-heightAt(player.x,player.z-.4),g=Math.hypot(gx,gz)/.8;
+        if(g>1.25){const v=Math.min(3,(g-1.25)*3+.8)*dt/(g*.8);player.x-=gx*v;player.z-=gz*v;if(!STAM.slid){STAM.slid=true;}}          // on a slope this steep you slide unless you hold on
+        if(g<.8)STAM.v=Math.min(STAM.max,STAM.v+dt*6);}
       if(fw==null&&deep>1){const off=-masks(player.x,player.z).d;if(off>80){const k=(off-80)*.6*dt,r=Math.hypot(player.x,player.z);player.x-=player.x/r*k;player.z-=player.z/r*k; // past the reef the current turns you back
         if(!DIVE.toldReef){DIVE.toldReef=true;toast('Past the reef the current is too strong.',3);}}}
       }
@@ -1823,6 +1840,7 @@ function update(dt){
     if(player.mode==='sit')ht='E to stand up';else if(player.mode==='hammock')ht='E to get up';
     if(held)ht=(ht?ht+'   ·   ':'')+(held.kind==='cup'&&held.sips===0?(held.rinsed?'':'Click to rinse in the sea   ·   '):held.hint+'   ·   ')+'G to put down';
     if(!held){const sh=sysHint();if(sh)ht=(ht?ht+'   ·   ':'')+sh;}
+    if(player.climb)ht='Climbing   ·   let go of W to stop'+(ht?'   ·   '+ht:'');
     if(player.uw)ht='Space to rise   ·   C to go deeper'+(ht?'   ·   '+ht:'');
     else if(player.mode==='walk'&&!player.air&&(freshAt(player.x,player.z)??water.position.y)-heightAt(player.x,player.z)>1.7)ht='C to dive'+(ht?'   ·   '+ht:'');
     if(introHint>0){introHint-=dt;if(!ht&&!locked)ht='Click to look around';else if(!ht)ht='W A S D to walk   ·   E to interact   ·   Esc for the menu';}
@@ -1841,10 +1859,14 @@ function update(dt){
   sky.position.copy(camera.position);
   GRASS.update(camera.position.x,camera.position.z);
   updateFresh(dt);
-  SEA.update(dt,time);FLORA.update(camera.position.x,camera.position.z);FAUNA.tick(dt,time);if(state==='play')DIVE.tick(dt);
+  SEA.update(dt,time);FLORA.update(camera.position.x,camera.position.z);FAUNA.tick(dt,time);if(state==='play')DIVE.tick(dt);STAM.tick();
   {const c=camera.position,cw=freshAt(c.x,c.z),und=c.y<(cw!=null?cw:water.position.y)-.03?1:0; // under the surface: blue-green haze, muffled sound
    U.uUnder.value=und;postU.uUnder.value=und;postU.uLookUp.value=smooth(-.5,.8,player.pitch);
-   scene.fog.density=und?(have('goggles')>0?.042:.062):0;const dl=.12+.88*U.uDay.value;scene.fog.color.setRGB(.03*dl,.2*dl,.23*dl);U.uFogCol.value.copy(scene.fog.color);
+   const dl=.12+.88*U.uDay.value;
+   if(und){scene.fog.density=have('goggles')>0?.042:.062;scene.fog.color.setRGB(.03*dl,.2*dl,.23*dl);U.uFogCol.value.copy(scene.fog.color);}
+   else{const mist=Math.max(U.uWet.value*forestW(c.x,c.z)*.022,smooth(42,72,c.y)*.016,U.uCover.value*.004); // mist hangs in the forest after rain, and around the summit
+     scene.fog.density=mist;scene.fog.color.setRGB(.6*dl,.64*dl,.66*dl);}
+   SUMMIT.update(dt,dl);
    sky.visible=!und;scene.background=und?scene.fog.color:null;scene.environmentIntensity=envBase*(und?.3:1);hemi.intensity=hemiBase*(und?.55:1);}
   WIND.player.value.set(player.x,player.y,player.z);WIND.strength.value=.5+U.uCover.value*.8; // rain squalls blow harder
   leafU.uSunView.value.copy(U.uSunDir.value).transformDirection(camera.matrixWorldInverse);leafU.uSunTr.value.copy(sun.color).multiplyScalar(sun.intensity*.11);
@@ -2681,6 +2703,7 @@ function updateWeather(dt){
       for(const pc of W.pieces)if(pc.f==='crate'&&pc.d.st&&!roofed(pc.x,pc.z))for(const s of pc.d.st)if(isFood(s.kind)&&!/^d_/.test(s.kind)&&s.n>1)s.n--;}}
   }else if(evening.running)W.rainLeft=0;
   raining=lerp(raining,W.rainLeft>0?1:0,1-Math.exp(-dt*.45));
+  U.uWet.value=clamp(U.uWet.value+(raining>.3?dt/25:-dt/150),0,1);U.uSwell.value=clamp(U.uSwell.value+(raining>.5?dt/60:-dt/240),0,1); // soaks in over half a minute, dries over minutes; the river swells after a while
   U.uCover.value=Math.max(raining,W.rainLeft<=0&&W.rainIn<30&&W.clock.phase!=='night'&&!evening.running?(1-W.rainIn/30)*.65:0);
   sun.intensity=sunBase*(1-.75*U.uCover.value)*(U.uUnder.value?.42*Math.exp(-Math.max(0,water.position.y-camera.position.y)*.07):1); // sea water swallows sunlight with depth
   rainMesh.visible=raining>.02;
@@ -2690,7 +2713,10 @@ function updateWeather(dt){
     rainGeo.attributes.position.needsUpdate=true;
     for(const pc of W.pieces)if(pc.f==='barrel'){const was=pc.d.w>0;pc.d.w=Math.min(20,(pc.d.w||0)+dt/6*raining*(roofs.some(t=>Math.hypot(t.x-pc.x,t.z-pc.z)<1.8)?2:1));if(!was&&pc.d.w>0)recompute();}}
   for(const pc of W.pieces)if(pc.f==='barrel'){const w=pc.g.getObjectByName('water');w.visible=pc.d.w>.2;w.position.y=.1+.65*Math.min(1,(pc.d.w||0)/20);}
-  if(AU.rainG){const t=AU.ctx.currentTime;AU.rainG.gain.setTargetAtTime(raining*.3,t,.4);
+  if(AU.rainG){const t=AU.ctx.currentTime,fw=forestW(player.x,player.z),cm=masks(player.x,player.z),roof=sheltered(player)||roofed(player.x,player.z),und=U.uUnder.value;
+    AU.rainG.gain.setTargetAtTime(raining*.3*(1-.5*fw)*(1-und),t,.4);                                      // the hiss of rain on open ground and sea
+    AU.rainLeafG.gain.setTargetAtTime(raining*.22*fw*(1-und),t,.4);AU.rainRoofG.gain.setTargetAtTime(raining*(roof?.35:0)*(1-und),t,.3);AU.rainSeaG.gain.setTargetAtTime(raining*.18*smooth(10,-20,cm.d)*(1-und),t,.5);
+    if(AU.fallG)AU.fallG.gain.setTargetAtTime(.6+U.uSwell.value*.5,t,1);
     AU.preG.gain.setTargetAtTime(radio.mode>0&&W.rainLeft<=0&&W.rainIn<40&&W.clock.phase!=='night'?.22*(.5+.5*Math.sin(time*9)*Math.sin(time*2.3)):0,t,.1);}
 }
 
@@ -2808,6 +2834,11 @@ Object.assign(SFX,{
 function initAudio2(){
   if(!AU.ctx||AU.rainG)return;const c=AU.ctx;
   AU.rainG=AU.G(0,AU.amb);AU.loop(AU.pink,AU.filt('highpass',1400,.3,AU.rainG));AU.loop(AU.white,AU.filt('bandpass',6500,.4,AU.G(.25,AU.rainG)));
+  // rain on leaves: a patter of drops on the canopy; on a roof: a low drumming; on the sea: a soft, wide hiss
+  AU.rainLeafG=AU.G(0,AU.amb);AU.loop(AU.pink,AU.filt('bandpass',2600,.7,AU.rainLeafG));{const b=c.createBuffer(1,c.sampleRate*2,c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()<.004?(Math.random()*2-1):(d[i-1]||0)*.9;
+    const s=c.createBufferSource();s.buffer=b;s.loop=true;s.connect(AU.filt('highpass',1200,.5,AU.G(1.4,AU.rainLeafG)));s.start();}
+  AU.rainRoofG=AU.G(0,AU.amb);AU.loop(AU.brown,AU.filt('lowpass',700,.6,AU.rainRoofG));AU.loop(AU.pink,AU.filt('bandpass',1800,1.2,AU.G(.4,AU.rainRoofG)));
+  AU.rainSeaG=AU.G(0,AU.amb);AU.loop(AU.white,AU.filt('highpass',3200,.3,AU.rainSeaG));AU.loop(AU.pink,AU.filt('lowpass',500,.4,AU.G(.6,AU.rainSeaG)));
   AU.preG=AU.G(0,AU.radioBus);AU.loop(AU.white,AU.filt('bandpass',1800,2,AU.preG));
   AU.fireG=AU.G(0,AU.amb);AU.loop(AU.brown,AU.filt('lowpass',500,.4,AU.fireG));
   {const cr=c.createScriptProcessor?null:null;const b=c.createBuffer(1,c.sampleRate*3,c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()<.0006?(Math.random()*2-1):d[i-1]*.82||0;
@@ -3333,27 +3364,30 @@ window.__tF0=performance.now();const FLORA=(()=>{
 const FAUNA=(()=>{
   const R4=rng(4242),V3=THREE.Vector3,list=[],loader=gltfLoader;
   const night=()=>smooth(4,-6,evening.elev);
+  // loaded materials are plain ones; shader colour and leg changes need node materials
+  const toNode=m=>m.isNodeMaterial?m.clone():new THREE.MeshStandardNodeMaterial({map:m.map,normalMap:m.normalMap,roughnessMap:m.roughnessMap,metalnessMap:m.metalnessMap,aoMap:m.aoMap,
+    roughness:m.roughness??.8,metalness:m.metalness??0,color:m.color?m.color.clone():new THREE.Color(1,1,1),transparent:m.transparent,alphaTest:m.alphaTest,side:m.side,name:m.name});
   // bake a static model into one canonical mesh: y up, feet at 0, facing +z, scaled to `len` along its body
   function bake(gl,spec){gl.scene.updateMatrixWorld(true);const meshes=[];gl.scene.traverse(o=>{if(o.isMesh)meshes.push(o);});
     const out=new THREE.Group(),box=new THREE.Box3();
-    const geos=meshes.map(m=>{const g=floatGeo(m.geometry).applyMatrix4(m.matrixWorld);g.rotateY(spec.turn||0);return{g,mat:m.material};});
+    const geos=meshes.map(m=>{const g=floatGeo(m.geometry).applyMatrix4(m.matrixWorld);g.rotateY(spec.turn||0);return{g,mat:toNode(m.material)};});
     for(const {g} of geos){g.computeBoundingBox();box.union(g.boundingBox);}
     if(spec.cut){const cy=box.min.y+(box.max.y-box.min.y)*spec.cut;for(const q of geos){const p=q.g.attributes.position,ix=q.g.index;if(!ix)continue;const keep=[];
       for(let i=0;i<ix.count;i+=3){const a=ix.getX(i),b=ix.getX(i+1),c=ix.getX(i+2);if(Math.max(p.getY(a),p.getY(b),p.getY(c))>cy)keep.push(a,b,c);}q.g.setIndex(keep);}box.min.y=cy;} // cut away the display base
     const size=box.getSize(new V3()),k=spec.len/Math.max(size.x,size.z),cx=(box.min.x+box.max.x)/2,cz=(box.min.z+box.max.z)/2;
-    for(const q of geos){q.g.translate(-cx,-box.min.y,-cz);q.g.scale(k,k,k);q.g.computeBoundingSphere();const mat=q.mat.clone();
+    for(const q of geos){q.g.translate(-cx,-box.min.y,-cz);q.g.scale(k,k,k);q.g.computeBoundingSphere();const mat=q.mat;
       if(spec.tint){mat.color=new THREE.Color(...spec.tint);if(mat.emissiveMap){mat.emissiveMap=null;mat.emissive&&mat.emissive.setRGB(0,0,0);}}const mesh=new THREE.Mesh(q.g,mat);mesh.castShadow=true;mesh.receiveShadow=true;mesh.raycast=()=>{};out.add(mesh);}
     return{g:out,h:size.y*k};}
   // legs of a static quadruped or bird swing about the hip, diagonal pairs (or alternate, for birds) in step
   function legShader(group,hip,biped){const uW=TSL.uniform(0),uA=TSL.uniform(0);const {positionLocal,positionGeometry,sin,float,vec3,select,sign,clamp}=TSL;
-    group.traverse(o=>{if(!o.isMesh)return;const m=o.material=o.material.clone();const y=positionGeometry.y,z=positionGeometry.z,x=positionGeometry.x;
+    group.traverse(o=>{if(!o.isMesh)return;const m=o.material=toNode(o.material);const y=positionGeometry.y,z=positionGeometry.z,x=positionGeometry.x;
       const w=clamp(float(hip).sub(y).div(hip*.7),0,1),side=sign(x),front=sign(z),ph=biped?side.mul(1.5708):side.mul(front).mul(1.5708);
       const a=sin(uW.add(ph)).mul(uA).mul(w);m.positionNode=positionLocal.add(vec3(0,a.abs().mul(-.04*hip),a.mul(float(hip).sub(y).max(0))));});
     return{uW,uA};}
   // the moa and the feral goat reuse the island's own rigged chicken and goat models
   const SKINNED={kao:{url:'assets/models/goat.glb',height:.9,turn:0,legs:/^thigh_stretch/,amp:.45,stride:7},moa:{url:'assets/models/rooster.glb',height:.5,turn:-Math.PI/2,legs:/thigh/i,amp:.6,stride:16}};
   const SPEC={
-    puaa:{n:'Puaʻa (wild pig)',file:'pig',len:1.25,turn:0,tint:[.34,.28,.26],hip:.42,count:8,zone:'forest',speed:[.6,3.6],flee:13,sneak:6,food:['pork',2]},
+    puaa:{n:'Puaʻa (wild pig)',file:'pig',len:1.25,turn:0,recolour:'feral',hip:.42,count:8,zone:'forest',speed:[.6,3.6],flee:13,sneak:6,food:['pork',2]},
     kia:{n:'Kia (axis deer)',file:'deer',len:1.5,turn:Math.PI,rig:true,anims:{idle:'Idle',graze:'Grazing',walk:'WalkForward',run:'Gallop'},count:7,zone:'edge',speed:[.8,6],flee:18,sneak:8,food:['venison',3]},
     kao:{n:'Kao (feral goat)',skinned:'kao',count:5,zone:'mountain',speed:[.7,3.5],flee:12,sneak:6,food:['goatmeat',2]},
     moa:{n:'Moa (jungle fowl)',skinned:'moa',count:7,zone:'forest',speed:[.5,3],flee:6,sneak:3,food:['fowl',1]},
@@ -3397,10 +3431,11 @@ const FAUNA=(()=>{
     return null;}
   // ── load and make the animals ──
   const cache={};const load=url=>cache[url]||(cache[url]=loader.loadAsync(url));
-  function recolour(root,how){root.traverse(o=>{if(!o.isMesh)return;const m=o.material=o.material.clone();const {texture,uv,vec3,vec4,dot,mix,smoothstep,materialColor}=TSL;
+  function recolour(root,how){root.traverse(o=>{if(!o.isMesh)return;const m=o.material=toNode(o.material);const {texture,uv,vec3,vec4,dot,mix,smoothstep,materialColor}=TSL;
     if(!m.map)return;const tx=texture(m.map,uv()),l=dot(tx.rgb,vec3(.3,.59,.11));
     if(how==='iiwi')m.colorNode=vec4(mix(vec3(.02,.015,.012),vec3(.78,.06,.03),smoothstep(.06,.3,l)),tx.a);        // scarlet with black wings
     else if(how==='apapane')m.colorNode=vec4(mix(vec3(.02,.015,.015),vec3(.5,.03,.04),smoothstep(.05,.3,l)),tx.a);   // deeper crimson
+    else if(how==='feral')m.colorNode=vec4(vec3(l).mul(vec3(.13,.105,.088)).mul(1.4),tx.a);                         // dark, bristly feral colouring
     else if(how==='chameleon'&&/Default/.test(m.name))m.colorNode=vec4(mix(vec3(.08,.22,.05),vec3(.35,.62,.18),smoothstep(.15,.6,l)),tx.a);});}
   function makeOne(key,sp,h0){const a={key,sp,g:new THREE.Group(),home:{...h0},p:new V3(h0.x,h0.y,h0.z),yaw:R4()*6.28,t:R4()*100,state:'idle',stT:R4()*4,
       walk:0,speed:0,dead:false,gone:0,fleeT:0,mixer:null,acts:{},cur:null,legs:null,bones:null,phase:R4()*6.28};
@@ -3475,7 +3510,7 @@ const FAUNA=(()=>{
 })();
 
 scene.fog=new THREE.FogExp2(0x0b4a58,0); // only thickens under water
-window.__tF1=performance.now();window.FLORA_INFO=()=>({count:FLORA.count,kinds:FLORA.kinds});window.__hm={get FAUNA(){return FAUNA;},get FLORA(){return FLORA;},get SEA(){return SEA;},get DIVE(){return DIVE;},get scene(){return scene;},player,groundAt,surfaceAt,pickUp,cup,lantern,coco,chickens,goat,PHYS,useHeld,sysDrop,settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
+window.__tF1=performance.now();window.STAMv=()=>STAM.v;window.__forceWet=()=>{U.uWet.value=1;U.uSwell.value=1;raining=1;};window.WETv=()=>U.uWet.value;window.FLORA_INFO=()=>({count:FLORA.count,kinds:FLORA.kinds});window.__hm={get FAUNA(){return FAUNA;},get FLORA(){return FLORA;},get SEA(){return SEA;},get DIVE(){return DIVE;},get scene(){return scene;},player,groundAt,surfaceAt,pickUp,cup,lantern,coco,chickens,goat,PHYS,useHeld,sysDrop,settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
 /* ───────── physics: Rapier (Apache-2.0, vendor/rapier) ─────────
    Things you let go of or throw become rigid bodies until they come to rest: they fall, bounce, tumble, roll downhill,
    float (coconuts, wood, fronds) or sink, and your body pushes them as you walk. Once still, the body is removed and the

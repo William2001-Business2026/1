@@ -97,7 +97,8 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
 - **Island:** about 250 m across and 310 m from north to south, with a lumpy grassy knoll, rolling ground inland, a lava coast to the west and 34 palms.
 - **Zones:** the island is divided into zones, and the zone's name appears as you walk into it.
   - **Kahakai, the beach:** where you arrive, with coconuts and building.
-  - **Kuahiwi, the mountain:** a green, fluted mountain about 75 m high, with sea cliffs on its north side. Walking slows on steep slopes.
+  - **Kuahiwi, the mountain:** a green, fluted mountain about 75 m high, with sea cliffs on its north side and a cap of cloud drifting around the summit.
+    - **Climbing:** gentle slopes you walk. Steeper ones slow you down. Past about 43° you climb hand over hand while holding W, using the **Strength** bar. If it runs out, or you let go on very steep ground, you slide back down. Strength returns when you stand on easier ground.
   - **Wailele, the waterfall pool:** a 14 m waterfall drops into a cliff-backed pool you can swim in. From there a river winds east to the sea, and its current carries you downstream.
   - **Ka Puna Huna, the hidden spring:** the river's source, high on the mountain behind fallen boulders. Finding it adds a page to the journal.
   - **Ke Kai, the open sea.**
@@ -112,6 +113,14 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
 - **Animals:** rigged, textured hens, a rooster and a goat. Each keeps its wandering, pecking, grazing and feeding behaviour; the hen plays its own walk-and-peck animation, and the rooster's and goat's legs swing as they walk.
 - **Physics:** [Rapier](https://rapier.rs) rigid bodies. Things you drop or throw (resources, the coconut, binoculars, ukulele) fall, bounce, tumble and roll on the terrain, deck, rocks, palm trunks and your buildings; coconuts and wood float, stones sink; walking into loose items pushes them. Bodies are removed once things come to rest. The cup and lantern are still set down upright, and buildings keep their own support rules.
 - **Shadows:** dynamic sun shadows. High uses cascaded shadow maps (three 2048 px maps out to 140 m): sharp up close and still present in the distance, plus lantern shadows. Medium and Low use one map that follows you.
+
+## Rain
+
+Rain squalls blow through now and then, more often in the wet season.
+- The ground darkens and turns glossy as it soaks in, and puddles gather in flat hollows. Afterwards it dries over a few minutes.
+- After a while in heavy rain the river swells: it rises, runs faster and whiter, and the waterfall roars louder.
+- Rain sounds different depending on what it falls on: a hiss on open ground, a patter on the forest canopy, drumming on a roof and a wide hush on the sea. Under water it is silent.
+- Mist settles in the forest after rain and hangs around the summit.
 
 ## Undersea
 
