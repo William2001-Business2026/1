@@ -332,12 +332,38 @@ const START=enlarge(0,44.6);
 const BEACH=(x,z)=>[x+START.x,z+START.z-44.6];                                    // things that lie on the beach where you arrive keep their places around you
 const BY_LANAI=(x,z)=>[x+LANAI.x-LANAI_OLD.x,z+LANAI.z-LANAI_OLD.z];               // and those around the lanai keep theirs around it
 function masks(x,z,S=MAP){
-  const r=Math.hypot(x,z),th=Math.atan2(x,z),d=S*coastR(th)-r;
+  const r=Math.hypot(x,z),th=Math.atan2(x,z),d=coastAt(th,S)-r;
   let dth=th+Math.PI/2; if(dth>Math.PI)dth-=2*Math.PI;
   const lava=smooth(1.25,.75,Math.abs(dth))*smooth(30*S,16*S,d);
   return{r,th,d,lava};
 }
-function heightRaw(x,z,S=MAP){
+// ── zones: a fluted mountain to the north, a river from a hidden spring through a waterfall pool to the sea, forest to the east ──
+// (all of it only on the larger island, S>1; S=1 still draws the first island exactly, for moving old saves)
+const PEAK={x:-8,z:-132},PEAK_H=74;                     // Kuahiwi, the mountain
+const POOL={x:36,z:-70,r:10};                           // Wailele, the waterfall pool
+const SPRING={x:30,z:-112};                            // the hidden spring
+const FOREST={x:86,z:-6};                               // Wao Nahele, the forest, on the east side
+function northLobe(th){const a=Math.abs(Math.atan2(Math.sin(th-Math.PI),Math.cos(th-Math.PI)));return 62*Math.exp(-Math.pow(a/.8,2));} // the mountain pushes the coast north
+function coastAt(th,S){return S*coastR(th)+(S>1?northLobe(th):0);}
+function mountainH(x,z){
+  const dx=x-PEAK.x,dz=z-PEAK.z,r=Math.hypot(dx,dz);if(r>150)return 0;const a=Math.atan2(dx,dz);
+  const base=PEAK_H*Math.exp(-Math.pow(r/57,2.1));                 // a rounded summit and steep flanks
+  // Hawaiian fluted ridges: knife-edged spurs running down from the summit, with rounded valleys between them
+  const ridge=1-Math.abs(Math.sin(a*7+fbm(x*.02+3,z*.02,2)*3.2)),ridge2=1-Math.abs(Math.sin(a*17+fbm(x*.05,z*.05+9,2)*4));
+  const cut=(1-Math.pow(ridge,1.6))*.26+(1-ridge2)*.04;
+  return base*(1-cut*smooth(10,44,r)*smooth(140,60,r))+(fbm(x*.06+40,z*.06-7,3)-.5)*4*smooth(90,20,r);
+}
+// the river: control points from the spring down to the sea; the water level along it is worked out from the ground below
+const RIVER=(()=>{
+  const C=[[30,-112],[28.5,-103],[27.5,-95],[27.5,-88],[28.5,-82.5],[30.5,-78],[36,-70],[46,-60],[58,-50],[71,-43],[84,-38],[97,-33],[110,-29],[124,-26],[140,-23]];
+  const P=[];for(let i=0;i<C.length-1;i++){const p0=C[Math.max(0,i-1)],p1=C[i],p2=C[i+1],p3=C[Math.min(C.length-1,i+2)];
+    const L=Math.hypot(p2[0]-p1[0],p2[1]-p1[1]),n=Math.max(2,Math.round(L));
+    for(let k=0;k<n;k++){const t=k/n,t2=t*t,t3=t2*t;const f=(a,b,c,d)=>.5*(2*b+(-a+c)*t+(2*a-5*b+4*c-d)*t2+(-a+3*b-3*c+d)*t3);
+      P.push([f(p0[0],p1[0],p2[0],p3[0]),f(p0[1],p1[1],p2[1],p3[1])]);}}
+  P.push(C[C.length-1]);
+  return {P};
+})();
+function heightBase(x,z,S=MAP){
   const {th,d,lava}=masks(x,z,S);
   const bay=Math.exp(-Math.pow(th/.9,2));
   let h=d>0?2.2*(1-Math.exp(-d/14)):Math.max(-10,d*lerp(.17,.085,bay));
@@ -351,7 +377,60 @@ function heightRaw(x,z,S=MAP){
   if(S>1&&d>0)h+=(S-1)*(fbm(x*.022+11,z*.022-4,3)-.45)*3*smooth(14,48,d)*(1-lava); // rolling ground across the wider interior
   const K=S>1?KNOLL:KNOLL_OLD,kd=Math.hypot(x-K.x,z-K.z),lump=(S-1)*(fbm(x*.045+5,z*.045-2,3)-.5); // the larger knoll is lumpier, not a smooth dome
   h+=(9.5+(S-1)*3.5)*(1+lump*.5)*Math.exp(-Math.pow(kd/((15+(S-1)*9)*(1+lump*.45)),2))*smooth(0,6,d);
+  if(S>1)h+=mountainH(x,z)*smooth(-2,7,d);                  // sea cliffs where the mountain meets the coast
   return h;
+}
+// water level and width along the river, from the ground it runs over
+(()=>{const P=RIVER.P,n=P.length,g=P.map(([x,z])=>heightBase(x,z)),near=(x,z)=>{let b=0,bd=1e9;P.forEach((p,i)=>{const d=Math.hypot(p[0]-x,p[1]-z);if(d<bd){bd=d;b=i;}});return b;};
+  const iTop=near(28.5,-82.5),iPool=near(POOL.x,POOL.z),iIn=near(30.8,-77.6);
+  const poolL=g[iPool]-4.2,wl=new Float32Array(n),w=new Float32Array(n),dep=new Float32Array(n);
+  wl[0]=g[0]-.7;
+  for(let i=1;i<n;i++){
+    if(i<=iTop)wl[i]=Math.min(wl[i-1]-.08,g[i]-1.1);
+    else if(i<iIn)wl[i]=lerp(wl[iTop],poolL,(i-iTop)/(iIn-iTop));        // the waterfall
+    else if(i<=iPool+4)wl[i]=poolL;
+    else wl[i]=Math.max(0,Math.min(wl[i-1]-.012,g[i]-.9));
+  }
+  for(let i=0;i<n;i++){const s=i/(n-1);w[i]=i<iTop?lerp(1.1,1.8,i/iTop):i<iPool?1.6:lerp(2.6,5.5,smooth(iPool,n,i));dep[i]=i<iTop?.55:i<iPool?.6:lerp(1,1.4,smooth(iPool,n,i));}
+  Object.assign(RIVER,{wl,w,dep,iTop,iIn,iPool,poolL,top:wl[iTop],springL:wl[0]});
+  // nearest river point for every square metre around it
+  const x0=-60,z0=-170,nx=230,nz=170,idx=new Int16Array(nx*nz).fill(-1);
+  for(let j=0;j<nz;j++)for(let i=0;i<nx;i++){const x=x0+i+.5,z=z0+j+.5;let b=-1,bd=24*24;
+    for(let k=0;k<n;k+=1){const dx=P[k][0]-x,dz=P[k][1]-z,d=dx*dx+dz*dz;if(d<bd){bd=d;b=k;}}idx[j*nx+i]=b;}
+  Object.assign(RIVER,{x0,z0,nx,nz,idx});
+})();
+// where (x,z) lies against the river: distance to its centre line, the water level, width and depth there, and which way it flows
+function riverQ(x,z){
+  const R_=RIVER,i=Math.floor(x-R_.x0),j=Math.floor(z-R_.z0);if(i<0||j<0||i>=R_.nx||j>=R_.nz)return null;
+  const k=R_.idx[j*R_.nx+i];if(k<0)return null;const P=R_.P,n=P.length;
+  let best=null;
+  for(let s=Math.max(0,k-2);s<Math.min(n-1,k+2);s++){const ax=P[s][0],az=P[s][1],bx=P[s+1][0],bz=P[s+1][1],ex=bx-ax,ez=bz-az,L2=ex*ex+ez*ez;
+    const t=clamp(((x-ax)*ex+(z-az)*ez)/L2,0,1),px=ax+ex*t,pz=az+ez*t,d=Math.hypot(x-px,z-pz);
+    if(!best||d<best.d){const L=Math.sqrt(L2);best={d,s,t,fx:ex/L,fz:ez/L};}}
+  const a=best.s,b=a+1,t=best.t;
+  best.wl=lerp(R_.wl[a],R_.wl[b],t);best.w=lerp(R_.w[a],R_.w[b],t);best.dep=lerp(R_.dep[a],R_.dep[b],t);best.i=a+t;
+  return best;
+}
+const smin=(a,b,k)=>{const h=clamp(.5+.5*(b-a)/k,0,1);return lerp(b,a,h)-k*h*(1-h);};
+function heightRaw(x,z,S=MAP){
+  let h=heightBase(x,z,S);if(S===1)return h;
+  const q=riverQ(x,z);
+  if(q&&q.d<q.w+18){
+    if(q.d<q.w)h=q.wl-q.dep*(1-Math.pow(q.d/q.w,2))-.05;
+    else{const wall=q.wl+.25+(q.d-q.w)*(q.i<RIVER.iPool?.9:.45);h=smin(h,wall,1.2);if(q.d<q.w+2.5)h=Math.max(h,q.wl+.18*(1-(q.d-q.w)/2.5));}
+  }
+  const dp=Math.hypot(x-POOL.x,z-POOL.z);                  // the pool's basin
+  if(dp<POOL.r+14){const L=RIVER.poolL,k=lerp(1.1,2.3,smooth(-.3,.5,(POOL.z-z)/Math.max(dp,.01))); // cliffs behind the waterfall, a gentle shore to the south
+    if(dp<POOL.r)h=Math.min(h,L-3.2*Math.sqrt(1-Math.pow(dp/POOL.r,2))-.05);else h=smin(h,L+.3+(dp-POOL.r)*k,2.4);}
+  const ds=Math.hypot(x-SPRING.x,z-SPRING.z);              // the spring's little pool
+  if(ds<9){const L=RIVER.springL;if(ds<2.6)h=Math.min(h,L-.9*(1-ds/2.6)-.05);else h=smin(h,L+.25+(ds-2.6)*1.6,.8);}
+  return h;
+}
+// the fresh-water surface at (x,z), or null where there is none
+function freshAt(x,z){
+  if(Math.hypot(x-POOL.x,z-POOL.z)<POOL.r+.6)return RIVER.poolL;
+  if(Math.hypot(x-SPRING.x,z-SPRING.z)<2.9)return RIVER.springL;
+  const q=riverQ(x,z);return q&&q.d<q.w+.4&&q.wl>.02?q.wl:null;
 }
 const LANAI_H=heightRaw(LANAI.x,LANAI.z),LANAI_H_OLD=heightRaw(LANAI_OLD.x,LANAI_OLD.z,1);
 function heightAt(x,z,S=MAP){
@@ -362,9 +441,19 @@ const DECK_Y=LANAI_H+.36;
 const onDeck=(x,z)=>Math.abs(x-LANAI.x)<LANAI.w/2&&Math.abs(z-LANAI.z)<LANAI.d/2;
 const groundAt=(x,z)=>onDeck(x,z)?DECK_Y:heightAt(x,z);
 function grassMask(x,z,h,m){return clamp(smooth(2.5,3.8,h)+smooth(24,34,m.d)*smooth(.3,.48,fbm(x*.07+3,z*.07,3)),0,1)*(1-m.lava);}
+// the island's zones (the forest joins in once its trees are planted)
+const ZONES={beach:['Kahakai','the beach'],mountain:['Kuahiwi','the mountain'],fountain:['Wailele','the waterfall pool'],forest:['Wao Nahele','the forest'],sea:['Ke Kai','the open sea']};
+const FOREST_READY=false;
+function zoneAt(x,z){
+  if(Math.hypot(x-POOL.x,z-POOL.z)<POOL.r+18)return'fountain';
+  if(mountainH(x,z)>13)return'mountain';
+  const m=masks(x,z);if(m.d<-14)return'sea';
+  if(FOREST_READY&&Math.hypot((x-FOREST.x)/38,(z-FOREST.z)/52)<1&&m.d>6)return'forest';
+  return'beach';
+}
 function surfaceAt(x,z){
-  if(onDeck(x,z))return'wood'; const h=heightAt(x,z); if(h<.03)return'water';
-  const m=masks(x,z); if(m.lava>.5)return'rock'; return grassMask(x,z,h,m)>.5?'grass':'sand';
+  if(onDeck(x,z))return'wood'; const h=heightAt(x,z); if(h<.03)return'water'; const fw=freshAt(x,z); if(fw!=null&&fw>h+.03)return'water';
+  const m=masks(x,z); if(m.lava>.5)return'rock'; return grassMask(x,z,h,m)>.5?'grass':h>6?'rock':'sand';
 }
 
 /* ───────────────────────── procedural textures ───────────────────────── */
@@ -514,17 +603,23 @@ const TERR=new Float32Array((SEG+1)*(SEG+1)),TGRASS=new Float32Array((SEG+1)*(SE
 {
   const g=new THREE.PlaneGeometry(SIZE,SIZE,SEG,SEG); g.rotateX(-Math.PI/2);
   const pos=g.attributes.position,col=new Float32Array(pos.count*3),am=new Float32Array(pos.count);
-  const cSand=srgb(.88,.76,.56),cWet=srgb(.58,.48,.35),cGrass=srgb(.24,.33,.13),cDry=srgb(.45,.42,.22),cLava=srgb(.085,.08,.08),cLava2=srgb(.17,.15,.14),t=new THREE.Color();
+  const cCliff=srgb(.33,.31,.28),cMoss=srgb(.2,.25,.12),cSand=srgb(.88,.76,.56),cWet=srgb(.58,.48,.35),cGrass=srgb(.24,.33,.13),cDry=srgb(.45,.42,.22),cLava=srgb(.085,.08,.08),cLava2=srgb(.17,.15,.14),t=new THREE.Color();
+  for(let i=0;i<pos.count;i++){const h=heightAt(pos.getX(i),pos.getZ(i));pos.setY(i,h);TERR[i]=h;}
+  g.computeVertexNormals();const nrm=g.attributes.normal;
   for(let i=0;i<pos.count;i++){
-    const x=pos.getX(i),z=pos.getZ(i),h=heightAt(x,z); pos.setY(i,h); TERR[i]=h;
+    const x=pos.getX(i),z=pos.getZ(i),h=TERR[i];
     const m=masks(x,z);
+    const rock=smooth(.56,.3,nrm.getY(i))*smooth(3,8,h);                                       // bare rock only on cliffs; the ridges are green to the top, as in Hawaii
+    const wetBank=(()=>{const q=riverQ(x,z),dp=Math.hypot(x-POOL.x,z-POOL.z);return Math.max(q?smooth(q.w+4,q.w,q.d):0,smooth(POOL.r+5,POOL.r,dp));})();
     t.copy(cSand).lerp(cWet,smooth(.34,.05,h)*.8);
     t.multiplyScalar(.93+.12*fbm(x*.4,z*.4,2));
-    const gm=grassMask(x,z,h,m); TGRASS[i]=gm; if(gm>0){const gc=cGrass.clone().lerp(cDry,fbm(x*.15,z*.15,3));t.lerp(gc,gm);}
-    if(m.lava>0){const lc=cLava.clone().lerp(cLava2,fbm(x*.5,z*.5,3));t.lerp(lc,smooth(.25,.6,m.lava));}
-    am[i]=Math.max(gm,smooth(.25,.6,m.lava)*2);col[i*3]=t.r;col[i*3+1]=t.g;col[i*3+2]=t.b;
+    const gm=grassMask(x,z,h,m)*(1-rock)*(1-wetBank*.85); TGRASS[i]=gm; if(gm>0){const gc=cGrass.clone().lerp(cDry,fbm(x*.15,z*.15,3));t.lerp(gc,gm);}
+    const rk=Math.max(smooth(.25,.6,m.lava),smooth(.3,.7,rock));
+    if(rk>0){const lc=m.lava>.25?cLava.clone().lerp(cLava2,fbm(x*.5,z*.5,3)):cCliff.clone().lerp(cMoss,smooth(.4,.65,fbm(x*.3,z*.3+5,3)));t.lerp(lc,rk);} // weathered, mossy cliffs
+    if(wetBank>0)t.multiplyScalar(1-.3*wetBank);                                               // dark, damp ground along the water
+    am[i]=Math.max(gm,rk*2,wetBank*.7);col[i*3]=t.r;col[i*3+1]=t.g;col[i*3+2]=t.b;
   }
-  g.setAttribute('aMat',new THREE.BufferAttribute(am,1));g.setAttribute('color',new THREE.BufferAttribute(col,3)); g.computeVertexNormals();
+  g.setAttribute('aMat',new THREE.BufferAttribute(am,1));g.setAttribute('color',new THREE.BufferAttribute(col,3));
   const tex=grainTex.clone(); tex.repeat.set(180,180); tex.needsUpdate=true;
   const mat=new THREE.MeshStandardNodeMaterial({roughness:1,metalness:0});
   {
@@ -535,7 +630,8 @@ const TERR=new Float32Array((SEG+1)*(SEG+1)),TGRASS=new Float32Array((SEG+1)*(SE
     const damp=sstep(.36,.2,wp.y),wetM=sandM.mul(damp),dryM=sandM.mul(float(1).sub(damp));
     // [weight, material, metres per repeat, albedo gain (the scanned sand is grey temperate sand; coral sand is paler; the soil under the grass is
     //  greened to the blades' own colour, so grass and ground read as one)]
-    const LAYERS=[[dryM,'sand',3.2,1.55],[wetM,'wetsand',3.2,1.1],[grassM,'grass',2.6,vec3(.62,.92,.5)],[lavaM,'rock',3.6,1]].map(([w,n,sc,g])=>({w,t:pbrTex(n),sc,g}));
+    const rockLift=clamp(dot(vCol,vec3(.2126,.7152,.0722)).div(.016),1,6); // cliffs are paler weathered rock than the black lava
+    const LAYERS=[[dryM,'sand',3.2,1.55],[wetM,'wetsand',3.2,1.1],[grassM,'grass',2.6,vec3(.62,.92,.5)],[lavaM,'rock',3.6,rockLift]].map(([w,n,sc,g])=>({w,t:pbrTex(n),sc,g}));
     // each layer is only sampled where it shows
     const blend=(pick,init)=>Fn(()=>{const acc=init.toVar();
       for(const L of LAYERS)If(L.w.greaterThan(.002),()=>{acc.addAssign(pick(L,wp.xz.div(L.sc)).mul(L.w));});return acc;})();
@@ -641,6 +737,71 @@ function seaGeometry(){
 const water=new THREE.Mesh(seaGeometry(),waterMat);
 water.frustumCulled=false; scene.add(water);
 
+/* ───────────────────────── fresh water: the river, its waterfall, the pool and the spring ─────────────────────────
+   One flowing-water shader: the surface streams along the river at a speed set by its fall, turns white on the waterfall and
+   rapids, and reflects the sky like the sea does. */
+const freshMat=new THREE.MeshBasicNodeMaterial({transparent:true,depthWrite:false,fog:false});
+{
+  const {Fn,attribute,float,vec2,vec3,vec4,mix,max,pow,abs,dot,normalize,reflect,length,clamp,uv,positionWorld,cameraPosition}=TSL;
+  const aFlow=attribute('aFlow','float'),aFoam=attribute('aFoam','float');
+  freshMat.colorNode=Fn(()=>{const q=uv(),t=U.uTime,wp=positionWorld,V=normalize(cameraPosition.sub(wp)),dist=length(cameraPosition.sub(wp));
+    const a=vec2(q.x.mul(2.2),q.y.mul(.55).sub(t.mul(aFlow).mul(.55))),b=vec2(q.x.mul(5.1).add(3),q.y.mul(1.4).sub(t.mul(aFlow).mul(1.1)));
+    const h0=vn(a).add(vn(b).mul(.5)),e=.07;
+    const dx=vn(a.add(vec2(e,0))).add(vn(b.add(vec2(e,0))).mul(.5)).sub(h0),dz=vn(a.add(vec2(0,e))).add(vn(b.add(vec2(0,e))).mul(.5)).sub(h0);
+    const k=float(.22).add(aFlow.mul(.12)).mul(float(1).sub(sstep(30,120,dist)));
+    const N=normalize(vec3(dx.mul(k).div(e).mul(.35),1,dz.mul(k).div(e).mul(.35)));
+    const F=float(.02).add(pow(float(1).sub(max(dot(N,V),0)),5).mul(.98));
+    const Rf0=reflect(V.negate(),N),Rf=vec3(Rf0.x,abs(Rf0.y),Rf0.z);
+    const body=vec3(.018,.05,.035).mul(U.uDay.add(.05));
+    const col=mix(body,grey(skyBase(Rf)),F).add(U.uSunDisc.mul(pow(max(dot(Rf,U.uSunDir),0),220).mul(.25))).toVar();
+    col.assign(mix(col,vec3(.5,.56,.58).mul(U.uDay.add(.08)),aFoam.mul(.45)));            // falling, churning water is white, not a mirror
+    const streak=vn(vec2(q.x.mul(14),q.y.mul(.3).sub(t.mul(aFlow).mul(.9)))).mul(.6).add(vn(vec2(q.x.mul(31),q.y.mul(.8).sub(t.mul(aFlow).mul(1.6)))).mul(.4)); // long streaks down the flow
+    const fine=vn(vec2(q.x.mul(41),q.y.mul(5).sub(t.mul(aFlow).mul(4.2))));
+    const foam=clamp(aFoam.mul(sstep(.38,.72,streak.mul(.75).add(fine.mul(.35)))),0,1);
+    col.assign(mix(col,vec3(.9,.93,.95).mul(U.uDay.add(.1)),foam.mul(.9)));
+    return vec4(col,max(mix(mix(.5,.32,aFoam),.96,foam),F.mul(1.2)));})();                        // clear enough to see the stream bed, opaque where it froths
+}
+const FRESH={pool:null,fallAt:new THREE.Vector3(),mist:null};
+{
+  const Rv=RIVER,P=Rv.P,n=P.length,COLS=5,pos=[],uvs=[],flow=[],foam=[],idx=[];let v=0;const keep=[];
+  const inPool=(x,z)=>Math.hypot(x-POOL.x,z-POOL.z)<POOL.r-.6,inSpring=(x,z)=>Math.hypot(x-SPRING.x,z-SPRING.z)<2.2;
+  let end=n-1;for(let i=Rv.iPool;i<n;i++)if(Rv.wl[i]<.05){end=i;break;} // the river's own surface ends where it meets the sea
+  for(let i=0;i<=end;i++){
+    const a=P[Math.max(0,i-1)],b=P[Math.min(n-1,i+1)],tx=b[0]-a[0],tz=b[1]-a[1],l=Math.hypot(tx,tz)||1,nx=-tz/l,nz=tx/l;
+    const drop=(Rv.wl[Math.max(0,i-1)]-Rv.wl[Math.min(n-1,i+1)])/l;                                 // how steeply the water falls here
+    if(i>0){const p0=P[i-1];v+=Math.hypot(P[i][0]-p0[0],P[i][1]-p0[1],Rv.wl[i]-Rv.wl[i-1]);}
+    const hw=Rv.w[i]+.45,fo=Math.max(smooth(.15,.9,drop)*.85,i>=Rv.iTop&&i<=Rv.iIn+3?1:0);
+    for(let k=0;k<COLS;k++){const o=(k/(COLS-1)*2-1)*hw;pos.push(P[i][0]+nx*o,Rv.wl[i]+.03,P[i][1]+nz*o);uvs.push(k/(COLS-1)*hw/2.5,v);
+      flow.push(clamp(.35+drop*28,.35,4.5));foam.push(fo);}
+    keep.push(!inPool(P[i][0],P[i][1])&&!inSpring(P[i][0],P[i][1]));
+  }
+  for(let i=0;i<end;i++){if(!keep[i]||!keep[i+1])continue;for(let k=0;k<COLS-1;k++){const a=i*COLS+k,b=a+COLS;idx.push(a,a+1,b,a+1,b+1,b);}}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
+  g.setAttribute('aFlow',new THREE.Float32BufferAttribute(flow,1));g.setAttribute('aFoam',new THREE.Float32BufferAttribute(foam,1));g.setIndex(idx);g.computeBoundingSphere();
+  const river=new THREE.Mesh(g,freshMat);river.renderOrder=1;scene.add(river);
+  // the pool and the spring: discs at their water level, churned white where the waterfall lands and where the spring wells up
+  FRESH.fallAt.set(P[Rv.iIn][0],Rv.poolL,P[Rv.iIn][1]);
+  const disc=(cx,cz,r,y,foamAt,foamR)=>{const d=new THREE.CircleGeometry(r,64);d.rotateX(-Math.PI/2);const ps=d.attributes.position,fl=[],fm=[],uv=d.attributes.uv;
+    for(let i=0;i<ps.count;i++){const x=ps.getX(i)+cx,z=ps.getZ(i)+cz;uv.setXY(i,x/2.5,z/2.5);const f=smooth(foamR,0,Math.hypot(x-foamAt.x,z-foamAt.z));fl.push(.12+f*1.6);fm.push(f);}
+    d.setAttribute('aFlow',new THREE.Float32BufferAttribute(fl,1));d.setAttribute('aFoam',new THREE.Float32BufferAttribute(fm,1));
+    const m=new THREE.Mesh(d,freshMat);m.position.set(cx,y+.03,cz);m.renderOrder=1;scene.add(m);return m;};
+  FRESH.pool=disc(POOL.x,POOL.z,POOL.r+.9,Rv.poolL,{x:FRESH.fallAt.x,z:FRESH.fallAt.z},4.5);
+  disc(SPRING.x,SPRING.z,2.9,Rv.springL,{x:SPRING.x,z:SPRING.z},1.4);
+  // spray rising where the waterfall lands: soft camera-facing puffs, placed on the CPU each frame
+  const mt=canvasTex(64,64,(c,w,h)=>{const gr=c.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);gr.addColorStop(0,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');c.fillStyle=gr;c.fillRect(0,0,w,h);});
+  const mm=new THREE.MeshBasicNodeMaterial({map:mt,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false});
+  const NM=40,mist=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1),mm,NM);mist.frustumCulled=false;mist.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(NM*3),3);
+  mist.userData.p=Array.from({length:NM},(_,i)=>({t:i/NM*4,ox:(Math.random()-.5)*2,oz:(Math.random()-.5)*2}));scene.add(mist);FRESH.mist=mist;
+}
+function updateFresh(dt){
+  const m=FRESH.mist;if(!m)return;const far=camera.position.distanceTo(FRESH.fallAt)>140;m.visible=!far;if(far)return;
+  const M=new THREE.Matrix4(),S=new THREE.Vector3(),P=new THREE.Vector3(),c=new THREE.Color(),day=.25+.75*U.uDay.value;
+  m.userData.p.forEach((q,i)=>{q.t+=dt;if(q.t>4){q.t-=4;q.ox=(Math.random()-.5)*2;q.oz=(Math.random()-.5)*2;}const k=q.t/4;
+    P.set(FRESH.fallAt.x+q.ox*(1+k*3),FRESH.fallAt.y+.3+k*5,FRESH.fallAt.z+q.oz*(1+k*3)+k*2);const sc=1.2+k*4.5;S.set(sc,sc,sc);
+    M.compose(P,camera.quaternion,S);m.setMatrixAt(i,M);const a=Math.sin(Math.PI*k)*.22*day;m.setColorAt(i,c.setRGB(a,a,a));});
+  m.instanceMatrix.needsUpdate=true;m.instanceColor.needsUpdate=true;
+}
+
 /* far island: flat silhouette on the northern horizon */
 const farMat=new THREE.MeshBasicNodeMaterial({fog:false});
 { // not a flat cut-out: ridges and valleys in light and shade, and more sea haze toward its foot
@@ -691,8 +852,8 @@ const palmSpots=(()=>{
   const out=old.map(([x,z,H],i)=>{const p=i<3?BY_LANAI(x,z):(q=>[q.x,q.z])(enlarge(x,z));return[p[0],p[1],H];});
   // more palms for the larger island, mostly near the shore where palms grow
   const r=rng(41);let t=0;
-  while(out.length<34&&t++<4000){const th=r()*Math.PI*2,m0=MAP*coastR(th),dd=r()<.7?6+r()*22:28+r()*50,x=Math.sin(th)*(m0-dd),z=Math.cos(th)*(m0-dd);
-    if(heightAt(x,z)<1.1||masks(x,z).lava>.15||Math.hypot(x-LANAI.x,z-LANAI.z)<12||Math.hypot(x-START.x,z-START.z)<6)continue;
+  while(out.length<34&&t++<4000){const th=r()*Math.PI*2,m0=coastAt(th,MAP),dd=r()<.7?6+r()*22:28+r()*50,x=Math.sin(th)*(m0-dd),z=Math.cos(th)*(m0-dd);
+    if(heightAt(x,z)<1.1||heightAt(x,z)>12||freshAt(x,z)!=null||masks(x,z).lava>.15||Math.hypot(x-LANAI.x,z-LANAI.z)<12||Math.hypot(x-START.x,z-START.z)<6)continue;
     if(out.some(q=>Math.hypot(q[0]-x,q[1]-z)<9))continue;
     out.push([x,z,7+r()*2.6]);}
   return out;})();
@@ -793,11 +954,11 @@ const GRASS=(()=>{
   const onGrid=(arr,x,z)=>{const gx=(x+SIZE/2)/st,gz=(z+SIZE/2)/st,i=Math.floor(gx),j=Math.floor(gz),u=gx-i,v=gz-j,o=j*n1+i;
     const ha=arr[o],hb=arr[o+n1],hc=arr[o+n1+1],hd=arr[o+1];
     return u+v<=1?ha+(hd-ha)*u+(hb-ha)*v:hc+(hb-hc)*(1-u)+(hd-hc)*(1-v);};
-  const TOTAL=120000,CH=16,chunks=new Map(),up=new THREE.Vector3(0,1,0),nv=new THREE.Vector3(),qa=new THREE.Quaternion(),qb=new THREE.Quaternion(),d=new THREE.Object3D(),c=new THREE.Color();
+  const TOTAL=150000,CH=16,chunks=new Map(),up=new THREE.Vector3(0,1,0),nv=new THREE.Vector3(),qa=new THREE.Quaternion(),qb=new THREE.Quaternion(),d=new THREE.Object3D(),c=new THREE.Color();
   const lush=new THREE.Color(.92,1.04,.9),dryC=new THREE.Color(1.3,1.0,1.02);
   let placed=0,tries=0;
-  while(placed<TOTAL&&tries<1500000){tries++;const x=(R()-.5)*270,z=(R()-.5)*270,h=onGrid(TERR,x,z);if(h<1.2)continue;
-    const gm=onGrid(TGRASS,x,z);if(gm<.12||R()>gm)continue;if(Math.hypot(x-LANAI.x,z-LANAI.z)<4.6)continue;
+  while(placed<TOTAL&&tries<2200000){tries++;const x=(R()-.5)*280,z=-178+R()*316,h=onGrid(TERR,x,z);if(h<1.2)continue;
+    const gm=onGrid(TGRASS,x,z);if(gm<.12||R()>gm||freshAt(x,z)!=null)continue;if(Math.hypot(x-LANAI.x,z-LANAI.z)<4.6)continue;
     const key=Math.floor(x/CH)+','+Math.floor(z/CH);let ch=chunks.get(key);if(!ch){ch={x0:Math.floor(x/CH)*CH,z0:Math.floor(z/CH)*CH,t:[]};chunks.set(key,ch);}
     nv.set(onGrid(TERR,x-.4,z)-onGrid(TERR,x+.4,z),.8,onGrid(TERR,x,z-.4)-onGrid(TERR,x,z+.4)).normalize();
     const s=(.35+R()*.55)*(.55+.45*smooth(.2,.8,gm)),f=smooth(.45,.68,fbm(x*.15,z*.15,3));   // shorter, sparser grass where it thins out at its edges
@@ -839,7 +1000,7 @@ const GRASS=(()=>{
    const wd=windAt(positionLocal.xz),h=positionGeometry.y.add(.45).max(0),fl=sin(U.uTime.mul(7.3).add(dot(positionGeometry,vec3(9.1,5.3,7.7)))).mul(wd.z.add(.3)).mul(.012);
    sm.positionNode=positionLocal.add(vec3(wd.x,0,wd.y).mul(h).mul(.09)).add(vec3(fl,fl.mul(.6),fl.negate()));}
   const SHRUBS=220,shr=new THREE.InstancedMesh(sg,sm,SHRUBS),d=new THREE.Object3D();let i=0,t=0;
-  while(i<SHRUBS&&t<60000){t++;const x=(R()-.5)*250,z=(R()-.5)*250,h=heightAt(x,z),mk=masks(x,z);if(h<1.5||mk.lava>.3||mk.d<12||grassMask(x,z,h,mk)<.35)continue;
+  while(i<SHRUBS&&t<60000){t++;const x=(R()-.5)*250,z=-170+R()*295,h=heightAt(x,z),mk=masks(x,z);if(h<1.5||mk.lava>.3||mk.d<12||grassMask(x,z,h,mk)<.35||freshAt(x,z)!=null||Math.hypot(x-SPRING.x,z-SPRING.z)<4)continue;
     if(Math.hypot(x-LANAI.x,z-LANAI.z)<12||Math.hypot(x-START.x,z-START.z)<16)continue; if(h>5&&R()>.3)continue;
     const s=.6+R()*1.1;d.position.set(x,h+.1*s,z);d.rotation.y=R()*6.28;d.scale.set(s*(1+R()*.5),s,s*(1+R()*.5));d.updateMatrix();shr.setMatrixAt(i++,d.matrix);
     if(s>1.1)colliders.push({x,z,r:s*.8});}
@@ -864,7 +1025,11 @@ const GRASS=(()=>{
   for(let k=0;k<rp.count;k++){const x=rp.getX(k),y=rp.getY(k),z=rp.getZ(k),f=.7+.45*vnoise(x*1.7+y*2.1+9,z*1.9+y)+.22*(fbm(x*4+y*3,z*4-y*2,3)-.5)+.05*fbm(x*14+y*9,z*14,2);rp.setXYZ(k,x*f,y*f*.7,z*f);}
   rg.computeVertexNormals();
   const rm=new THREE.MeshStandardMaterial({color:srgb(.085,.08,.08),roughness:.7});
-  const ROCKS=380,rocks=new THREE.InstancedMesh(rg,rm,ROCKS);i=0;t=0;
+  const SPRING_ROCKS=16,ROCKS=380+SPRING_ROCKS,rocks=new THREE.InstancedMesh(rg,rm,ROCKS);i=0;t=0;
+  // fallen boulders screen the hidden spring, with one narrow way in beside the stream
+  for(let k=0;k<SPRING_ROCKS;k++){const a=k/SPRING_ROCKS*6.283+.25,gap=Math.abs(Math.atan2(Math.sin(a-Math.PI*.05),Math.cos(a-Math.PI*.05)))<.32;if(gap)continue;
+    const rr=4.4+R()*1.4,x=SPRING.x+Math.sin(a)*rr,z=SPRING.z+Math.cos(a)*rr,s=1.3+R()*1.1,h=heightAt(x,z);
+    d.position.set(x,h+s*.25,z);d.rotation.set(R()*6,R()*6,R()*6);d.scale.set(s*(1+R()*.5),s*1.2,s*(1+R()*.5));d.updateMatrix();rocks.setMatrixAt(i++,d.matrix);colliders.push({x,z,r:s*.95});}
   while(i<ROCKS&&t<90000){t++;const x=-40-R()*96,z=(R()-.5)*220,mk=masks(x,z),h=heightAt(x,z);if(mk.lava<.45||h<-1.2)continue;
     const s=.25+Math.pow(R(),2.2)*1.5;d.position.set(x,h+s*.15,z);d.rotation.set(R()*6,R()*6,R()*6);d.scale.set(s*(1+R()),s,s*(1+R()*.6));d.updateMatrix();rocks.setMatrixAt(i++,d.matrix);
     if(s>.95&&h>.2)colliders.push({x,z,r:s*.9});}
@@ -1175,6 +1340,13 @@ function initAudio(){
   // wind and palm rustle
   AU.windG=G(0,AU.amb);loop(AU.pink,filt('bandpass',420,.5,AU.windG));
   AU.rustG=G(0,AU.amb);loop(AU.white,filt('highpass',4200,.3,filt('lowpass',9000,.3,AU.rustG)));
+  // the waterfall: a deep roar and a bright hiss, heard from where it falls and fading with distance
+  AU.fallP=ctx.createPanner();AU.fallP.panningModel='equalpower';AU.fallP.distanceModel='inverse';AU.fallP.refDistance=7;AU.fallP.rolloffFactor=1.15;AU.fallP.connect(AU.amb);
+  {const fp=FRESH.fallAt;if(AU.fallP.positionX){AU.fallP.positionX.value=fp.x;AU.fallP.positionY.value=fp.y+5;AU.fallP.positionZ.value=fp.z;}else AU.fallP.setPosition(fp.x,fp.y+5,fp.z);}
+  AU.fallG=G(.6,AU.fallP);loop(AU.brown,filt('lowpass',620,.4,AU.fallG));loop(AU.pink,filt('bandpass',2400,.6,G(.35,AU.fallG)));
+  // the river's babble, and the wind's howl over the summit
+  AU.riverG=G(0,AU.amb);AU.riverF=filt('bandpass',1500,1.1,AU.riverG);loop(AU.pink,AU.riverF);
+  AU.howlG=G(0,AU.amb);AU.howlF=filt('bandpass',760,6,AU.howlG);loop(AU.pink,AU.howlF);
   // night insects
   AU.crick=G(0,AU.amb);{const o=ctx.createOscillator();o.frequency.value=4350;const g1=G(.5),g2=G(0);
     const l1=ctx.createOscillator();l1.frequency.value=27;const lg1=G(.5);l1.connect(lg1);lg1.connect(g1.gain);
@@ -1233,16 +1405,24 @@ const RADIO_MODES=['off','static','slack-key guitar','surf report'];
 function scheduleAudio(dt,time){
   const c=AU.ctx;if(!c||c.state!=='running')return;const now=c.currentTime,T=AU.t,tc=.25;
   // ambience follows the place and the hour
-  const h=heightAt(player.x,player.z),prox=clamp(1.05-h*.09,.3,1),night=smooth(0,-10,evening.elev);
+  const h=heightAt(player.x,player.z),cm=masks(player.x,player.z),prox=clamp(1.05-h*.06,.2,1)*clamp(1.12-Math.max(0,cm.d)/42,.05,1),night=smooth(0,-10,evening.elev); // surf fades inland and uphill
   const sw=Math.pow(.5+.5*Math.sin(time*WW+2.4),3)*.75+(.5+.5*Math.sin(time*2*Math.PI/23+1))*.25;
   if(sw>.78&&!AU.crash){AU.crash=true;noiseBurst(AU.pink,'lowpass',1700,.4,.2*prox,.6,2.4,AU.amb,320);noiseBurst(AU.white,'bandpass',4300,.5,.045*prox*prox,1.4,3.2,AU.amb,2400);}else if(sw<.3)AU.crash=false;
   AU.surfG.gain.setTargetAtTime(prox*(.1+.2*sw),now,tc);AU.surfF.frequency.setTargetAtTime(380+900*sw,now,tc);
   AU.washG.gain.setTargetAtTime(prox*prox*(.02+.16*Math.pow(sw,1.6)),now,tc);AU.washF.frequency.setTargetAtTime(1200+2200*sw,now,tc);
   const gust=fbm(time*.13,3.3,3);
-  AU.windG.gain.setTargetAtTime(.03+.07*gust,now,.6);AU.rustG.gain.setTargetAtTime((.006+.03*smooth(.4,.75,gust))*(1-.4*night),now,.5);
+  const alt=smooth(8,58,player.y);                                                              // the higher you climb, the harder it blows
+  AU.windG.gain.setTargetAtTime((.03+.07*gust)*(1+4.5*alt),now,.6);AU.rustG.gain.setTargetAtTime((.006+.03*smooth(.4,.75,gust))*(1-.4*night)*(1-.75*alt),now,.5);
+  AU.howlG.gain.setTargetAtTime(alt*alt*(.015+.1*smooth(.4,.85,gust)),now,.5);AU.howlF.frequency.setTargetAtTime(560+620*gust,now,.8);
+  {const q=riverQ(player.x,player.z);let rv=0;if(q){const i=Math.floor(q.i),gr=Math.max(0,RIVER.wl[i]-RIVER.wl[Math.min(RIVER.P.length-1,i+2)])/2;rv=smooth(q.w+28,q.w,q.d)*clamp(.35+gr*25,.35,1.4);}
+   AU.riverG.gain.setTargetAtTime(.1*rv,now,.4);AU.riverF.frequency.setTargetAtTime(1150+700*vnoise(time*2.3,7),now,.08);
+   if(rv>.05&&now>(T.burble||0)){T.burble=now+.05+Math.random()*.25;const o=c.createOscillator(),g=AU.G(0,AU.amb),t=now+.01,f=420+Math.random()*900; // water plopping over stones
+     o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(f*1.9,t+.06);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.012*rv,t+.008);g.gain.exponentialRampToValueAtTime(.0005,t+.08);o.connect(g);o.start(t);o.stop(t+.1);}}
+  {const ds=Math.hypot(player.x-SPRING.x,player.z-SPRING.z);if(ds<16&&now>(T.bub||0)){T.bub=now+.15+Math.random()*.6;const o=c.createOscillator(),g=AU.G(0,AU.amb),t=now+.01,f=300+Math.random()*400; // the spring welling up
+     o.type='sine';o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(f*2.6,t+.09);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.03*smooth(16,2,ds),t+.01);g.gain.exponentialRampToValueAtTime(.0005,t+.12);o.connect(g);o.start(t);o.stop(t+.14);}}
   AU.crick.gain.setTargetAtTime(.012*night*(1-.5*prox+.3),now,1.5);
   // distant seabirds until dusk
-  if(now>T.bird){T.bird=now+7+Math.random()*14;if(evening.elev>.5){const p=c.createStereoPanner?c.createStereoPanner():AU.G(1);if(p.pan)p.pan.value=Math.random()*1.6-.8;p.connect(AU.amb);p.connect(AU.revSfx);
+  if(now>T.bird){T.bird=now+7+Math.random()*14;if(evening.elev>.5&&prox>.3){const p=c.createStereoPanner?c.createStereoPanner():AU.G(1);if(p.pan)p.pan.value=Math.random()*1.6-.8;p.connect(AU.amb);p.connect(AU.revSfx);
     const n=2+(Math.random()*3|0),base=2300+Math.random()*900;for(let i=0;i<n;i++){const t=now+.1+i*(.16+Math.random()*.05),o=c.createOscillator(),g=AU.G(0,p);
       o.frequency.setValueAtTime(base*.8,t);o.frequency.linearRampToValueAtTime(base*1.25,t+.05);o.frequency.linearRampToValueAtTime(base*.7,t+.13);
       g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.022,t+.03);g.gain.linearRampToValueAtTime(0,t+.14);o.connect(g);o.start(t);o.stop(t+.2);}}}
@@ -1286,6 +1466,7 @@ let held=null,looked=null,state='title',locked=false,mouseDown=false,useAnim=0,r
 const keys={};
 const $=id=>document.getElementById(id);
 const hud=$('hud'),dot=$('dot'),label=$('label'),hint=$('hint'),toastEl=$('toast'),menu=$('menu'),mask=$('mask');
+const zoneState={cur:null,next:null,t:0,shown:false};
 let toastT=0; function toast(msg,secs=4){toastEl.textContent=msg;toastEl.classList.add('on');toastT=secs;}
 let introHint=0;
 
@@ -1377,7 +1558,7 @@ addEventListener('keydown',e=>{
   if(sysKey(e))return;
   if(e.code==='KeyV'){settings.view=settings.view==='first'?'third':'first';saveSettings();$('s-view').value=settings.view;applyView();toast(settings.view==='first'?'First person':'Third person',1.5);return;}
   if(e.code==='Space'){e.preventDefault();
-    if(player.mode==='walk'&&!player.air&&player.trans>=1&&heightAt(player.x,player.z)>-.55){player.vy=4.2;player.air=true;} // about 0.9 m high
+    if(player.mode==='walk'&&!player.air&&player.trans>=1&&(freshAt(player.x,player.z)??0)-heightAt(player.x,player.z)<.55){player.vy=4.2;player.air=true;} // about 0.9 m high
     return;}
   if(e.code==='KeyE')interactE();
   else if(e.code==='KeyG'){held?putDown():sysDrop();}
@@ -1497,14 +1678,18 @@ function update(dt){
     let moving=0;
     if(player.mode==='walk'&&playing){
       const f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0),s=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
-      const h=heightAt(player.x,player.z),deep=Math.max(0,-h);
+      const h=heightAt(player.x,player.z),fw=freshAt(player.x,player.z),deep=Math.max(0,(fw!=null?fw:0)-h);
       let sp=(keys.ShiftLeft||keys.ShiftRight?1.35:3)*speedMul()*clamp(1-(deep-.5)/.9,.18,1);
       if(f||s){const l=Math.hypot(f,s),sy=Math.sin(player.yaw),cy=Math.cos(player.yaw);
         let dx=(-sy*f+cy*s)/l*sp*dt,dz=(-cy*f-sy*s)/l*sp*dt;
+        if(deep<.9&&!player.air){const grade=(heightAt(player.x+dx,player.z+dz)-h)/Math.max(1e-4,Math.hypot(dx,dz)); // steep ground uphill is slow going
+          const k=clamp(1-(grade-.4)*1.1,.22,1);dx*=k;dz*=k;}
         let nx=player.x+dx,nz=player.z+dz;
         for(const cs of[colliders,pieceCols])for(const c of cs){const ox=nx-c.x,oz=nz-c.z,d=Math.hypot(ox,oz),m=c.r+.3;if(d<m&&d>1e-4){nx=c.x+ox/d*m;nz=c.z+oz/d*m;}}
         moving=Math.hypot(nx-player.x,nz-player.z)/dt;player.x=nx;player.z=nz;}
-      if(deep>1){const k=(deep-1)*1.6*dt,r=Math.hypot(player.x,player.z);player.x-=player.x/r*k;player.z-=player.z/r*k;
+      if(fw!=null&&deep>.35){const q=riverQ(player.x,player.z);                // the river's current carries you downstream
+        if(q&&q.d<q.w+.3){const gr=Math.max(0,RIVER.wl[Math.floor(q.i)]-RIVER.wl[Math.min(RIVER.P.length-1,Math.floor(q.i)+2)])/2;const cs=clamp(.4+gr*30,.4,4)*smooth(.35,1,deep)*dt;player.x+=q.fx*cs;player.z+=q.fz*cs;}}
+      if(deep>1&&fw==null){const k=(deep-1)*1.6*dt,r=Math.hypot(player.x,player.z);player.x-=player.x/r*k;player.z-=player.z/r*k;
         const want=Math.atan2(player.x,player.z);let dy=want-player.yaw;dy=Math.atan2(Math.sin(dy),Math.cos(dy));player.yaw+=dy*Math.min(1,(deep-1)*.9*dt);}
       if(!player.air)player.stride+=moving*dt;
       if(player.stride>.78){player.stride=0;const sf=floorY(player.x,player.z,player.y)!=null?'wood':surfaceAt(player.x,player.z);SFX.step(sf,keys.ShiftLeft?.45:.8);
@@ -1516,7 +1701,7 @@ function update(dt){
     // camera pose
     let roll=0;
     if(player.mode==='walk'){
-      let gy=Math.max(groundAt(player.x,player.z),-1.12);const fy=floorY(player.x,player.z,player.y);if(fy!=null&&fy>gy)gy=fy;
+      const fwy=freshAt(player.x,player.z);let gy=Math.max(groundAt(player.x,player.z),(fwy!=null?fwy:0)-1.12);const fy=floorY(player.x,player.z,player.y);if(fy!=null&&fy>gy)gy=fy;
       if(player.air){ // ballistic jump under gravity; land on ground, the deck or built floors
         player.vy-=9.81*dt;player.y+=player.vy*dt;
         if(player.y<=gy&&player.vy<=0){const hit=-player.vy;player.y=gy;player.vy=0;player.air=false;player.land=Math.min(1,hit/5);
@@ -1568,10 +1753,15 @@ function update(dt){
   }
   hud.style.opacity=(state==='play'&&!settings.photo)?1:0;
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on');}
+  if(state==='play'&&player.trans>=1){ // say where you are when you cross into another zone, and notice the hidden spring
+    const z=zoneAt(player.x,player.z);if(z!==zoneState.cur){if(z===zoneState.next)zoneState.t+=dt;else{zoneState.next=z;zoneState.t=0;}
+      if(zoneState.t>1.2){zoneState.cur=z;if(zoneState.shown)toast(ZONES[z][0]+' · '+ZONES[z][1],3.5);zoneState.shown=true;}}
+    if(!W.flags.spring&&Math.hypot(player.x-SPRING.x,player.z-SPRING.z)<3.6){W.flags.spring=1;note('spring');toast('Ka Puna Huna, the hidden spring. The river starts here.',6);}}
 
   // sky and shadow follow the camera
   sky.position.copy(camera.position);
   GRASS.update(camera.position.x,camera.position.z);
+  updateFresh(dt);
   WIND.player.value.set(player.x,player.y,player.z);WIND.strength.value=.5+U.uCover.value*.8; // rain squalls blow harder
   leafU.uSunView.value.copy(U.uSunDir.value).transformDirection(camera.matrixWorldInverse);leafU.uSunTr.value.copy(sun.color).multiplyScalar(sun.intensity*.11);
   const tx=Math.round(camera.position.x/2)*2,tz=Math.round(camera.position.z/2)*2;
@@ -1678,6 +1868,7 @@ const GOAT_LIKES=k=>k==='vines'?1.5:['frond','banana','onion','spud','beans','se
 
 /* ───────── notebook: the only guidance, written after the fact ───────── */
 const NOTES={
+  spring:'High on the mountain, behind fallen boulders, cold water wells up out of the rock. This is where the river begins.',
   flake:'Stone struck on the black rock splits. One edge comes away sharp.',
   digstick:'A stick ground on the rock takes a point. It opens the soil.',
   coconut:'The flake opens a coconut: white meat, and husk that pulls apart into fibre.',
@@ -1814,8 +2005,8 @@ function applyView(){
 function updateHero(dt,moving){
   if(!hero.ready)return;
   const show=heroShown()&&player.zoom<.4;hero.root.visible=hero.socket.visible=show;if(!show)return;
-  const deep=Math.max(0,-heightAt(player.x,player.z)),swim=deep>1.05&&!player.air;
-  hero.root.position.set(player.x,swim?water.position.y-1.15:player.y,player.z);
+  const hfw=freshAt(player.x,player.z),deep=Math.max(0,(hfw!=null?hfw:0)-heightAt(player.x,player.z)),swim=deep>1.05&&!player.air;
+  hero.root.position.set(player.x,swim?(hfw!=null?hfw:water.position.y)-1.15:player.y,player.z);
   const k=1/Math.max(dt,1e-3),vx=(player.x-hero.px)*k,vz=(player.z-hero.pz)*k;hero.px=player.x;hero.pz=player.z;
   if(Math.hypot(vx,vz)>.15){const want=Math.atan2(-vx,-vz);let d=want-hero.bodyYaw;d=Math.atan2(Math.sin(d),Math.cos(d));hero.bodyYaw+=d*Math.min(1,dt*10);}
   hero.root.rotation.y=hero.bodyYaw;
@@ -2397,7 +2588,7 @@ function updateWeather(dt){
 }
 
 /* ───────── the slow clock: growth, hunger, tides, things that arrive ───────── */
-function shorePt(){for(let i=0;i<12;i++){const th=-.3+Math.random()*2.9,r=MAP*coastR(th)-1-Math.random()*1.8,x=Math.sin(th)*r,z=Math.cos(th)*r,h=heightAt(x,z);if(h>.15&&h<1.2&&masks(x,z).lava<.2)return[x,z];}return null;}
+function shorePt(){for(let i=0;i<12;i++){const th=-.3+Math.random()*2.9,r=coastAt(th,MAP)-1-Math.random()*1.8,x=Math.sin(th)*r,z=Math.cos(th)*r,h=heightAt(x,z);if(h>.15&&h<1.2&&masks(x,z).lava<.2)return[x,z];}return null;}
 function washUp(){const p=shorePt();if(!p)return;const q=Math.random(),k=q<.36?'stick':q<.64?'log':q<.82?'shell':'seaweed';if(countWorld(k)<(k==='stick'?6:4))spawn(k,p[0],p[1],1);}
 function underPalm(){const p=palms[Math.floor(Math.random()*palms.length)],a=Math.random()*6.28,q=1.2+Math.random()*1.8,x=p.x+Math.cos(a)*q,z=p.z+Math.sin(a)*q;return heightAt(x,z)>.5&&!onDeck(x,z)?[x,z]:null;}
 function lavaPt(){for(let i=0;i<20;i++){const x=-56-Math.random()*56,z=(Math.random()-.5)*112;if(masks(x,z).lava>.6&&heightAt(x,z)>.5)return[x,z];}return null;}
