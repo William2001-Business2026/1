@@ -2,7 +2,7 @@
 
 *An evening on a small island.*
 
-Hale Moku is a first-person 3D island you explore in the browser. You can walk the beach, pick things up, build with them, sit or lie down, play the ukulele and take photos. Every mesh, texture, light and sound is generated in code when the page loads; there are no model, image or audio files.
+Hale Moku is a first-person 3D island you explore in the browser. You can walk the beach, jump, pick things up, build with them, sit or lie down, play the ukulele and take photos. The skies, ground materials and boulders are real-world scans; everything else, every sound included, is generated in code when the page loads.
 
 **Status:** pre-launch. Not yet published.
 
@@ -79,9 +79,23 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
 | `chat.js`, `chat.css` | The chat panel |
 | `chat-config.js` | Chat connection details (empty until set up) |
 | `supabase/migrations/` | Database setup for the chat |
+| `assets/sky/` | Photographed skies: 8192×2048 upper-hemisphere JPEGs and `skies.json` (sun direction, brightness, time-of-day range) |
+| `assets/tex/` | Scanned 2K materials: `<name>_albedo.jpg` and `<name>_nr.jpg` (normal X/Y + roughness) |
+| `assets/models/` | Scanned models as compressed GLB |
 | `vendor/three/` | Bundled copy of Three.js 0.186.1, WebGPU build (MIT licence, see `vendor/three/LICENSE`) |
 | `vendor/supabase/` | Bundled copy of supabase-js 2.119.0 (MIT licence) |
 | `vendor/fonts/` | Pacifico and Quicksand fonts (SIL Open Font License, licences included) |
+
+## Realism
+
+- **Sky and light:** five photographed HDRI skies (day, golden hour, sunset, afterglow, dusk) cross-fade as the sun moves. Each is turned to match the sun and lights the island (image-based lighting); the computed starry sky takes over at night.
+- **Materials:** physically based (albedo, normal, roughness) scans for sand, wet sand, grassy ground, lava rock, deck boards and palm bark.
+- **Wind:** a shared wind with travelling gusts bends 12,000 tufts of real grass blades, shrubs and palm fronds; grass parts around the player.
+- **Shadows:** dynamic sun shadows (up to 4096 px on High) and lantern shadows on High.
+
+## Asset credits
+
+Skies, materials and the boulder are from [Poly Haven](https://polyhaven.com) under CC0 (public domain). Each folder's JSON file lists the exact source asset.
 
 ## Licence
 

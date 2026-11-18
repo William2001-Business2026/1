@@ -152,7 +152,7 @@
 
   <div class="panel" id="p-credits">
     <h2>Credits</h2>
-    <div class="box"><p class="c">Every mesh, texture, light and sound on this island is generated in code when the page loads. There are no model, image or audio files.</p>
+    <div class="box"><p class="c">The skies, ground, deck, bark and boulders are real-world scans from Poly Haven (CC0). Everything else, every sound included, is generated in code when the page loads.</p>
     <p class="c">Rendered with Three.js using WebGPU, or WebGL 2 where WebGPU is not available. Sound made with the Web Audio API.</p>
     <p class="c">Nothing here needs doing. Sit down when you are ready.</p></div>
     <button class="m" data-go="p-main">Back</button>
@@ -170,6 +170,8 @@ import { ao } from 'three/addons/tsl/display/GTAONode.js';
 import { denoise } from 'three/addons/tsl/display/DenoiseNode.js';
 import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
 import { mergeVertices as mergeVerts } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 const showErr=m=>{const el=document.getElementById('err');el.style.display='block';el.textContent='Error: '+m;};
 window.addEventListener('error',e=>showErr(e.message));
@@ -370,7 +372,7 @@ const radioTex=canvasTex(256,128,(g,w,h)=>{g.fillStyle='#d9cfb8';g.fillRect(0,0,
 
 /* ───────────────────────── scanned materials ─────────────────────────
    assets/tex/<name>_albedo.jpg: colour (sRGB). <name>_nr.jpg: normal X,Y and roughness (linear). From Poly Haven, CC0. */
-const texLoader=new THREE.TextureLoader(),pbrCache={};
+const texLoader=new THREE.TextureLoader(),pbrCache={},gltfLoader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 function pbrTex(name){
   if(!pbrCache[name]){const a=texLoader.load('assets/tex/'+name+'_albedo.jpg'),n=texLoader.load('assets/tex/'+name+'_nr.jpg');
     a.colorSpace=THREE.SRGBColorSpace;for(const t of [a,n]){t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=8;}pbrCache[name]={a,n};}
@@ -769,6 +771,12 @@ const up=new THREE.Vector3(0,1,0),qa=new THREE.Quaternion(),qb=new THREE.Quatern
     const s=.25+Math.pow(R(),2.2)*1.5;d.position.set(x,h+s*.15,z);d.rotation.set(R()*6,R()*6,R()*6);d.scale.set(s*(1+R()),s,s*(1+R()*.6));d.updateMatrix();rocks.setMatrixAt(i++,d.matrix);
     if(s>.95&&h>.2)colliders.push({x,z,r:s*.9});}
   rocks.count=i;rocks.castShadow=rocks.receiveShadow=true;scene.add(rocks);
+  // swap in a scanned boulder (Poly Haven boulder_01, CC0) once it has loaded; the shaped blobs stay until then
+  gltfLoader.loadAsync('assets/models/boulder.glb').then(gl=>{let src=null;gl.scene.updateMatrixWorld(true);gl.scene.traverse(o=>{if(o.isMesh&&!src)src=o;});
+    const geo=src.geometry.clone();geo.applyMatrix4(src.matrixWorld);geo.center();geo.computeBoundingSphere();const k=1.05/geo.boundingSphere.radius;geo.scale(k,k,k);geo.computeBoundingSphere();
+    const m=src.material;m.color.setRGB(.3,.29,.3);                     // weathered grey granite darkened to volcanic basalt
+    rocks.geometry.dispose();rocks.geometry=geo;rocks.material=m;})
+    .catch(e=>console.warn('Boulder model did not load:',e));
 }
 
 /* ───────────────────────── lanai and living items ───────────────────────── */
