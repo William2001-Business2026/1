@@ -19,7 +19,22 @@ python3 -m http.server 8000
 
 Then open <http://localhost:8000>.
 
-A desktop browser (Chrome, Edge or Firefox) on a computer with a graphics card is recommended. The controls are keyboard and mouse.
+A desktop browser on a computer with a graphics card is recommended. The controls are keyboard and mouse.
+
+## Graphics and performance
+
+The island is drawn with **WebGPU** where the browser supports it (current Chrome and Edge, Safari 26 and later, Firefox on Windows). Other browsers automatically fall back to **WebGL 2** with the same shaders, so the island looks the same either way. Add `?renderer=webgl` to the address to force the fallback.
+
+| Target | How it is met |
+|---|---|
+| 1920 × 1080 resolution | The 3D view renders at the screen's pixel density but never above 1920 × 1080 pixels. |
+| 16:9 aspect ratio | The view is always 16:9, centred and letterboxed to fit the window. |
+| 60 FPS | Frames are capped at 60 per second, including on 120 Hz and 144 Hz screens. |
+| At least 30 FPS | On **Auto** quality (the default), the game lowers quality within about two seconds when the frame rate drops, and raises it again after eight smooth seconds. |
+
+Auto moves between seven levels, from High (ambient occlusion, 4096-pixel shadows, lantern shadows) down to Low at 50% render scale. It detects screens that refresh slower than 60 Hz and does not lower quality for them. **Settings → Show frame rate** displays the live frame rate, renderer, render size and current level. Choosing Low, Medium or High turns Auto off.
+
+Very old or very weak graphics chips may still fall below 30 FPS at the lowest level.
 
 ## Controls
 
@@ -63,7 +78,7 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
 | `chat.js`, `chat.css` | The chat panel |
 | `chat-config.js` | Chat connection details (empty until set up) |
 | `supabase/migrations/` | Database setup for the chat |
-| `vendor/three/` | Bundled copy of Three.js 0.170.0 (MIT licence, see `vendor/three/LICENSE`) |
+| `vendor/three/` | Bundled copy of Three.js 0.186.1, WebGPU build (MIT licence, see `vendor/three/LICENSE`) |
 | `vendor/supabase/` | Bundled copy of supabase-js 2.119.0 (MIT licence) |
 | `vendor/fonts/` | Pacifico and Quicksand fonts (SIL Open Font License, licences included) |
 
