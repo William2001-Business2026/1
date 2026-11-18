@@ -175,6 +175,7 @@ import { mergeVertices as mergeVerts } from 'three/addons/utils/BufferGeometryUt
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 
 const showErr=m=>{const el=document.getElementById('err');el.style.display='block';el.textContent='Error: '+m;};
 window.addEventListener('error',e=>showErr(e.message));
@@ -255,7 +256,7 @@ function buildPost(g){
 const PRESETS={ // aa: MSAA samples (WebGPU allows 1 or 4); shadowEvery: redraw the sun's shadow map every n frames
   low:   {scale:.75,shadow:1024,shadowEvery:3,aa:0,ao:false,bloom:false,grass:.35,lantern:false},
   medium:{scale:1,  shadow:2048,shadowEvery:2,aa:4,ao:false,bloom:true, grass:.7, lantern:false},
-  high:  {scale:1,  shadow:4096,shadowEvery:1,aa:4,ao:true, bloom:true, grass:1,  lantern:true}
+  high:  {scale:1,  shadow:2048,shadowEvery:1,aa:4,ao:true, bloom:true, grass:1,  lantern:true,csm:true} // csm: three cascaded 2048 px shadow maps out to 140 m
 };
 const AUTO_LEVELS=[ // best first; Auto starts at Medium
   {...PRESETS.high,name:'High'},
@@ -1330,7 +1331,15 @@ $('b-begin').addEventListener('click',begin);
 $('b-restart').addEventListener('click',()=>{restartEvening();begin();});
 function bind(id,key,type,after){const el=$(id);if(type==='check')el.checked=settings[key];else el.value=settings[key];
   el.addEventListener('input',()=>{settings[key]=type==='check'?el.checked:type==='num'?parseFloat(el.value):el.value;saveSettings();after&&after();});}
-let lastShadowsOn=null;
+let lastShadowsOn=null,csm=null,csmOn=false;
+/* Cascaded shadow maps (High): three sun shadow maps of growing reach, sharp at your feet and still there 140 m away.
+   Switching them on or off rebuilds the materials, so it only happens when the quality level changes. */
+function setCSM(on){
+  on=!!on&&settings.shadows;if(on===csmOn)return;csmOn=on;
+  if(on){if(!csm){csm=new CSMShadowNode(sun,{cascades:3,maxFar:140,mode:'practical',lightMargin:80});csm.fade=true;}sun.shadow.shadowNode=csm;}
+  else sun.shadow.shadowNode=null;
+  scene.traverse(o=>{if(o.material)o.material.needsUpdate=true;});
+}
 function applyGraphics(){
   const g=activeGfx();
   sizeRenderer();
@@ -1338,6 +1347,7 @@ function applyGraphics(){
   buildPost({ao:settings.post&&g.ao,bloom:settings.post&&g.bloom,grade:settings.post,aa:g.aa});
   postU.uGrain.value=settings.post?.035:0;postU.uVig.value=settings.post?.55:0;
   if(sun.shadow.mapSize.x!==g.shadow){sun.shadow.mapSize.set(g.shadow,g.shadow);sun.shadow.needsUpdate=true;}
+  setCSM(g.csm);if(csm&&csm.camera)csm.updateFrustums(); // the cascades find the camera on their first render
   renderer.shadowMap.enabled=settings.shadows;sun.castShadow=settings.shadows&&sun.intensity>.05;
   lanternLight.castShadow=settings.shadows&&g.lantern;
   const gr=scene.userData.grass;gr.count=Math.floor(gr.userData.full*g.grass);
@@ -1449,7 +1459,7 @@ function update(dt){
 
     // binocular zoom
     const zt=(held&&held.kind==='bino'&&mouseDown&&playing)?1:0;player.zoom=lerp(player.zoom,zt,1-Math.exp(-dt*9));
-    const fov=lerp(settings.fov,settings.fov/8,player.zoom);if(Math.abs(camera.fov-fov)>.01){camera.fov=fov;camera.updateProjectionMatrix();}
+    const fov=lerp(settings.fov,settings.fov/8,player.zoom);if(Math.abs(camera.fov-fov)>.01){camera.fov=fov;camera.updateProjectionMatrix();if(csmOn&&csm.camera)csm.updateFrustums();}
     mask.style.opacity=smooth(.3,.9,player.zoom);
     if(held){held.group.visible=player.zoom<.4;
       if(heroShown()){if(useAnim>0)useAnim=Math.max(0,useAnim-dt*1.6);}
@@ -1485,6 +1495,7 @@ function update(dt){
   const tx=Math.round(camera.position.x/2)*2,tz=Math.round(camera.position.z/2)*2;
   sun.target.position.set(tx,0,tz);sun.position.set(tx,0,tz).addScaledVector(U.uSunDir.value.clone().setY(Math.max(U.uSunDir.value.y,.12)).normalize(),200);
   {const cell=tx+','+tz;if(cell!==perf.shotCell||++perf.shadowTick>=activeGfx().shadowEvery){perf.shotCell=cell;perf.shadowTick=0;sun.shadow.needsUpdate=true;}}
+  if(csmOn&&csm)for(const l of csm.lights)l.shadow.autoUpdate=true; // the cascades copied the sun's 'manual update' flag
   lanternLight.shadow.autoUpdate=lanternLight.intensity>.01; // no point redrawing the lantern's six shadow views while it is dark
   sysUpdate(dt);updateAnimalModels(dt);
   scheduleAudio(dt,time);
