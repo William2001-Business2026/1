@@ -643,6 +643,14 @@ const leafTex=canvasTex(128,128,(g)=>{g.translate(64,64);for(let i=0;i<7;i++){g.
   g.beginPath();g.moveTo(0,0);g.bezierCurveTo(-9,-18,-21,-44,0,-61);g.bezierCurveTo(21,-44,9,-18,0,0);g.fill();g.strokeStyle='rgba(40,60,20,.5)';g.lineWidth=1;g.beginPath();g.moveTo(0,0);g.lineTo(0,-56);g.stroke();}
   g.fillStyle='#4c682c';g.beginPath();g.arc(0,0,12,0,7);g.fill();});
 const windU=TSL.uniform(0);
+/* Wind: a steady trade wind from the east-north-east with gusts that travel across the island as bands.
+   windAt(p) gives the horizontal push at world position p (metres, xz) and how gusty it is there (0–1). */
+const WIND={dir:TSL.uniform(new THREE.Vector2(-.86,.51)),strength:TSL.uniform(.5),player:TSL.uniform(new THREE.Vector3(0,-99,0))};
+const windAt=(p)=>{const {vec3,sin,dot,pow}=TSL;const t=U.uTime,dir=WIND.dir;
+  const gust=sstep(.38,.82,vn(p.mul(.028).sub(dir.mul(t.mul(.23)))));                   // gust bands about 30 m apart, moving ~8 m/s
+  const flutter=sin(t.mul(2.6).add(dot(p,dir).mul(.8)).add(vn(p.mul(.6)).mul(6))).mul(.22);
+  const amount=WIND.strength.mul(gust.mul(1.15).add(.32).add(flutter));
+  return vec3(dir.x.mul(amount),dir.y.mul(amount),gust);};
 const palmSpots=[[5.2,23.4,8.6],[14.5,24.9,7.6],[14.7,28.9,8.2],[-14,31,9],[-23,22,7.4],[21,35,8.4],[29,17,9.2],[-7,13,8],[19,-3,7],[-30,-9,8.8],[3,-34,9.4],[31,-22,7.8],[-12,-28,8.3]];
 const palms=[];
 {
@@ -674,9 +682,10 @@ const palms=[];
   { // fronds sway at the tips; each frond's phase and its own up and side axes are per-instance attributes, filled in below
     const {attribute,positionLocal,positionGeometry,uv,sin}=TSL;
     const ph=attribute('aPh','float'),up=attribute('aUp','vec3'),side=attribute('aSide','vec3'),k=uv().x.mul(uv().x),w=windU;
+    const wd=windAt(positionLocal.xz),gk=wd.z.mul(1.6).add(.55); // gusts make the fronds thrash harder
     const dy=sin(w.mul(1.1).add(ph).add(positionGeometry.z.mul(.9))).mul(.09).mul(k).add(sin(w.mul(2.7).add(ph.mul(1.7)).add(positionGeometry.x.mul(3))).mul(.02).mul(k));
     const dx=sin(w.mul(.8).add(ph.mul(1.3))).mul(.07).mul(k);
-    fm.positionNode=positionLocal.add(up.mul(dy)).add(side.mul(dx));
+    fm.positionNode=positionLocal.add(up.mul(dy.mul(gk))).add(side.mul(dx.mul(gk))).add(TSL.vec3(wd.x,0,wd.y).mul(k).mul(.5));
   }
   const FR=17,fronds=new THREE.InstancedMesh(fg,fm,palmSpots.length*FR); fronds.castShadow=true; fronds.receiveShadow=true; fronds.frustumCulled=false;
   const M=new THREE.Matrix4(),Q=new THREE.Quaternion(),E=new THREE.Euler(0,0,0,'YXZ'),S=new THREE.Vector3(),T=new THREE.Vector3();
@@ -701,13 +710,30 @@ const palms=[];
    fg.setAttribute('aPh',new THREE.InstancedBufferAttribute(aPh,1));fg.setAttribute('aUp',new THREE.InstancedBufferAttribute(aUp,3));fg.setAttribute('aSide',new THREE.InstancedBufferAttribute(aSide,3));}
   scene.add(fronds);
 }
-{ // grass tufts
-  const g=new THREE.BufferGeometry(),v=[],uv=[],n=[];
-  for(const a of[0,Math.PI/2]){const c=Math.cos(a)*.5,s=Math.sin(a)*.5;
-    v.push(-c,0,-s, c,0,s, c,1,s, -c,0,-s, c,1,s, -c,1,-s);uv.push(0,0,1,0,1,1,0,0,1,1,0,1);for(let i=0;i<6;i++)n.push(0,1,0);}
-  g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setAttribute('normal',new THREE.Float32BufferAttribute(n,3));
-  const m=leafy(new THREE.MeshStandardNodeMaterial({map:grassTex,alphaTest:.35,side:THREE.DoubleSide,roughness:.85}));const up=new THREE.Vector3(0,1,0),qa=new THREE.Quaternion(),qb=new THREE.Quaternion();
-  const COUNT=9000,im=new THREE.InstancedMesh(g,m,COUNT),d=new THREE.Object3D(),c=new THREE.Color();let i=0,tries=0;
+{ // grass: tufts of curved, tapering blades
+  const g=(()=>{const P=[],N=[],C=[],UVs=[],I=[],BL=11,SEG=4,cBase=new THREE.Color(.05,.09,.025),cTip=new THREE.Color(.34,.42,.12),cDry=new THREE.Color(.42,.36,.16),c=new THREE.Color();
+    for(let b=0;b<BL;b++){const a=R()*6.283,r=Math.sqrt(R())*.13,bx=Math.cos(a)*r,bz=Math.sin(a)*r,H=.5+R()*.5,w=.022+R()*.02;
+      const la=a+(R()-.5)*1.2,L=.08+R()*.28,lx=Math.cos(la),lz=Math.sin(la),fa=R()*3.1416,sx=Math.cos(fa),sz=Math.sin(fa),dry=R()<.18?R():0;
+      const nx=-sz,nz=sx,base=P.length/3;
+      for(let k=0;k<=SEG;k++){const t=k/SEG,y=t*H,cx=bx+lx*L*t*t,cz=bz+lz*L*t*t,hw=w*Math.pow(1-t,.8)*.5;
+        c.copy(cBase).lerp(cTip,Math.pow(t,.7)).lerp(cDry,dry*t);
+        for(const sd of[-1,1]){P.push(cx+sx*hw*sd,y,cz+sz*hw*sd);const ny=.75;N.push(nx*.5,ny,nz*.5);C.push(c.r,c.g,c.b);UVs.push(sd*.5+.5,t);}}
+      for(let k=0;k<SEG;k++){const a0=base+k*2;I.push(a0,a0+1,a0+2,a0+1,a0+3,a0+2);}}
+    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(P,3));geo.setAttribute('normal',new THREE.Float32BufferAttribute(N,3));
+    geo.setAttribute('color',new THREE.Float32BufferAttribute(C,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(UVs,2));geo.setIndex(I);geo.computeBoundingSphere();return geo;})();
+  const m=leafy(new THREE.MeshStandardNodeMaterial({vertexColors:true,side:THREE.DoubleSide,roughness:.72}));
+  {const {Fn,vec3,vec4,float,max,length,normalize,dot,positionLocal,positionGeometry,varyingProperty}=TSL;
+   const vBend=varyingProperty('float','vBend');
+   m.positionNode=Fn(()=>{const h=positionGeometry.y,k=h.mul(h),wd=windAt(positionLocal.xz);
+     const d=positionLocal.xz.sub(WIND.player.xz),dist=length(d),near=float(1).sub(sstep(.15,.95,dist)).mul(sstep(1.6,.4,positionLocal.y.sub(WIND.player.y).abs()));
+     const push=normalize(d.add(1e-4)).mul(near).mul(.8);                                  // blades lean away from your legs
+     const bend=wd.xy.mul(.55).add(push).mul(k);
+     vBend.assign(wd.z.mul(h));
+     return positionLocal.add(vec3(bend.x,dot(bend,bend).mul(-.45),bend.y));})();          // bending also lowers the tip a little
+   m.colorNode=vec4(vec3(float(1).add(vBend.mul(.28))),1);                                  // gusts flatten blades and show their paler sides
+  }
+const up=new THREE.Vector3(0,1,0),qa=new THREE.Quaternion(),qb=new THREE.Quaternion();
+  const COUNT=12000,im=new THREE.InstancedMesh(g,m,COUNT),d=new THREE.Object3D(),c=new THREE.Color();let i=0,tries=0;
   while(i<COUNT&&tries<200000){tries++;const x=(R()-.5)*130,z=(R()-.5)*130,h=heightAt(x,z);if(h<1.2)continue;const mk=masks(x,z);
     if(R()>grassMask(x,z,h,mk)*.95+.02*smooth(14,24,mk.d)*(1-mk.lava))continue; if(Math.hypot(x-LANAI.x,z-LANAI.z)<4.6)continue;
     d.position.set(x,h-.03,z);qa.setFromUnitVectors(up,tnorm(x,z));qb.setFromAxisAngle(up,R()*6.28);d.quaternion.copy(qa).multiply(qb);const s=.35+R()*.55;d.scale.set(s*1.3,s,s*1.3);d.updateMatrix();im.setMatrixAt(i,d.matrix);
@@ -725,6 +751,9 @@ const palms=[];
     for(const[a,b]of[[-1,-1],[1,-1],[1,1],[-1,-1],[1,1],[-1,1]]){sp.push(cv.x+tx.x*a*hs+ty.x*b*hs,cv.y+tx.y*a*hs+ty.y*b*hs,cv.z+tx.z*a*hs+ty.z*b*hs);sn.push(dv.x,dv.y*.6+.4,dv.z);su.push(a*.5+.5,b*.5+.5);sc.push(c.r,c.g,c.b);}}
   const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));sg.setAttribute('normal',new THREE.Float32BufferAttribute(sn,3));sg.setAttribute('uv',new THREE.Float32BufferAttribute(su,2));sg.setAttribute('color',new THREE.Float32BufferAttribute(sc,3));
   const sm=leafy(new THREE.MeshStandardNodeMaterial({map:leafTex,vertexColors:true,alphaTest:.45,side:THREE.DoubleSide,roughness:.55}));
+  {const {vec3,sin,dot,positionLocal,positionGeometry}=TSL; // shrubs lean with the wind; their outer leaves flutter
+   const wd=windAt(positionLocal.xz),h=positionGeometry.y.add(.45).max(0),fl=sin(U.uTime.mul(7.3).add(dot(positionGeometry,vec3(9.1,5.3,7.7)))).mul(wd.z.add(.3)).mul(.012);
+   sm.positionNode=positionLocal.add(vec3(wd.x,0,wd.y).mul(h).mul(.09)).add(vec3(fl,fl.mul(.6),fl.negate()));}
   const shr=new THREE.InstancedMesh(sg,sm,70),d=new THREE.Object3D();let i=0,t=0;
   while(i<70&&t<20000){t++;const x=(R()-.5)*120,z=(R()-.5)*120,h=heightAt(x,z),mk=masks(x,z);if(h<1.5||mk.lava>.3||mk.d<12)continue;
     if(Math.hypot(x-LANAI.x,z-LANAI.z)<12||(Math.abs(x)<10&&z>20))continue; if(h>5&&R()>.3)continue;
@@ -1388,6 +1417,7 @@ function update(dt){
 
   // sky and shadow follow the camera
   sky.position.copy(camera.position);
+  WIND.player.value.set(player.x,player.y,player.z);WIND.strength.value=.5+U.uCover.value*.8; // rain squalls blow harder
   leafU.uSunView.value.copy(U.uSunDir.value).transformDirection(camera.matrixWorldInverse);leafU.uSunTr.value.copy(sun.color).multiplyScalar(sun.intensity*.11);
   const tx=Math.round(camera.position.x/2)*2,tz=Math.round(camera.position.z/2)*2;
   sun.target.position.set(tx,0,tz);sun.position.set(tx,0,tz).addScaledVector(U.uSunDir.value.clone().setY(Math.max(U.uSunDir.value.y,.12)).normalize(),200);
@@ -2289,7 +2319,7 @@ function sysUpdate(dt){
 /* ───────────────────────── go ───────────────────────── */
 cupG.position.copy(slots[0].pos);cupG.rotation.y=1;slots[0].item=cup;
 applyTime(true);applyGraphics();
-window.__hm={player,settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
+window.__hm={player,groundAt,surfaceAt,settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
 // diagnostics, for testing: which renderer is drawing, at what size and quality level
 window.__gfx=()=>({api:GFX_API,buffer:[canvas.width,canvas.height],css:[canvas.clientWidth,canvas.clientHeight],scale:scenePass.getResolutionScale(),samples:scenePass.renderTarget.samples,quality:settings.quality,level:activeGfx().name,fps:Math.round(perf.fps)});
 requestAnimationFrame(frame);
