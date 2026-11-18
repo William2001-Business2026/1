@@ -372,8 +372,8 @@ const radioTex=canvasTex(256,128,(g,w,h)=>{g.fillStyle='#d9cfb8';g.fillRect(0,0,
 /* Shaders are written in TSL, Three.js's shading language. The same code compiles to WGSL for
    WebGPU and to GLSL for the WebGL 2 fallback, so both renderers draw the same island. */
 const WK=6,WW=.7;
-const {U,uRipplesNode,sstep,hash21,vn,fbmN,grey,skyBase,wavePh,waveAmp,skyMat}=(()=>{
-const {Fn,If,Loop,uniform,uniformArray,float,vec2,vec3,dot,fract,floor,mix,clamp,max,pow,exp,sin,length,normalize,step,positionLocal}=TSL;
+const {U,uRipplesNode,sstep,hash21,vn,fbmN,grey,skyBase,skyRad,wavePh,waveAmp,skyMat,envSkyMat,SKYU}=(()=>{
+const {Fn,If,Loop,uniform,uniformArray,texture,float,vec2,vec3,dot,fract,floor,mix,clamp,max,pow,exp,sin,sqrt,length,normalize,step,atan,acos,dFdx,dFdy,positionLocal}=TSL;
 const U={ // shared uniforms (same names and .value API as before)
   uTime:uniform(0),uSunDir:uniform(new THREE.Vector3(0,1,0)),uZenith:uniform(new THREE.Color()),uHorizon:uniform(new THREE.Color()),
   uGlow:uniform(new THREE.Color()),uSunDisc:uniform(new THREE.Color()),uCloud:uniform(new THREE.Color()),uStars:uniform(0),
@@ -403,19 +403,31 @@ const starLayer=Fn(([d,sc,th])=>{const p=d.mul(sc),ip=floor(p),fp=fract(p).sub(.
   const o=vec3(hash31(ip.add(3.1)),hash31(ip.add(7.7)),hash31(ip.add(11.3))).sub(.5);const dist=length(fp.sub(o.mul(.6)));
   const tw=sin(U.uTime.mul(h.mul(5).add(2)).add(h.mul(90))).mul(.25).add(.75);
   return step(th,h).mul(sstep(.2,0,dist)).mul(fract(h.mul(91.7)).mul(.65).add(.35)).mul(tw);}); // inlined (uses a uniform)
-const skyColor=Fn(()=>{
+/* Photographed skies (Poly Haven HDRIs, see assets/sky). Two are on the GPU at a time and cross-fade as the sun
+   moves; each is turned so its own sun direction matches the game's sun, and scaled to the light level of the moment. */
+const blank=new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1);blank.magFilter=blank.minFilter=THREE.LinearFilter;blank.needsUpdate=true;
+// each shader that shows the sky gets its own texture lookups (shared ones lose their sampler in this Three.js
+// version); they are listed here so a sky swap reaches all of them
+const skyLookups={A:[],B:[]},skyCurrent={A:blank,B:blank}; // shaders compiled later start from the current sky
+const lookSky=(slot,uvq,gx,gy)=>{const t=texture(skyCurrent[slot],uvq),g=t.grad(gx,gy);skyLookups[slot].push(t,g);return g;};
+const SKYU={setTex:(slot,tex)=>{skyCurrent[slot]=tex;for(const n of skyLookups[slot])n.value=tex;},mix:uniform(1),rotA:uniform(0),rotB:uniform(0),gainA:uniform(0),gainB:uniform(0),lightA:uniform(0),lightB:uniform(0),hdri:uniform(0)};
+const skyHDR=(d,forLight)=>Fn(()=>{ // forLight: the brightness the island is lit with, rather than the brightness you see
+  const phi=atan(d.z,d.x),th=acos(clamp(d.y,0,1)),v=float(1).sub(th.div(Math.PI/2));
+  // texture gradients worked out from the view direction, so there is no seam where the panorama wraps around
+  const dx=dFdx(d),dy=dFdy(d),r2=max(d.x.mul(d.x).add(d.z.mul(d.z)),1e-6),sn=max(sqrt(float(1).sub(d.y.mul(d.y))),1e-3);
+  const gx=vec2(d.x.mul(dx.z).sub(d.z.mul(dx.x)).div(r2).div(2*Math.PI),dx.y.div(sn).div(Math.PI/2));
+  const gy=vec2(d.x.mul(dy.z).sub(d.z.mul(dy.x)).div(r2).div(2*Math.PI),dy.y.div(sn).div(Math.PI/2));
+  const uvA=vec2(fract(phi.add(SKYU.rotA).div(2*Math.PI).add(.5)),v),uvB=vec2(fract(phi.add(SKYU.rotB).div(2*Math.PI).add(.5)),v);
+  const a=lookSky('A',uvA,gx,gy).rgb.mul(forLight?SKYU.lightA:SKYU.gainA),b=lookSky('B',uvB,gx,gy).rgb.mul(forLight?SKYU.lightB:SKYU.gainB);
+  return mix(b,a,SKYU.mix);
+})();
+// sky radiance without stars or sun disc, for reflections and the distant haze
+const skyRad=(d)=>grey(mix(skyBase(d),skyHDR(d,false),SKYU.hdri));
+const skyColor=(withSun)=>Fn(()=>{
   const d=normalize(positionLocal).toVar();
-  const c=grey(skyBase(d)).toVar();const sd=dot(d,U.uSunDir);
-  // stars and Milky Way
-  If(U.uStars.greaterThan(.001).and(d.y.greaterThan(-.02)),()=>{
-    const mn=normalize(vec3(.42,.28,.86)),bq=dot(d,mn).div(.2),band=exp(bq.mul(bq).negate());
-    const dust=fbmN(d.xy.mul(5).add(d.z.mul(3)));
-    const s=starLayer(d,110,float(.988).sub(band.mul(.03))).add(starLayer(d,230,float(.984).sub(band.mul(.05))).mul(.5));
-    const mw=vec3(.02,.022,.032).mul(band).mul(dust.mul(1.4).add(.3)).mul(sstep(.3,.75,dust.add(band.mul(.35))));
-    c.addAssign(vec3(1,.96,.9).mul(s).mul(1.6).add(mw).mul(U.uStars).mul(sstep(-.02,.12,d.y)));
-  });
-  // trade-wind clouds
-  If(d.y.greaterThan(0),()=>{
+  const c=skyBase(d).toVar();const sd=dot(d,U.uSunDir);
+  // computed trade-wind clouds, only needed while the photographed sky is not fully shown (night)
+  If(d.y.greaterThan(0).and(SKYU.hdri.lessThan(.999)),()=>{
     const p=d.xz.div(d.y.add(.12)).mul(1.25).add(vec2(U.uTime.mul(.004),U.uTime.mul(.0015)));
     const n=fbmN(p).add(fbmN(p.mul(3.1).add(4)).mul(.25));
     const a=sstep(float(.62).sub(U.uCover.mul(.5)),float(.92).sub(U.uCover.mul(.45)),n).mul(sstep(0,.1,d.y)).mul(sstep(1,float(.35).sub(U.uCover.mul(.35)),d.y));
@@ -423,20 +435,34 @@ const skyColor=Fn(()=>{
     const cc=U.uCloud.mul(pow(ps,3).mul(.9).add(.55)).add(U.uGlow.mul(pow(ps,8)).mul(.5)).mul(mix(1,.5,U.uCover));
     c.assign(mix(c,cc,a.mul(.82)));
   });
-  // sun disc
-  c.addAssign(U.uSunDisc.mul(sstep(Math.cos(.0165),Math.cos(.0145),sd)).mul(sstep(-.004,.004,d.y)));
-  // green flash
-  const fd=dot(d,U.uFlashDir),fc=sstep(Math.cos(.036),Math.cos(.012),fd);
-  c.assign(mix(c,vec3(.05,1.7,.42),U.uFlash.mul(fc).mul(.95)).add(vec3(.01,.5,.13).mul(U.uFlash).mul(sstep(Math.cos(.17),Math.cos(.03),fd))));
+  c.assign(grey(mix(c,skyHDR(d,!withSun),SKYU.hdri)));
+  // stars and Milky Way
+  If(U.uStars.greaterThan(.001).and(d.y.greaterThan(-.02)),()=>{
+    const mn=normalize(vec3(.42,.28,.86)),bq=dot(d,mn).div(.2),band=exp(bq.mul(bq).negate());
+    const dust=fbmN(d.xy.mul(5).add(d.z.mul(3)));
+    const s=starLayer(d,110,float(.988).sub(band.mul(.03))).add(starLayer(d,230,float(.984).sub(band.mul(.05))).mul(.5));
+    const mw=vec3(.02,.022,.032).mul(band).mul(dust.mul(1.4).add(.3)).mul(sstep(.3,.75,dust.add(band.mul(.35))));
+    c.addAssign(vec3(1,.96,.9).mul(s).mul(1.6).add(mw).mul(U.uStars).mul(sstep(-.02,.12,d.y)).mul(float(1).sub(U.uCover)));
+  });
+  if(withSun){
+    // sun disc
+    c.addAssign(U.uSunDisc.mul(sstep(Math.cos(.0165),Math.cos(.0145),sd)).mul(sstep(-.004,.004,d.y)));
+    // green flash
+    const fd=dot(d,U.uFlashDir),fc=sstep(Math.cos(.036),Math.cos(.012),fd);
+    c.assign(mix(c,vec3(.05,1.7,.42),U.uFlash.mul(fc).mul(.95)).add(vec3(.01,.5,.13).mul(U.uFlash).mul(sstep(Math.cos(.17),Math.cos(.03),fd))));
+  }
   return c;
 });
 const skyMat=new THREE.MeshBasicNodeMaterial({side:THREE.BackSide,depthWrite:false,fog:false});
-skyMat.colorNode=skyColor();
-return {U,uRipplesNode,sstep,hash21,vn,fbmN,grey,skyBase,wavePh,waveAmp,skyMat};
+skyMat.colorNode=skyColor(true)();
+// the sky that lights the island: no sun disc (the sun's light comes from the sun lamp)
+const envSkyMat=new THREE.MeshBasicNodeMaterial({side:THREE.BackSide,depthWrite:false,fog:false});
+envSkyMat.colorNode=skyColor(false)();
+return {U,uRipplesNode,sstep,hash21,vn,fbmN,grey,skyBase,skyRad,wavePh,waveAmp,skyMat,envSkyMat,SKYU};
 })();
 const sky=new THREE.Mesh(new THREE.SphereGeometry(4800,48,24),skyMat);
 sky.frustumCulled=false; sky.renderOrder=-10; scene.add(sky);
-const envScene=new THREE.Scene(); envScene.add(new THREE.Mesh(new THREE.SphereGeometry(100,32,16),skyMat));
+const envScene=new THREE.Scene(); envScene.add(new THREE.Mesh(new THREE.SphereGeometry(100,32,16),envSkyMat));
 const pmrem=new THREE.PMREMGenerator(renderer); let envRT=null;
 scene.environmentIntensity=.55;
 
@@ -553,7 +579,7 @@ const waterMat=new THREE.MeshBasicNodeMaterial({transparent:true,depthWrite:fals
     const Rf0=reflect(V.negate(),N),Rf=vec3(Rf0.x,abs(Rf0.y),Rf0.z);
     const F=float(.02).add(pow(float(1).sub(max(dot(N,V),0)),5).mul(.98));
     const body=mix(vec3(.07,.50,.47),vec3(.006,.07,.17),float(1).sub(exp(max(depth,0).mul(-.3)))).mul(U.uDay);
-    const refl=grey(skyBase(Rf)),sr=max(dot(Rf,U.uSunDir),0),far=sstep(50,600,dist);
+    const refl=skyRad(Rf),sr=max(dot(Rf,U.uSunDir),0),far=sstep(50,600,dist);
     const col=mix(body,refl,F).add(U.uSunDisc.mul(pow(sr,420).mul(.2).add(pow(sr,mix(36,90,far)).mul(mix(.012,.05,far))))).toVar();
     const alpha=max(clamp(float(1).sub(exp(max(depth,0).mul(-1.5))),0,1),F).toVar();
     const bio=vec3(.02,.36,1);
@@ -572,7 +598,7 @@ const waterMat=new THREE.MeshBasicNodeMaterial({transparent:true,depthWrite:fals
         If(age.greaterThan(0).and(age.lessThan(5)),()=>{const r=distance(p,rp.xy),k=r.sub(age.mul(.9)).div(.12);
           col.addAssign(bio.mul(U.uBio).mul(exp(k.mul(k).negate()).add(exp(r.mul(r).mul(-3)).mul(.6))).mul(exp(age.mul(-1.1))).mul(4));});});
     });
-    const hz=grey(skyBase(normalize(vec3(V.x.negate(),.015,V.z.negate()))));
+    const hz=skyRad(normalize(vec3(V.x.negate(),.015,V.z.negate())));
     col.assign(mix(col,hz,sstep(500,4300,dist).mul(.92)));
     return vec4(col,alpha);
   })();
@@ -884,6 +910,43 @@ function elevAt(s){
   return lerp(-12,-18,(s-.8)/.2);
 }
 let envElev=99;
+/* ───────── photographed skies: loading, choosing and blending ─────────
+   assets/sky/skies.json lists each sky with the range of sun elevations it covers (degrees), where its sun is
+   (sunU, across the panorama), and how bright its sky is (Esky), so it can be scaled to the light of the moment. */
+const SKIES=await fetch('assets/sky/skies.json').then(r=>r.ok?r.json():{skies:[]}).then(j=>j.skies||[]).catch(()=>[]);
+const SKY_FADE=1.5,SKY_K=.45; // half-width of a cross-fade, degrees; overall sky brightness
+const maxTex=(()=>{try{const b=renderer.backend;return b.isWebGPUBackend?b.device.limits.maxTextureDimension2D:b.gl.getParameter(b.gl.MAX_TEXTURE_SIZE);}catch(e){return 4096;}})();
+const skyLowRes=maxTex<8192||(navigator.deviceMemory||8)<=4;
+const skyTex=new Map();
+function skyTexture(sk){
+  let e=skyTex.get(sk.name);
+  if(!e){e={tex:null};skyTex.set(sk.name,e);
+    fetch('assets/sky/'+sk.name+'.jpg').then(r=>r.blob())
+      .then(b=>createImageBitmap(b,{imageOrientation:'flipY',...(skyLowRes?{resizeWidth:4096,resizeHeight:1024,resizeQuality:'high'}:{})}))
+      .then(bmp=>{if(skyTex.get(sk.name)!==e){bmp.close&&bmp.close();return;}
+        const t=new THREE.Texture(bmp);t.flipY=false;t.colorSpace=THREE.SRGBColorSpace;t.wrapS=THREE.RepeatWrapping;t.wrapT=THREE.ClampToEdgeWrapping;
+        t.anisotropy=8;t.generateMipmaps=true;t.minFilter=THREE.LinearMipmapLinearFilter;t.needsUpdate=true;e.tex=t;applyTime(true);})
+      .catch(err=>console.warn('Sky image '+sk.name+' did not load:',err));}
+  return e.tex;
+}
+function pickSky(e,hI){
+  const n=SKIES.length;if(!n){SKYU.hdri.value=0;return 0;}
+  let A=SKIES.findIndex(sk=>e>=sk.lo);if(A<0)A=n-1;let B=A,t=1;
+  for(let k=0;k<n-1;k++){const b=SKIES[k].lo;if(Math.abs(e-b)<SKY_FADE){A=k;B=k+1;t=smooth(b-SKY_FADE,b+SKY_FADE,e);break;}}
+  // fetch the skies that are coming up, and let go of ones far from the current light
+  SKIES.forEach((sk,i)=>{const dist=e>sk.hi?e-sk.hi:e<sk.lo?sk.lo-e:0;
+    if(dist<4||i===A||i===B)skyTexture(sk);
+    else if(dist>8&&skyTex.has(sk.name)){const c=skyTex.get(sk.name);if(c.tex)c.tex.dispose();skyTex.delete(sk.name);}});
+  let ta=skyTexture(SKIES[A]),tb=skyTexture(SKIES[B]);
+  if(!ta&&!tb){SKYU.hdri.value=0;return 0;}
+  if(!ta){A=B;ta=tb;t=0;}if(!tb){B=A;tb=ta;t=1;}
+  const phiSun=Math.atan2(U.uSunDir.value.z,U.uSunDir.value.x),K=Math.PI*hI*SKY_K;
+  const set=(sk,slot)=>{SKYU.setTex(slot,skyTex.get(sk.name).tex);SKYU['rot'+slot].value=(sk.sunU-.5)*Math.PI*2-phiSun;
+    const light=K*sk.scale/sk.Esky;SKYU['light'+slot].value=light;SKYU['gain'+slot].value=light*(sk.look||1);};
+  set(SKIES[A],'A');set(SKIES[B],'B');SKYU.mix.value=t;
+  const last=SKIES[n-1].lo,w=smooth(last-SKY_FADE,last+SKY_FADE,e); // below the last sky, the computed night sky takes over
+  SKYU.hdri.value=w;return w;
+}
 function applyTime(force){
   let e,hx=SUN_AZ.x,hz=SUN_AZ.y;
   if(W.clock.phase==='day'){const u=W.clock.dayT,pk=season()?50:66;e=14+(pk-14)*Math.sin(Math.PI*u);const ph=(165+(48-165)*u)*DEG;hx=-Math.cos(ph);hz=Math.sin(ph);}else e=elevAt(evening.s);
@@ -898,7 +961,9 @@ function applyTime(force){
   const fe=.45*DEG; U.uFlashDir.value.set(SUN_AZ.x*Math.cos(fe),Math.sin(fe),SUN_AZ.y*Math.cos(fe));
   U.uBio.value=smooth(.86,.96,evening.s);
   sun.color.setRGB(...sc); sun.intensity=sI; sunBase=sI; sun.castShadow=settings.shadows&&sI>.05;
-  hemi.color.setRGB(...zen).lerp(new THREE.Color(...hor),.55); hemi.groundColor.setRGB(hor[0]*.5+.1*day,hor[1]*.45+.08*day,hor[2]*.4+.05*day); hemi.intensity=hI;
+  hemi.color.setRGB(...zen).lerp(new THREE.Color(...hor),.55); hemi.groundColor.setRGB(hor[0]*.5+.1*day,hor[1]*.45+.08*day,hor[2]*.4+.05*day);
+  const hw=pickSky(e,hI); // with a photographed sky, the sky itself lights the island instead of the flat hemisphere light
+  hemi.intensity=hI*(1-hw); scene.environmentIntensity=.55+.45*hw;
   renderer.toneMappingExposure=expo;
   farMat.color.setRGB(...hor).lerp(new THREE.Color(...zen),.45).multiplyScalar(.8);
   if(force)sun.shadow.needsUpdate=true;

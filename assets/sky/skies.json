@@ -1,0 +1,76 @@
+{
+ "source": "Poly Haven (CC0), polyhaven.com",
+ "skies": [
+  {
+   "name": "day",
+   "src": "kloofendal_48d_partly_cloudy_puresky",
+   "lo": 30,
+   "hi": 90,
+   "sunU": 0.59528,
+   "sunEl": 47.88,
+   "scale": 3.997524,
+   "Esky": 1.72511,
+   "Esun": 4.1262,
+   "w": 8192,
+   "h": 2048,
+   "look": 1.0
+  },
+  {
+   "name": "golden",
+   "src": "hilly_terrain_01_puresky",
+   "lo": 9,
+   "hi": 30,
+   "sunU": 0.59979,
+   "sunEl": 11.4,
+   "scale": 5.993389,
+   "Esky": 2.13543,
+   "Esun": 2.0586,
+   "w": 8192,
+   "h": 2048,
+   "look": 0.4
+  },
+  {
+   "name": "sunset",
+   "src": "syferfontein_1d_clear_puresky",
+   "lo": -0.6,
+   "hi": 9,
+   "sunU": 0.59991,
+   "sunEl": 0.99,
+   "scale": 3.637549,
+   "Esky": 1.19707,
+   "Esun": 2.8994,
+   "w": 8192,
+   "h": 2048,
+   "look": 0.45
+  },
+  {
+   "name": "afterglow",
+   "src": "rosendal_park_sunset_puresky",
+   "lo": -5,
+   "hi": -0.6,
+   "sunU": 0.59955,
+   "sunEl": 0.02,
+   "scale": 17.130354,
+   "Esky": 3.05053,
+   "Esun": 0.0,
+   "w": 8192,
+   "h": 2048,
+   "look": 0.65
+  },
+  {
+   "name": "dusk",
+   "src": "qwantani_dusk_2_puresky",
+   "lo": -11,
+   "hi": -5,
+   "sunU": 0.6037,
+   "sunEl": 11.54,
+   "scale": 5.739132,
+   "Esky": 3.54452,
+   "Esun": 0.0,
+   "w": 8192,
+   "h": 2048,
+   "look": 0.8
+  }
+ ],
+ "note": "look: exposure of the visible sky relative to the light it casts (hand-tuned per photo)"
+}
