@@ -368,6 +368,18 @@ const radioTex=canvasTex(256,128,(g,w,h)=>{g.fillStyle='#d9cfb8';g.fillRect(0,0,
   g.fillStyle='#f4eedd';g.fillRect(166,30,76,30);g.strokeStyle='#8a2f22';g.lineWidth=2;g.beginPath();g.moveTo(210,30);g.lineTo(210,60);g.stroke();
   g.fillStyle='#3a342c';for(let x=170;x<240;x+=6)g.fillRect(x,52,1,6);g.beginPath();g.arc(184,86,11,0,7);g.arc(224,86,11,0,7);g.fill();});
 
+/* ───────────────────────── scanned materials ─────────────────────────
+   assets/tex/<name>_albedo.jpg: colour (sRGB). <name>_nr.jpg: normal X,Y and roughness (linear). From Poly Haven, CC0. */
+const texLoader=new THREE.TextureLoader(),pbrCache={};
+function pbrTex(name){
+  if(!pbrCache[name]){const a=texLoader.load('assets/tex/'+name+'_albedo.jpg'),n=texLoader.load('assets/tex/'+name+'_nr.jpg');
+    a.colorSpace=THREE.SRGBColorSpace;for(const t of [a,n]){t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=8;}pbrCache[name]={a,n};}
+  return pbrCache[name];
+}
+// normal from a <name>_nr texture sample, in the mesh's own UV tangent frame
+function nrNormal(nr,scale=1){const {vec2,vec3,float,sqrt,max,dot,normalMap}=TSL;const t=nr.rg.mul(2).sub(1);
+  return normalMap(vec3(nr.r,nr.g,sqrt(max(float(1).sub(dot(t,t)),0)).mul(.5).add(.5)),vec2(scale));}
+
 /* ───────────────────────── sky ───────────────────────── */
 /* Shaders are written in TSL, Three.js's shading language. The same code compiles to WGSL for
    WebGPU and to GLSL for the WebGL 2 fallback, so both renderers draw the same island. */
@@ -490,39 +502,30 @@ const SIZE=320,SEG=320;
   }
   g.setAttribute('aMat',new THREE.BufferAttribute(am,1));g.setAttribute('color',new THREE.BufferAttribute(col,3)); g.computeVertexNormals();
   const tex=grainTex.clone(); tex.repeat.set(90,90); tex.needsUpdate=true;
-  const mat=new THREE.MeshStandardNodeMaterial({vertexColors:true,map:tex,bumpMap:tex,bumpScale:1.2,roughness:.94,metalness:0});
+  const mat=new THREE.MeshStandardNodeMaterial({roughness:1,metalness:0});
   {
-    const {Fn,If,attribute,float,vec2,vec3,vec4,dot,floor,mix,clamp,max,pow,sin,cos,normalize,length,reflect,abs,step,positionWorld,positionView,cameraPosition,cameraViewMatrix,diffuseColor,materialColor,materialRoughness,materialNormal}=TSL;
-    const vMat=attribute('aMat','float'),wp=positionWorld;
-    const sandM=float(1).sub(sstep(0,.5,vMat)),lavaM=sstep(1.3,1.9,vMat);
-    const damp=sstep(.36,.2,wp.y);
-    // the costly noise only runs where it shows: sand detail on sand, lava detail on lava
-    mat.colorNode=Fn(()=>{
-      const k=mix(1,.58,damp.mul(sandM)).toVar();
-      If(sandM.greaterThan(.001),()=>{k.mulAssign(mix(1,fbmN(wp.xz.mul(.9)).mul(.28).add(.86),sandM));});
-      If(lavaM.greaterThan(.001),()=>{k.mulAssign(mix(1,fbmN(wp.xz.mul(5)).mul(.7).add(.65),lavaM));});
-      return vec4(materialColor.rgb.mul(k),1);
-    })();
-    mat.roughnessNode=Fn(()=>{
-      const ph0=U.uTime.mul(.7).add(vn(wp.xz.mul(.045)).mul(7));
-      const gloss=clamp(sstep(.25,.07,wp.y).mul(sin(ph0.sub(1.3)).mul(.5).add(.5)),0,1);
-      const r=mix(materialRoughness,.24,gloss.mul(sandM).mul(.85)).toVar();
-      If(lavaM.greaterThan(.001),()=>{const lv=fbmN(wp.xz.mul(1.3));r.assign(mix(r,mix(.32,.92,sstep(.38,.62,lv)),lavaM));});
-      return r;
-    })();
-    mat.normalNode=Fn(()=>{
-      const dC=length(positionView),q=wp.xz;
-      const dn=vec3(0).toVar();
-      If(dC.lessThan(13).and(sandM.greaterThan(.001)),()=>{ // sand ripples close to the camera
-        const w=vn(q.mul(.3)).mul(6),fade=float(1).sub(sstep(3,13,dC));
-        const r1=cos(dot(q,vec2(6.1,3.4)).add(w)).mul(.07).mul(fade).mul(sandM).mul(float(1).sub(damp));
-        dn.assign(vec3(r1.mul(.87),0,r1.mul(.49)));
-      });
-      If(dC.lessThan(70).and(lavaM.greaterThan(.001)),()=>{ // rough lava
-        const qq=q.mul(2.4).add(3),l0=fbmN(qq);
-        dn.addAssign(vec3(l0.sub(fbmN(qq.add(vec2(.2,0)))),0,l0.sub(fbmN(qq.add(vec2(0,.2))))).mul(3.2).mul(lavaM).mul(float(1).sub(sstep(20,70,dC))));
-      });
-      return normalize(materialNormal.add(cameraViewMatrix.mul(vec4(dn,0)).xyz));
+    const {Fn,If,attribute,texture,float,vec2,vec3,vec4,dot,floor,mix,clamp,max,pow,sin,sqrt,normalize,length,reflect,abs,step,cross,positionWorld,cameraPosition,cameraViewMatrix,normalWorldGeometry,diffuseColor}=TSL;
+    const vMat=attribute('aMat','float'),vCol=attribute('color','vec3'),wp=positionWorld;
+    // four scanned materials blended by the island's masks: dry sand, wet sand at the waterline, grassy ground, lava rock
+    const lavaM=sstep(1.3,1.9,vMat),grassM=sstep(0,.5,vMat).mul(float(1).sub(lavaM)),sandM=max(float(1).sub(grassM).sub(lavaM),0);
+    const damp=sstep(.36,.2,wp.y),wetM=sandM.mul(damp),dryM=sandM.mul(float(1).sub(damp));
+    // [weight, material, metres per repeat, albedo gain (the scanned sand is grey temperate sand; coral sand is paler)]
+    const LAYERS=[[dryM,'sand',3.2,1.55],[wetM,'wetsand',3.2,1.1],[grassM,'grass',2.6,1],[lavaM,'rock',3.6,1]].map(([w,n,sc,g])=>({w,t:pbrTex(n),sc,g}));
+    // each layer is only sampled where it shows
+    const blend=(pick,init)=>Fn(()=>{const acc=init.toVar();
+      for(const L of LAYERS)If(L.w.greaterThan(.002),()=>{acc.addAssign(pick(L,wp.xz.div(L.sc)).mul(L.w));});return acc;})();
+    const macro=vn(wp.xz.mul(.045)).mul(.3).add(.85); // breaks up tiling over large areas
+    const tint=mix(vec3(1),vCol.div(max(dot(vCol,vec3(.2126,.7152,.0722)),.05)),.22); // keep the island's dry/green and sand-warmth variation
+    mat.colorNode=vec4(blend((L,q)=>texture(L.t.a,q).rgb.mul(L.g),vec3(0)).mul(tint).mul(macro).mul(mix(1,.82,wetM)),1);
+    const nr=blend((L,q)=>texture(L.t.n,q).rgb,vec3(0));
+    const ph0=U.uTime.mul(.7).add(vn(wp.xz.mul(.045)).mul(7));
+    const gloss=clamp(sstep(.25,.07,wp.y).mul(sin(ph0.sub(1.3)).mul(.5).add(.5)),0,1); // the film of water left by each wave
+    mat.roughnessNode=mix(nr.z,.12,gloss.mul(sandM).mul(.9)).mul(mix(1,.7,wetM));
+    mat.normalNode=Fn(()=>{ // tangent space follows the ground: X along world X, Y along world Z
+      const N=normalWorldGeometry,T=normalize(vec3(1,0,0).sub(N.mul(N.x))),B=cross(T,N);
+      const t=nr.xy.mul(2).sub(1),tz=sqrt(max(float(1).sub(dot(t,t)),0));
+      const n=normalize(T.mul(t.x).add(B.mul(t.y)).add(N.mul(tz)));
+      return normalize(cameraViewMatrix.mul(vec4(n,0)).xyz);
     })();
     mat.emissiveNode=Fn(()=>{
       const e=vec3(0).toVar(),dist=length(cameraPosition.sub(wp));
@@ -530,7 +533,7 @@ const SIZE=320,SEG=320;
         const Vw=normalize(cameraPosition.sub(wp)),cell=floor(wp.xz.mul(240)),hs=hash21(cell);
         const gn=normalize(vec3(hash21(cell.add(3)).sub(.5),.55,hash21(cell.add(7)).sub(.5)));
         const gl=step(.982,hs).mul(pow(max(dot(reflect(Vw.negate(),gn),U.uSunDir),0),30)).mul(float(1).sub(sstep(2,16,dist)));
-        e.addAssign(U.uSunDisc.mul(gl).mul(.035).mul(sandM).mul(float(1).sub(damp)));
+        e.addAssign(U.uSunDisc.mul(gl).mul(.035).mul(dryM));
       });
       const uw=sstep(0,-.3,wp.y).mul(sstep(-3.5,-.4,wp.y));
       If(uw.greaterThan(0),()=>{ // caustics in the shallows
@@ -643,7 +646,10 @@ const windU=TSL.uniform(0);
 const palmSpots=[[5.2,23.4,8.6],[14.5,24.9,7.6],[14.7,28.9,8.2],[-14,31,9],[-23,22,7.4],[21,35,8.4],[29,17,9.2],[-7,13,8],[19,-3,7],[-30,-9,8.8],[3,-34,9.4],[31,-22,7.8],[-12,-28,8.3]];
 const palms=[];
 {
-  const trunkMat=new THREE.MeshStandardMaterial({map:barkTex,normalMap:barkNorm,normalScale:new THREE.Vector2(1.6,1.6),roughness:.9});
+  const trunkMat=new THREE.MeshStandardNodeMaterial({roughness:.9});
+  {const {texture,uv,vec2,vec3,dot,mix}=TSL;const bk=pbrTex('bark'),q=uv().mul(vec2(2,.8)),nr=texture(bk.n,q);
+   const detail=dot(texture(bk.a,q).rgb,vec3(.2126,.7152,.0722)).div(.125); // the scan's light and shade, around 1 on average
+   trunkMat.colorNode=texture(barkTex,uv()).rgb.mul(mix(1,detail,.7));trunkMat.roughnessNode=nr.b.mul(.3).add(.68);trunkMat.normalNode=nrNormal(nr,1.4);}
   // one frond, pointing along +Z
   const P=[],C=[],UV=[],L=3.3,NL=30,a=new THREE.Color(),cb=srgb(.12,.27,.07),ct=srgb(.33,.43,.12),cr=srgb(.45,.47,.2);
   const rach=u=>new THREE.Vector3(0,L*(.42*u-.8*u*u),L*(u-.14*u*u));
@@ -749,7 +755,15 @@ function addItem(o){o.group.userData.item=o;items.push(o);interact.push(o.group)
 
 const lanai=new THREE.Group(); lanai.position.set(LANAI.x,DECK_Y,LANAI.z); scene.add(lanai);
 {
-  const n=26,pw=LANAI.d/n,pg=new THREE.BoxGeometry(LANAI.w,.035,pw-.012),planks=new THREE.InstancedMesh(pg,woodMat,n),d=new THREE.Object3D(),c=new THREE.Color();
+  const n=26,pw=LANAI.d/n,pg=new THREE.BoxGeometry(LANAI.w,.035,pw-.012),d=new THREE.Object3D(),c=new THREE.Color();
+  const deckMat=new THREE.MeshStandardNodeMaterial({roughness:1});
+  {const {texture,vec2,vec3,vec4,float,floor,fract,mod,sqrt,max,dot,normalize,cross,positionLocal,normalWorldGeometry,cameraViewMatrix}=TSL;const t=pbrTex('planks');
+   const z=positionLocal.z.add(LANAI.d/2).div(pw),idx=floor(z); // board number, and position across the board
+   const q=vec2(fract(z).mul(.84).add(.08).add(mod(idx,6)).div(6),positionLocal.x.div(1.25).add(idx.mul(.37))); // texture planks run along v
+   const nr=texture(t.n,q);deckMat.colorNode=texture(t.a,q).rgb.mul(2.6);deckMat.roughnessNode=nr.b;
+   deckMat.normalNode=(()=>{const N=normalWorldGeometry,T=normalize(vec3(0,0,1).sub(N.mul(N.z))),B=cross(N,T),tt=nr.rg.mul(2).sub(1);
+     return normalize(cameraViewMatrix.mul(vec4(normalize(T.mul(tt.x).add(B.mul(tt.y)).add(N.mul(sqrt(max(float(1).sub(dot(tt,tt)),0))))),0)).xyz);})();}
+  const planks=new THREE.InstancedMesh(pg,deckMat,n);
   for(let i=0;i<n;i++){d.position.set((R()-.5)*.02,-.0175,-LANAI.d/2+pw*(i+.5));d.updateMatrix();planks.setMatrixAt(i,d.matrix);const v=.82+R()*.3;planks.setColorAt(i,c.setRGB(v,v*.98,v*.95));}
   planks.castShadow=planks.receiveShadow=true;lanai.add(planks);
   for(const x of[-2.3,-.8,.8,2.3])box(lanai,.09,.3,LANAI.d-.1,woodDark,x,-.19,0);

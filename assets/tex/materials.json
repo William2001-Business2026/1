@@ -1,0 +1,29 @@
+{
+ "source": "Poly Haven (CC0), polyhaven.com",
+ "materials": {
+  "sand": {
+   "src": "aerial_beach_01",
+   "res": 2048
+  },
+  "wetsand": {
+   "src": "damp_beach_sand",
+   "res": 2048
+  },
+  "grass": {
+   "src": "leafy_grass",
+   "res": 2048
+  },
+  "rock": {
+   "src": "dark_rock",
+   "res": 2048
+  },
+  "planks": {
+   "src": "weathered_planks",
+   "res": 2048
+  },
+  "bark": {
+   "src": "bark_willow_02",
+   "res": 2048
+  }
+ }
+}
