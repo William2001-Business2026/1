@@ -84,6 +84,7 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
 | `assets/tex/` | Scanned 2K materials: `<name>_albedo.jpg` and `<name>_nr.jpg` (normal X/Y + roughness) |
 | `assets/models/` | Scanned models as compressed GLB |
 | `vendor/three/` | Bundled copy of Three.js 0.186.1, WebGPU build (MIT licence, see `vendor/three/LICENSE`) |
+| `vendor/rapier/` | Rapier 0.19.3 physics engine, WebAssembly embedded (Apache-2.0) |
 | `vendor/supabase/` | Bundled copy of supabase-js 2.119.0 (MIT licence) |
 | `vendor/fonts/` | Pacifico and Quicksand fonts (SIL Open Font License, licences included) |
 
@@ -96,6 +97,7 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
 - **Plants:** scanned fern clumps and anthuriums replace the leaf-card shrubs and lean and flutter in the same wind as the grass.
 - **Props:** scanned binoculars, oil lantern, rocking chair, conch shells, lava stones, bananas, rain barrel, storage crate, clay pot and basket replace the shape-built versions, fitted to the same size so everything works as before.
 - **Animals:** rigged, textured hens, a rooster and a goat. Each keeps its wandering, pecking, grazing and feeding behaviour; the hen plays its own walk-and-peck animation, and the rooster's and goat's legs swing as they walk.
+- **Physics:** [Rapier](https://rapier.rs) rigid bodies. Things you drop or throw (resources, the coconut, binoculars, ukulele) fall, bounce, tumble and roll on the terrain, deck, rocks, palm trunks and your buildings; coconuts and wood float, stones sink; walking into loose items pushes them. Bodies are removed once things come to rest. The cup and lantern are still set down upright, and buildings keep their own support rules.
 - **Shadows:** dynamic sun shadows. High uses cascaded shadow maps (three 2048 px maps out to 140 m): sharp up close and still present in the distance, plus lantern shadows. Medium and Low use one map that follows you.
 
 ## Asset credits

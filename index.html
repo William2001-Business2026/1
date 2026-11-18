@@ -197,6 +197,11 @@ const srgb=(r,g,b)=>new THREE.Color().setRGB(r,g,b,THREE.SRGBColorSpace);
 const settings={quality:'auto',showFps:false,view:'third',scale:1,shadows:true,post:true,fov:70,master:.8,amb:.8,music:.5,sens:1,invertY:false,bob:true,photo:false};
 try{const saved=JSON.parse(localStorage.getItem('halemoku')||'{}');if(!saved.v)delete saved.quality;Object.assign(settings,saved);}catch(e){}
 settings.v=2;
+// physics state (the Rapier world itself is set up near the end of this script); declared early because loading a save already touches it
+const PHYS={ready:false,R:null,world:null,bodies:new Map(),acc:0,pieceCols:[],me:null};
+const PHYS_KINDS=new Set(['coco','bino','uke']);
+const FLOATS=new Set(['coconut','log','plank','frond','bamboo','fibre','stick','seaweed','cocomeat','basket','crate','barrel','shellstring','mat','fishtrap']);
+
 settings.photo=false;
 const saveSettings=()=>{try{localStorage.setItem('halemoku',JSON.stringify(settings));}catch(e){}};
 
@@ -790,7 +795,7 @@ const up=new THREE.Vector3(0,1,0),qa=new THREE.Quaternion(),qb=new THREE.Quatern
   while(i<170&&t<40000){t++;const x=-20-R()*52,z=(R()-.5)*110,mk=masks(x,z),h=heightAt(x,z);if(mk.lava<.45||h<-1.2)continue;
     const s=.25+Math.pow(R(),2.2)*1.5;d.position.set(x,h+s*.15,z);d.rotation.set(R()*6,R()*6,R()*6);d.scale.set(s*(1+R()),s,s*(1+R()*.6));d.updateMatrix();rocks.setMatrixAt(i++,d.matrix);
     if(s>.95&&h>.2)colliders.push({x,z,r:s*.9});}
-  rocks.count=i;rocks.castShadow=rocks.receiveShadow=true;scene.add(rocks);
+  rocks.count=i;rocks.castShadow=rocks.receiveShadow=true;scene.add(rocks);scene.userData.rocks=rocks;
   // swap in a scanned boulder (Poly Haven boulder_01, CC0) once it has loaded; the shaped blobs stay until then
   gltfLoader.loadAsync('assets/models/boulder.glb').then(gl=>{let src=null;gl.scene.updateMatrixWorld(true);gl.scene.traverse(o=>{if(o.isMesh&&!src)src=o;});
     const geo=src.geometry.clone();geo.applyMatrix4(src.matrixWorld);geo.center();geo.computeBoundingSphere();const k=1.05/geo.boundingSphere.radius;geo.scale(k,k,k);geo.computeBoundingSphere();
@@ -1220,7 +1225,7 @@ function itemLabel(it){
   return it.name;
 }
 function pickUp(it){
-  if(held)putDown(); if(held)return;
+  if(held)putDown(); if(held)return;physForget(it.group);
   for(const s of slots)if(s.item===it)s.item=null;
   if(it.kind==='lantern')it.hung=false; if(it.kind==='coco')it.fly=false;
   held=it;holdItem(it);heroOneShot('Interact');SFX.pickup();
@@ -1238,6 +1243,9 @@ function putDown(){
   if(gy<.04&&it.kind!=='coco'){toast('Better to set that down on dry ground.',2.5);return;}
   place(_v.set(px,gy+it.restY,pz),it.restRot?[it.restRot[0],Math.random()*6.28,0]:null);
   if(it.restRot)g.rotation.order='YXZ';
+  // the coconut, binoculars and ukulele are let go from the hand and tumble to rest (the cup and lantern are set down upright)
+  if(PHYS_KINDS.has(it.kind)&&player.mode==='walk'){g.position.set(px,player.y+1,pz);
+    if(physDrop(g,{vel:{x:fx*.6,y:0,z:fz*.6},ball:it.kind==='coco'?.12:0,float:it.kind!=='bino'})){if(it.kind==='coco'){it.fly=false;}return;}}
   const sf=surfaceAt(px,pz);if(sf==='water')SFX.splash(.5);else if(sf==='wood')it.kind==='cup'?SFX.clink():SFX.knock();else SFX.step(sf,.8);
   if(it.kind==='coco'){it.fly=true;it.vel.set(0,0,0);}
 }
@@ -1252,7 +1260,8 @@ function useHeld(){
   else if(it.kind==='coco'){
     const f=_fwd.set(0,0,-1).applyQuaternion(camera.quaternion);const from=heroShown();scene.add(it.group);
     if(from)it.group.position.copy(hero.socket.position).addScaledVector(f,.25);else{it.group.position.copy(camera.position).addScaledVector(f,.6);it.group.position.y-=.15;}
-    it.vel.copy(f).multiplyScalar(9.5);it.vel.y+=2.6;it.fly=true;it.wet=false;held=null;noiseBurst(AU.pink,'bandpass',600,.6,.08,.05,.2);
+    it.vel.copy(f).multiplyScalar(9.5);it.vel.y+=2.6;it.fly=true;it.wet=false;held=null;
+    if(physDrop(it.group,{vel:it.vel,ball:.12,float:true}))it.fly=false; // a real rigid body: bounces, rolls downhill, floatsnoiseBurst(AU.pink,'bandpass',600,.6,.08,.05,.2);
   }else if(it.kind==='uke'){SFX.strum(0);sysStrum();}
 }
 function sit(){
@@ -1497,7 +1506,7 @@ function update(dt){
   {const cell=tx+','+tz;if(cell!==perf.shotCell||++perf.shadowTick>=activeGfx().shadowEvery){perf.shotCell=cell;perf.shadowTick=0;sun.shadow.needsUpdate=true;}}
   if(csmOn&&csm)for(const l of csm.lights)l.shadow.autoUpdate=true; // the cascades copied the sun's 'manual update' flag
   lanternLight.shadow.autoUpdate=lanternLight.intensity>.01; // no point redrawing the lantern's six shadow views while it is dark
-  sysUpdate(dt);updateAnimalModels(dt);
+  sysUpdate(dt);updateAnimalModels(dt);physStep(dt);
   scheduleAudio(dt,time);
 }
 function frame(now){
@@ -1673,7 +1682,7 @@ function spawn(kind,x,z,n=1,y){
   const px=new THREE.Mesh(geo.box,proxyMat);px.scale.set(.34,.3,.34);px.position.y=.12;it.g.add(px);
   scene.add(it.g);interact.push(it.g);W.items.push(it);return it;
 }
-function despawn(it){scene.remove(it.g);let i=interact.indexOf(it.g);if(i>=0)interact.splice(i,1);i=W.items.indexOf(it);if(i>=0)W.items.splice(i,1);}
+function despawn(it){physForget(it.g);scene.remove(it.g);let i=interact.indexOf(it.g);if(i>=0)interact.splice(i,1);i=W.items.indexOf(it);if(i>=0)W.items.splice(i,1);}
 const countWorld=k=>W.items.reduce((a,o)=>a+(o.kind===k?o.n:0),0);
 
 /* ───────── what you carry ───────── */
@@ -1756,7 +1765,10 @@ function refreshHand(){handDirty=false;const k=held?null:selKind();if(k===handKi
 function cycleSel(d){if(held)return;const n=W.inv.length;if(!n){W.sel=-1;return;}W.sel=((W.sel+1+d)%(n+1)+(n+1))%(n+1)-1;handDirty=true;build.on=false;}
 function sysDrop(){const k=selKind();if(!k)return;const fx=player.x-Math.sin(player.yaw)*.9,fz=player.z-Math.cos(player.yaw)*.9;
   if(groundAt(fx,fz)<.02&&k!=='fishtrap'){return;}
-  const n=keys.ShiftLeft?W.inv[W.sel].n:1;takeFrom(k,n);spawn(k,fx,fz,n);SFX.step(surfaceAt(fx,fz),.6);}
+  const n=keys.ShiftLeft?W.inv[W.sel].n:1;takeFrom(k,n);const before=W.items.length,it=spawn(k,fx,fz,n);SFX.step(surfaceAt(fx,fz),.6);
+  if(W.items.length>before&&!K[k].place){it.g.position.set(fx,player.y+1,fz); // let go from the hand: it falls, tumbles and comes to rest
+    physDrop(it.g,{vel:{x:-Math.sin(player.yaw)*.7,y:.4,z:-Math.cos(player.yaw)*.7},float:FLOATS.has(k),onRest:g=>{it.x=g.position.x;it.z=g.position.z;
+      const top=g.position.y-groundAt(it.x,it.z);it.y=top>.06?g.position.y:null;}});}}
 
 /* ───────── making things: hold one thing, use it on another ───────── */
 const RECIPES=[
@@ -2434,7 +2446,7 @@ function initAudio2(){
 /* ───────── saving: browser storage twice over, plus a file you can keep ───────── */
 let fileHandle=null,saveT=0;
 function serialize(){return JSON.stringify({v:1,day:W.day,inv:W.inv,sel:W.sel,basket:W.basket,notes:W.notes,flags:W.flags,chick:W.chick,goat:W.goat,buff:W.buff,clock:W.clock,rainIn:W.rainIn,nodes:W.nodes,fires:W.fires,stamp:Date.now(),
-  items:W.items.map(o=>({kind:o.kind,n:o.n,x:+o.x.toFixed(2),z:+o.z.toFixed(2)})),
+  items:W.items.map(o=>({kind:o.kind,n:o.n,x:+o.x.toFixed(2),z:+o.z.toFixed(2),...(o.y!=null?{y:+o.y.toFixed(2)}:{})})),
   plots:W.plots.map(p=>({x:p.x,z:p.z,soil:p.soil,moist:p.moist,crop:p.crop,g:p.g,over:p.over,health:p.health,last:p.last,dry:p.dry,wild:p.wild})),
   pieces:W.pieces.map(p=>({f:p.f,x:p.x,y:p.y,z:p.z,r:p.r,t:p.t,d:p.d}))});}
 function idb(fn){try{const rq=indexedDB.open('halemoku',1);rq.onupgradeneeded=()=>rq.result.createObjectStore('s');rq.onsuccess=()=>{try{fn(rq.result.transaction('s','readwrite').objectStore('s'));}catch(e){}};}catch(e){}}
@@ -2445,7 +2457,7 @@ function loadSave(str){
   [...W.items].forEach(despawn);[...W.plots].forEach(removePlot);[...W.pieces].forEach(p=>removePiece(p,false));
   for(const k of['day','inv','sel','basket','notes','flags','chick','goat','buff','clock','rainIn','nodes','fires'])if(d[k]!=null)W[k]=d[k];
   if(W.buff.until>nowS()+3600)W.buff.until=0;
-  for(const o of d.items||[])if(K[o.kind])spawn(o.kind,o.x,o.z,o.n);
+  for(const o of d.items||[])if(K[o.kind]){const it=spawn(o.kind,o.x,o.z,o.n,o.y);if(o.y!=null)it.y=o.y;}
   for(const p of d.plots||[])if(!p.crop||CROPS[p.crop])addPlot(p);
   for(const p of d.pieces||[])if(FORMS[p.f]){const pc=addPiece(p);if(pc.d.hung)drawHung(pc);}
   const gone=Math.max(0,(Date.now()-(d.stamp||Date.now()))/1000),away=Math.min(gone,8*3600);
@@ -2496,7 +2508,61 @@ function sysUpdate(dt){
 /* ───────────────────────── go ───────────────────────── */
 cupG.position.copy(slots[0].pos);cupG.rotation.y=1;slots[0].item=cup;
 applyTime(true);applyGraphics();
-window.__hm={player,groundAt,surfaceAt,pickUp,cup,lantern,chickens,goat,settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
+window.__hm={player,groundAt,surfaceAt,pickUp,cup,lantern,coco,chickens,goat,PHYS,useHeld,sysDrop,settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
+/* ───────── physics: Rapier (Apache-2.0, vendor/rapier) ─────────
+   Things you let go of or throw become rigid bodies until they come to rest: they fall, bounce, tumble, roll downhill,
+   float (coconuts, wood, fronds) or sink, and your body pushes them as you walk. Once still, the body is removed and the
+   object stays exactly where it stopped, so a quiet island costs nothing. Built structures keep their own support rules.
+   Physics loads in the background; until it is ready, things are placed the old way. */
+import('./vendor/rapier/rapier.mjs').then(async mod=>{
+  const R=mod.default||mod;await R.init();PHYS.R=R;const w=PHYS.world=new R.World({x:0,y:-9.81,z:0});
+  // the island's surface as a 1 m triangle mesh out to 85 m
+  const N=170,half=N/2,v=new Float32Array((N+1)*(N+1)*3),ix=new Uint32Array(N*N*6);let p=0,q=0;
+  for(let j=0;j<=N;j++)for(let i=0;i<=N;i++){const x=i-half,z=j-half;v[p++]=x;v[p++]=heightAt(x,z);v[p++]=z;}
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){const a=j*(N+1)+i,b=a+N+1;ix[q++]=a;ix[q++]=b;ix[q++]=a+1;ix[q++]=a+1;ix[q++]=b;ix[q++]=b+1;}
+  w.createCollider(R.ColliderDesc.trimesh(v,ix).setFriction(.8));
+  w.createCollider(R.ColliderDesc.cuboid(LANAI.w/2,.03,LANAI.d/2).setTranslation(LANAI.x,DECK_Y-.03,LANAI.z).setFriction(.6)); // deck
+  w.createCollider(R.ColliderDesc.cylinder(.02,.36).setTranslation(TABLE.x,TABLE.y+TABLE_TOP-.02,TABLE.z));                      // table top
+  for(const pm of palms){const lx=pm.crown.x-pm.x,lz=pm.crown.z-pm.z;                                                          // leaning trunks
+    for(let t=0;t<=1.001;t+=.2){const k=Math.pow(t,1.8);w.createCollider(R.ColliderDesc.ball(.22).setTranslation(pm.x+lx*k,pm.y-.15+t*pm.H,pm.z+lz*k));}}
+  const rk=scene.userData.rocks,M=new THREE.Matrix4(),P=new THREE.Vector3(),Q=new THREE.Quaternion(),Sc=new THREE.Vector3();
+  if(rk)for(let i=0;i<rk.count;i++){rk.getMatrixAt(i,M);M.decompose(P,Q,Sc);w.createCollider(R.ColliderDesc.ball(.75*Math.min(Sc.x,Sc.y,Sc.z)).setTranslation(P.x,P.y,P.z));}
+  PHYS.me=w.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(player.x,player.y+.85,player.z));         // you
+  w.createCollider(R.ColliderDesc.capsule(.55,.3),PHYS.me);
+  PHYS.ready=true;rebuildPhysPieces();
+}).catch(e=>console.warn('Physics did not start, so things are placed without it:',e));
+function rebuildPhysPieces(){
+  if(!PHYS.ready)return;const R=PHYS.R,w=PHYS.world;for(const c of PHYS.pieceCols)w.removeCollider(c,false);PHYS.pieceCols=[];
+  for(const p of W.pieces)if(p.f==='floor'){const a=p.r*Math.PI/4;PHYS.pieceCols.push(w.createCollider(R.ColliderDesc.cuboid(.56,.03,.31).setTranslation(p.x,p.y,p.z).setRotation({x:0,y:Math.sin(a/2),z:0,w:Math.cos(a/2)})));}
+  for(const c of pieceCols)PHYS.pieceCols.push(w.createCollider(R.ColliderDesc.cylinder(.6,c.r).setTranslation(c.x,groundAt(c.x,c.z)+.6,c.z)));
+}
+{const orig=rebuildCols;rebuildCols=function(...a){const r=orig.apply(this,a);rebuildPhysPieces();return r;};}
+function physDrop(g,{vel,ball=0,float=false,onRest}={}){
+  if(!PHYS.ready)return false;physForget(g);const R=PHYS.R,w=PHYS.world;
+  const box=localBox(g,new Set()),sz=box.getSize(new THREE.Vector3()),c=box.getCenter(new THREE.Vector3());if(box.isEmpty())return false;
+  const rnd=()=>(Math.random()-.5)*4,body=w.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(g.position.x,g.position.y,g.position.z)
+    .setRotation({x:g.quaternion.x,y:g.quaternion.y,z:g.quaternion.z,w:g.quaternion.w}).setLinvel(vel?.x||0,vel?.y||0,vel?.z||0)
+    .setAngvel({x:rnd(),y:rnd(),z:rnd()}).setCcdEnabled(true));
+  const d=(ball?R.ColliderDesc.ball(ball):R.ColliderDesc.cuboid(Math.max(sz.x/2,.015),Math.max(sz.y/2,.015),Math.max(sz.z/2,.015))).setTranslation(c.x,c.y,c.z)
+    .setDensity(float?450:1600).setFriction(.75).setRestitution(ball?.35:.12);
+  w.createCollider(d,body);PHYS.bodies.set(g,{body,float,onRest,ball:!!ball,t:0,still:0,vy:0,wet:false});return true;
+}
+function physForget(g){const b=PHYS.bodies.get(g);if(b){PHYS.world.removeRigidBody(b.body);PHYS.bodies.delete(g);}}
+function physStep(dt){
+  if(!PHYS.ready||!PHYS.bodies.size)return;const sea=water.position.y;
+  PHYS.me.setNextKinematicTranslation({x:player.x,y:player.y+.85,z:player.z});
+  PHYS.acc=Math.min(PHYS.acc+dt,.1);
+  while(PHYS.acc>=1/60){PHYS.acc-=1/60;
+    for(const b of PHYS.bodies.values()){const t=b.body.translation(),depth=sea-t.y;b.body.resetForces(true);
+      if(depth>-.05){const m=b.body.mass();if(b.float)b.body.addForce({x:0,y:m*9.81*1.5*clamp((depth+.05)/.15,0,1),z:0},true); // buoyancy
+        b.body.setLinearDamping(b.float?2.2:3.5);b.body.setAngularDamping(2);}else{b.body.setLinearDamping(.15);b.body.setAngularDamping(b.ball?3:.5);}} // on land: rolling resistance in sand
+    PHYS.world.step();}
+  for(const [g,b] of PHYS.bodies){const t=b.body.translation(),r=b.body.rotation(),v=b.body.linvel();g.position.set(t.x,t.y,t.z);g.quaternion.set(r.x,r.y,r.z,r.w);
+    if(b.vy<-1.6&&v.y>-.4&&t.y>sea){const sf=surfaceAt(t.x,t.z);sf==='wood'?SFX.knock():SFX.step(sf,clamp(-b.vy/6,.25,.8));} // it hit something
+    if(!b.wet&&t.y<sea){b.wet=true;SFX.splash(clamp(-v.y/6,.25,.8));if(U.uBio.value>.1)U.uRipples.value[rippleI++%8].set(t.x,t.z,time);}
+    b.vy=v.y;b.t+=dt;b.still=Math.hypot(v.x,v.y,v.z)<.1?b.still+dt:0;
+    if(b.body.isSleeping()||b.still>.6||b.t>15){physForget(g);if(b.onRest)b.onRest(g);}}
+}
 // diagnostics, for testing: which renderer is drawing, at what size and quality level
 window.__gfx=()=>({api:GFX_API,buffer:[canvas.width,canvas.height],css:[canvas.clientWidth,canvas.clientHeight],scale:scenePass.getResolutionScale(),samples:scenePass.renderTarget.samples,quality:settings.quality,level:activeGfx().name,fps:Math.round(perf.fps)});
 requestAnimationFrame(frame);
