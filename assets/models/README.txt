@@ -18,3 +18,7 @@ goat.glb, hen.glb, rooster.glb  (Creative Commons Attribution 4.0, https://creat
   "Chicken walk" by LostBoyz2078   https://sketchfab.com/3d-models/chicken-walk-4f17286860b84c90b8e0671003a896a8
   Changes: textures resized to 1024 px WebP, geometry meshopt-compressed; scaled and turned in the game,
   with leg and neck motion added in code.
+
+props/  (Poly Haven, CC0 1.0, https://polyhaven.com)
+  binoculars, wooden_lantern_01, Rockingchair_01, lambis_shell, stone_01, bananas, wine_barrel_01,
+  wooden_crate_01, planter_pot_clay, wicker_basket_02. 1K WebP textures, meshopt geometry.

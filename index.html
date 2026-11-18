@@ -154,7 +154,7 @@
 
   <div class="panel" id="p-credits">
     <h2>Credits</h2>
-    <div class="box"><p class="c">The skies, ground, deck, bark and boulders are real-world scans from Poly Haven (CC0). Your character and its movements are by Quaternius (CC0). The goat ("Goat" by GerardoA400), hen ("Chicken" by MAXDESIGN-3D) and rooster ("Chicken walk" by LostBoyz2078) are from Sketchfab under CC BY 4.0. Everything else, every sound included, is generated in code when the page loads.</p>
+    <div class="box"><p class="c">The skies, ground, deck, bark, boulders and props are real-world scans from Poly Haven (CC0). Your character and its movements are by Quaternius (CC0). The goat ("Goat" by GerardoA400), hen ("Chicken" by MAXDESIGN-3D) and rooster ("Chicken walk" by LostBoyz2078) are from Sketchfab under CC BY 4.0. Everything else, every sound included, is generated in code when the page loads.</p>
     <p class="c">Rendered with Three.js using WebGPU, or WebGL 2 where WebGPU is not available. Sound made with the Web Audio API.</p>
     <p class="c">Nothing here needs doing. Sit down when you are ready.</p></div>
     <button class="m" data-go="p-main">Back</button>
@@ -789,6 +789,31 @@ const proxyMat=new THREE.MeshBasicMaterial({colorWrite:false,depthWrite:false});
 function box(parent,w,h,d,mat,x,y,z,rx=0,ry=0,rz=0){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.rotation.set(rx,ry,rz);m.castShadow=m.receiveShadow=true;parent.add(m);return m;}
 function cyl(parent,rt_,rb,h,mat,x,y,z,seg=16){const m=new THREE.Mesh(new THREE.CylinderGeometry(rt_,rb,h,seg),mat);m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;parent.add(m);return m;}
 function proxy(parent,w,h,d,y=h/2){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),proxyMat);m.position.y=y;parent.add(m);return m;}
+/* ───────── scanned props (Poly Haven, CC0; assets/models/props) ─────────
+   dressProp(group, model) fits a scan to the size and footprint of the shape-built object it replaces, then hides the
+   old shape. The old meshes (and any invisible proxies) stay as hit areas, so picking up, placing and stacking are unchanged.
+   Options: fit 'x' | 'y' (match width or height instead of the largest side), rot (radians), tint (Color), keep (meshes to leave visible). */
+const propSrc={},propTint={};
+const propModel=name=>propSrc[name]||(propSrc[name]=gltfLoader.loadAsync('assets/models/props/'+name+'.glb'));
+function localBox(g,skip){g.updateMatrixWorld(true);const inv=new THREE.Matrix4().copy(g.matrixWorld).invert(),b=new THREE.Box3(),t=new THREE.Box3(),m=new THREE.Matrix4();
+  g.traverse(o=>{if(o.isMesh&&o.material!==proxyMat&&!skip.has(o)){if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();b.union(t.copy(o.geometry.boundingBox).applyMatrix4(m.multiplyMatrices(inv,o.matrixWorld)));}});return b;}
+function dressProp(g,name,o={}){
+  propModel(name).then(gl=>{if(g.userData.dressed)return;g.userData.dressed=true;
+    const keep=new Set(o.keep||[]),pb=localBox(g,keep);if(pb.isEmpty())return;
+    const ms=new THREE.Box3().setFromObject(gl.scene).getSize(new THREE.Vector3()),ps=pb.getSize(new THREE.Vector3());
+    let rot=o.rot;if(rot===undefined)rot=((ps.x>ps.z*1.3&&ms.z>ms.x*1.3)||(ps.z>ps.x*1.3&&ms.x>ms.z*1.3))?Math.PI/2:0; // line up the long sides
+    const sw=Math.abs(Math.sin(rot))>.5,mx=sw?ms.z:ms.x,mz=sw?ms.x:ms.z;
+    const k=(o.fit==='x'?ps.x/mx:o.fit==='y'?ps.y/ms.y:Math.max(ps.x,ps.y,ps.z)/Math.max(mx,ms.y,mz))*(o.scale||1);
+    const m=gl.scene.clone(true);m.rotation.y=rot;m.scale.setScalar(k);g.add(m);
+    const hb=localBox(g,new Set([...g.children].flatMap(c=>{const a=[];if(c!==m)c.traverse(x=>a.push(x));return a;})));
+    const pc=pb.getCenter(new THREE.Vector3()),hc=hb.getCenter(new THREE.Vector3());m.position.set(pc.x-hc.x,pb.min.y-hb.min.y,pc.z-hc.z); // stand on the old base
+    if(o.tint&&!propTint[name]){propTint[name]=new Map();}
+    m.traverse(x=>{if(!x.isMesh)return;x.castShadow=o.shadow!==false;x.receiveShadow=true;x.raycast=()=>{};
+      if(o.tint){let t=propTint[name].get(x.material);if(!t){t=x.material.clone();t.color.multiply(o.tint);propTint[name].set(x.material,t);}x.material=t;}});
+    g.traverse(x=>{if(x.isMesh&&x.material!==proxyMat&&!keep.has(x)&&!m.getObjectById(x.id))x.visible=false;});
+  }).catch(e=>console.warn('Prop model '+name+' did not load:',e));
+  return g;
+}
 
 const items=[]; const interact=[];
 function addItem(o){o.group.userData.item=o;items.push(o);interact.push(o.group);scene.add(o.group);return o;}
@@ -833,7 +858,7 @@ const CHAIR=new THREE.Vector3(LANAI.x-1.7,DECK_Y,LANAI.z+.2);
   for(const s of[-1,1]){box(g,.13,.025,.7,m,s*.34,.56,.02);box(g,.07,.56,.07,m,s*.31,.28,.3);box(g,.035,.09,.95,m,s*.28,.2,-.1,.33);box(g,.06,.4,.06,m,s*.31,.38,-.3);}
   proxy(g,.8,1.1,.9);
   g.position.copy(CHAIR); g.rotation.y=Math.atan2(SUN_AZ.x,SUN_AZ.y);
-  addItem({name:'Adirondack chair',verb:'sit',kind:'chair',group:g});
+  addItem({name:'Rocking chair',verb:'sit',kind:'chair',group:g});dressProp(g,'Rockingchair_01',{fit:'y'});
   colliders.push({x:CHAIR.x,z:CHAIR.z,r:.5});
 }
 // side table
@@ -899,6 +924,7 @@ const lanternG=new THREE.Group(); let flame, lanternLight;
   lanternLight=new THREE.PointLight(new THREE.Color(1,.6,.27),0,22,2);lanternLight.position.y=.14;lanternLight.shadow.mapSize.set(512,512);lanternLight.shadow.bias=-.004;lanternLight.shadow.camera.near=.09;lanternG.add(lanternLight);
   proxy(lanternG,.18,.36,.18);lanternG.traverse(o=>{o.castShadow=false;});
   lanternG.position.set(HOOK.x,HOOK.y-.33,HOOK.z);
+  dressProp(lanternG,'wooden_lantern_01',{fit:'y',keep:[flame],shadow:false}); // keeps the game's own flame and light inside
 }
 const lantern=addItem({name:'Oil lantern',verb:'take',kind:'lantern',group:lanternG,pickable:true,lit:true,hung:true,restY:0,
   hold:{p:[.34,-.42,-.55],r:[0,0,0]},hint:'Click to light or put out'});
@@ -910,6 +936,7 @@ const binoG=new THREE.Group();
     const l=new THREE.Mesh(new THREE.CircleGeometry(.03,16),gl);l.position.set(s*.036,.034,-.0755);l.rotation.y=Math.PI;binoG.add(l);}
   box(binoG,.04,.016,.04,m,0,.04,0);proxy(binoG,.18,.12,.2);
   binoG.position.set(LANAI.x+.9,DECK_Y+.946,LANAI.z-LANAI.d/2+.07); binoG.rotation.y=.5;
+  dressProp(binoG,'binoculars',{fit:'x'}); // sized by width: the scan's strap makes it longer
 }
 const bino=addItem({name:'Binoculars',verb:'pick up',kind:'bino',group:binoG,pickable:true,restY:0,hold:{p:[.24,-.27,-.46],r:[.2,.5,0]},hint:'Hold click to look'});
 // coconut
@@ -1605,6 +1632,11 @@ function openBook(){
 let bookOpen=false;function closeBook(){$('book').classList.remove('on');bookOpen=false;}
 
 /* ───────── things lying in the world ───────── */
+{ // scanned look for these kinds wherever they appear: on the ground, in hand, on shelves
+  const PROPK={shell:['lambis_shell',{}],stone:['stone_01',{tint:new THREE.Color(.33,.31,.31)}],banana:['bananas',{}],barrel:['wine_barrel_01',{}],
+    crate:['wooden_crate_01',{}],pot:['planter_pot_clay',{}],basket:['wicker_basket_02',{}]};
+  for(const [k,[n,o]] of Object.entries(PROPK)){const mk=K[k].mk;K[k].mk=function(...a){return dressProp(mk.apply(this,a),n,o);};}
+}
 function spawn(kind,x,z,n=1,y){
   for(const o of W.items)if(o.kind===kind&&Math.hypot(o.x-x,o.z-z)<.35&&o.n+n<=12){o.n+=n;return o;}
   const it={kind,n,x,z,wkind:kind,verb:'pick up',label(){return K[kind].n+(it.n>1?'  ×'+it.n:'');},
