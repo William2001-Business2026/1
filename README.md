@@ -44,7 +44,8 @@ Very old or very weak graphics chips may still fall below 30 FPS at the lowest l
 | Mouse | Look around (in third person, turns the camera around you) |
 | V | Switch between third-person and first-person view |
 | Shift | Walk slowly |
-| Space | Jump |
+| Space | Jump (under water: swim up) |
+| C | Dive when you are swimming; hold to go deeper |
 | E | Interact: pick up, sit, lie down, stand up |
 | Left click | Use what you are holding |
 | G | Put down, or drop one of what you carry (Shift+G drops them all) |
@@ -100,7 +101,8 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
   - **Wailele, the waterfall pool:** a 14 m waterfall drops into a cliff-backed pool you can swim in. From there a river winds east to the sea, and its current carries you downstream.
   - **Ka Puna Huna, the hidden spring:** the river's source, high on the mountain behind fallen boulders. Finding it adds a page to the journal.
   - **Ke Kai, the open sea.**
-  - **Planned:** the Hawaiian rainforest and the undersea zone are planned next.
+  - **Lalo o ke Kai, under the sea:** a fringing reef rings the island 15–65 m offshore, 2–4 m down, then drops away to 18 m. See the Undersea section below.
+  - **Planned:** the Hawaiian rainforest is planned next.
 - **Sound by zone:** the surf fades as you go inland. The waterfall roars louder as you get near it, and the river babbles and plops over stones close by. The spring bubbles. Wind grows stronger with height and howls over the summit.
 - **Grass:** 120,000 tufts of blades. Close by they are full tufts; further out they are lighter tufts that thin out gradually, and past that the ground's own green takes over, so there is no hard edge. The blades are lit the way the ground is and share its colours and dry and lush patches, so they sit in the soil rather than on top of it. Lower quality levels draw a smaller area of grass.
 - **Wind:** a shared wind with travelling gusts bends the grass, shrubs and palm fronds; grass parts around the player.
@@ -110,6 +112,21 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
 - **Animals:** rigged, textured hens, a rooster and a goat. Each keeps its wandering, pecking, grazing and feeding behaviour; the hen plays its own walk-and-peck animation, and the rooster's and goat's legs swing as they walk.
 - **Physics:** [Rapier](https://rapier.rs) rigid bodies. Things you drop or throw (resources, the coconut, binoculars, ukulele) fall, bounce, tumble and roll on the terrain, deck, rocks, palm trunks and your buildings; coconuts and wood float, stones sink; walking into loose items pushes them. Bodies are removed once things come to rest. The cup and lantern are still set down upright, and buildings keep their own support rules.
 - **Shadows:** dynamic sun shadows. High uses cascaded shadow maps (three 2048 px maps out to 140 m): sharp up close and still present in the distance, plus lantern shadows. Medium and Low use one map that follows you.
+
+## Undersea
+
+- **Diving:** swim out until your feet leave the bottom, then press **C**. W swims where you look, Space rises, C goes deeper, and Shift glides slowly. Past the reef's edge the current turns you back.
+- **Air:** one breath lasts about 60 seconds, shown by the Air bar. **Shell goggles** add 25 seconds and let you see further (2 shells on fibre). Below 15 seconds you hear your heartbeat. If you run out, you black out and wake on the beach, and whatever you gathered on that dive is lost.
+- **The reef:** six Hawaiian corals grow at their natural depths: lobe and finger coral (pōhaku puna), cauliflower coral (koʻa), rice-coral plates, mushroom coral and black coral on the drop-off. Limu grows between them, on a floor of coral rubble with sand in the grooves.
+- **Fish:** schools of lauʻīpala (yellow tang), kihikihi (Moorish idol), manini (convict tang), humuhumunukunukuāpuaʻa and uhu (parrotfish) wander over the reef and scatter from you.
+- **Larger animals:** honu (green sea turtles) graze and rise to breathe, a hāhālua (manta ray) glides along the edge, and manō (whitetip reef sharks) patrol the drop-off and circle you for a while if you come close. Honu are protected, so you can swim with them but not take them.
+- **Food from the sea:**
+  - Spear fish with a **bamboo spear** (a stone flake on bamboo).
+  - Catch heʻe (octopus), ula (spiny lobster) and ʻaʻama (rock crabs). They are shy, and they ink, flee or scuttle off if you crowd them.
+  - Gather wana (sea urchins) and limu. Pry ʻopihi off the wet lava rocks with a stone flake.
+  - Octopus, lobster, crab and fish roast at the fire. Wana, ʻopihi and limu are eaten raw.
+  - In the pot, heʻe with coconut makes heʻe lūʻau, and crab or lobster makes a seafood pot.
+- **Under water:** blue-green haze, red light absorbed, rippling light on the seabed, light shafts from the surface, and a bright window straight up through the surface. Sound is muffled, your breath bubbles, and the reef crackles.
 
 ## Asset credits
 
