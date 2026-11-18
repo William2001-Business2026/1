@@ -154,7 +154,7 @@
 
   <div class="panel" id="p-credits">
     <h2>Credits</h2>
-    <div class="box"><p class="c">The skies, ground, deck, bark, boulders and props are real-world scans from Poly Haven (CC0). Your character and its movements are by Quaternius (CC0). The goat ("Goat" by GerardoA400), hen ("Chicken" by MAXDESIGN-3D) and rooster ("Chicken walk" by LostBoyz2078) are from Sketchfab under CC BY 4.0. Everything else, every sound included, is generated in code when the page loads.</p>
+    <div class="box"><p class="c">The skies, ground, deck, bark, boulders, plants and props are real-world scans from Poly Haven (CC0). Your character and its movements are by Quaternius (CC0). The goat ("Goat" by GerardoA400), hen ("Chicken" by MAXDESIGN-3D) and rooster ("Chicken walk" by LostBoyz2078) are from Sketchfab under CC BY 4.0. Everything else, every sound included, is generated in code when the page loads.</p>
     <p class="c">Rendered with Three.js using WebGPU, or WebGL 2 where WebGPU is not available. Sound made with the Web Audio API.</p>
     <p class="c">Nothing here needs doing. Sit down when you are ready.</p></div>
     <button class="m" data-go="p-main">Back</button>
@@ -765,6 +765,22 @@ const up=new THREE.Vector3(0,1,0),qa=new THREE.Quaternion(),qb=new THREE.Quatern
     const s=.6+R()*1.1;d.position.set(x,h+.1*s,z);d.rotation.y=R()*6.28;d.scale.set(s*(1+R()*.5),s,s*(1+R()*.5));d.updateMatrix();shr.setMatrixAt(i++,d.matrix);
     if(s>1.1)colliders.push({x,z,r:s*.8});}
   shr.count=i;shr.castShadow=shr.receiveShadow=true;scene.add(shr);scene.userData.shrubs=shr;
+  // real plants: scanned ferns and anthuriums (Poly Haven, CC0) take the shrubs' places, sized to the same footprints.
+  // The old leaf-card shrubs stay, hidden, as the hit areas for picking flowers.
+  Promise.all([gltfLoader.loadAsync('assets/models/fern.glb'),gltfLoader.loadAsync('assets/models/anthurium.glb')]).then(([fe,an])=>{
+    const vars=[['fern_02_b',fe],['fern_02_c',fe],['anthurium_botany_01_a',an],['anthurium_botany_01_b',an]].map(([n,gl])=>gl.scene.getObjectByName(n)).filter(o=>o&&o.isMesh);
+    if(!vars.length)return;
+    const M=new THREE.Matrix4(),groups=vars.map(()=>[]);for(let k=0;k<shr.count;k++){shr.getMatrixAt(k,M);groups[k%vars.length].push(M.clone());}
+    const {vec3,sin,dot,positionLocal,positionGeometry}=TSL;
+    vars.forEach((src,vi)=>{src.updateWorldMatrix(true,false);const geo=src.geometry.clone().applyMatrix4(src.matrixWorld);geo.computeBoundingBox();
+      const b=geo.boundingBox,c=b.getCenter(new THREE.Vector3()),k=2.1/Math.max(b.max.x-b.min.x,b.max.z-b.min.z);
+      geo.translate(-c.x,-b.min.y,-c.z);geo.scale(k,k,k);geo.translate(0,-.1,0);geo.computeBoundingSphere(); // the old shrubs sat 0.1 above their base
+      const m0=src.material,nm=leafy(new THREE.MeshStandardNodeMaterial({map:m0.map,normalMap:m0.normalMap,roughnessMap:m0.roughnessMap,roughness:m0.roughness??.8,metalness:0,alphaTest:Math.max(m0.alphaTest||0,.45),side:THREE.DoubleSide}));
+      const wd=windAt(positionLocal.xz),h=positionGeometry.y.add(.1).max(0),fl=sin(U.uTime.mul(7.3).add(dot(positionGeometry,vec3(9.1,5.3,7.7)))).mul(wd.z.add(.3)).mul(.02).mul(h);
+      nm.positionNode=positionLocal.add(vec3(wd.x,0,wd.y).mul(h).mul(.14)).add(vec3(fl,fl.mul(.6),fl.negate())); // leaves lean and flutter in the wind
+      const im=new THREE.InstancedMesh(geo,nm,groups[vi].length);groups[vi].forEach((m,j)=>im.setMatrixAt(j,m));im.castShadow=im.receiveShadow=true;im.raycast=()=>{};scene.add(im);});
+    shr.visible=false;
+  }).catch(e=>console.warn('Plant models did not load:',e));
   let rg=new THREE.IcosahedronGeometry(1,4);rg.deleteAttribute('normal');rg.deleteAttribute('uv');rg=mergeVerts(rg);const rp=rg.attributes.position;
   for(let k=0;k<rp.count;k++){const x=rp.getX(k),y=rp.getY(k),z=rp.getZ(k),f=.7+.45*vnoise(x*1.7+y*2.1+9,z*1.9+y)+.22*(fbm(x*4+y*3,z*4-y*2,3)-.5)+.05*fbm(x*14+y*9,z*14,2);rp.setXYZ(k,x*f,y*f*.7,z*f);}
   rg.computeVertexNormals();

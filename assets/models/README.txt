@@ -22,3 +22,6 @@ goat.glb, hen.glb, rooster.glb  (Creative Commons Attribution 4.0, https://creat
 props/  (Poly Haven, CC0 1.0, https://polyhaven.com)
   binoculars, wooden_lantern_01, Rockingchair_01, lambis_shell, stone_01, bananas, wine_barrel_01,
   wooden_crate_01, planter_pot_clay, wicker_basket_02. 1K WebP textures, meshopt geometry.
+
+fern.glb, anthurium.glb  (Poly Haven "fern_02" and "anthurium_botany_01", CC0 1.0)
+  The undergrowth. Anthuriums simplified to 4,000 triangles per plant; 1K WebP textures.
