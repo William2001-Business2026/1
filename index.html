@@ -154,7 +154,7 @@
 
   <div class="panel" id="p-credits">
     <h2>Credits</h2>
-    <div class="box"><p class="c">The skies, ground, deck, bark and boulders are real-world scans from Poly Haven (CC0). Your character and its movements are by Quaternius (CC0). Everything else, every sound included, is generated in code when the page loads.</p>
+    <div class="box"><p class="c">The skies, ground, deck, bark and boulders are real-world scans from Poly Haven (CC0). Your character and its movements are by Quaternius (CC0). The goat ("Goat" by GerardoA400), hen ("Chicken" by MAXDESIGN-3D) and rooster ("Chicken walk" by LostBoyz2078) are from Sketchfab under CC BY 4.0. Everything else, every sound included, is generated in code when the page loads.</p>
     <p class="c">Rendered with Three.js using WebGPU, or WebGL 2 where WebGPU is not available. Sound made with the Web Audio API.</p>
     <p class="c">Nothing here needs doing. Sit down when you are ready.</p></div>
     <button class="m" data-go="p-main">Back</button>
@@ -174,6 +174,7 @@ import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
 import { mergeVertices as mergeVerts } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 const showErr=m=>{const el=document.getElementById('err');el.style.display='block';el.textContent='Error: '+m;};
 window.addEventListener('error',e=>showErr(e.message));
@@ -1442,7 +1443,7 @@ function update(dt){
   sun.target.position.set(tx,0,tz);sun.position.set(tx,0,tz).addScaledVector(U.uSunDir.value.clone().setY(Math.max(U.uSunDir.value.y,.12)).normalize(),200);
   {const cell=tx+','+tz;if(cell!==perf.shotCell||++perf.shadowTick>=activeGfx().shadowEvery){perf.shotCell=cell;perf.shadowTick=0;sun.shadow.needsUpdate=true;}}
   lanternLight.shadow.autoUpdate=lanternLight.intensity>.01; // no point redrawing the lantern's six shadow views while it is dark
-  sysUpdate(dt);
+  sysUpdate(dt);updateAnimalModels(dt);
   scheduleAudio(dt,time);
 }
 function frame(now){
@@ -2087,6 +2088,45 @@ goat.g.userData.item={label:()=>'Goat',get verb(){return'';},use(k){
   if(k==='bowl'&&goatTame()&&W.goat.fed>.5&&W.goat.milk>=1){W.goat.milk=0;takeFrom('bowl',1);give('milk',1);note('milk');SFX.pour();handAnim=1;return true;}
   return false;}};
 scene.add(goat.g);interact.push(goat.g);
+
+/* ───────── realistic animals ─────────
+   Rigged Sketchfab models (CC BY 4.0, credits in assets/models/README.txt) replace the shape-built birds and goat once
+   loaded. The old shapes stay as invisible hit areas, and all behaviour (wandering, pecking, grazing, feeding) is unchanged.
+   The hen's own clip walks and pecks; the rooster and goat play their idle clips and swing their legs in code as they walk. */
+const ANIMALS={hen:{url:'assets/models/hen.glb',height:.42,turn:0,legs:/thigh/i,amp:.6,stride:16},
+  rooster:{url:'assets/models/rooster.glb',height:.5,turn:-Math.PI/2,legs:/thigh/i,amp:.6,stride:16},
+  goat:{url:'assets/models/goat.glb',height:.95,turn:0,legs:/^thigh_stretch/,amp:.45,stride:7,neck:/^c_subneck/}};
+const animalSrc={};
+function dressAnimal(o,kind){
+  const spec=ANIMALS[kind];
+  (animalSrc[kind]||(animalSrc[kind]=gltfLoader.loadAsync(spec.url))).then(gl=>{
+    const box=new THREE.Box3().setFromObject(gl.scene),k=spec.height/box.getSize(_v).y;
+    const m=cloneSkinned(gl.scene),holder=new THREE.Group();m.rotation.y=spec.turn;m.scale.setScalar(k);m.position.y=-box.min.y*k;holder.add(m);
+    m.traverse(x=>{if(x.isMesh){x.castShadow=x.receiveShadow=true;x.frustumCulled=false;x.raycast=()=>{};}}); // aim at the old shapes, not the skinned mesh
+    for(const ch of o.g.children)ch.visible=false;o.g.add(holder);
+    const mixer=new THREE.AnimationMixer(m),act=mixer.clipAction(gl.animations[0]);act.play();mixer.update(Math.random()*act.getClip().duration);
+    const legs=[];m.traverse(x=>{if(x.isBone&&spec.legs.test(x.name))legs.push(x);});m.updateMatrixWorld(true);
+    // legs in the animal's own frame (x = right, z = forward): birds alternate left and right, the goat moves diagonal pairs together
+    o.g.updateMatrixWorld(true);const lp=legs.map(b=>({b,p:holder.worldToLocal(b.getWorldPosition(new THREE.Vector3()))})),mid=lp.reduce((a,l)=>a+l.p.z,0)/Math.max(1,lp.length);
+    let neck=null;if(spec.neck)m.traverse(x=>{if(x.isBone&&!neck&&spec.neck.test(x.name))neck=x;});
+    o.model={spec,mixer,act,neck,graze:0,pw:o.walk,legs:lp.map(({b,p})=>({b,ph:(lp.length<3?p.x>0:(p.z>mid)!==(p.x>0))?0:Math.PI}))};
+  }).catch(e=>console.warn('Animal model '+kind+' did not load:',e));
+}
+dressAnimal(chickens[0],'hen');dressAnimal(chickens[1],'rooster');dressAnimal(chickens[2],'hen');dressAnimal(goat,'goat');
+const _aq1=new THREE.Quaternion(),_aq2=new THREE.Quaternion(),_aq3=new THREE.Quaternion(),_aax=new THREE.Vector3(),_aax2=new THREE.Vector3();
+function updateAnimalModels(dt){
+  for(const o of [...chickens,goat]){const M=o.model;if(!M||!o.g.visible)continue;
+    const moved=o.walk-M.pw,moving=Math.abs(moved)>1e-5;M.pw=o.walk;const sp=Math.abs(moved)/Math.max(dt,1e-3);
+    if(M.spec===ANIMALS.hen)M.act.timeScale=moving?clamp(sp/.9,.6,1.8):(o.act==='peck'?1:0); // its clip is a walk with pecks
+    M.mixer.update(dt);
+    if(M.spec!==ANIMALS.hen&&moving){ // swing the legs about the animal's sideways axis, whatever the rig's own bone axes are
+      o.g.updateMatrixWorld(true);_aax.set(1,0,0).applyQuaternion(o.g.getWorldQuaternion(_aq1));
+      const ph=o.walk*M.spec.stride,amp=M.spec.amp*(o.run?1.3:1);
+      for(const L of M.legs){L.b.parent.getWorldQuaternion(_aq2).invert();_aax2.copy(_aax).applyQuaternion(_aq2);L.b.quaternion.premultiply(_aq3.setFromAxisAngle(_aax2,Math.sin(ph+L.ph)*amp));}}
+    if(M.neck){const graze=!moving&&(o.tm%4<2.2)&&!o.run;M.graze=lerp(M.graze,graze?1:0,1-Math.exp(-dt*3)); // the goat lowers its head to graze
+      if(M.graze>.01){o.g.updateMatrixWorld(true);_aax.set(1,0,0).applyQuaternion(o.g.getWorldQuaternion(_aq1));M.neck.parent.getWorldQuaternion(_aq2).invert();
+        _aax2.copy(_aax).applyQuaternion(_aq2);M.neck.quaternion.premultiply(_aq3.setFromAxisAngle(_aax2,M.graze*.9));}}}
+}
 const goatTame=()=>W.goat.trust>=3,feed=(c,a)=>{c.fed=Math.min(1,c.fed+a);};
 const chickHome={x:CHICKHOME.x,z:CHICKHOME.z};
 function walkTo(c,sp,dt){const dx=c.tx-c.x,dz=c.tz-c.z,d=Math.hypot(dx,dz);if(d<.12)return false;
@@ -2397,7 +2437,7 @@ function sysUpdate(dt){
 /* ───────────────────────── go ───────────────────────── */
 cupG.position.copy(slots[0].pos);cupG.rotation.y=1;slots[0].item=cup;
 applyTime(true);applyGraphics();
-window.__hm={player,groundAt,surfaceAt,pickUp,cup,lantern,settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
+window.__hm={player,groundAt,surfaceAt,pickUp,cup,lantern,chickens,goat,settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
 // diagnostics, for testing: which renderer is drawing, at what size and quality level
 window.__gfx=()=>({api:GFX_API,buffer:[canvas.width,canvas.height],css:[canvas.clientWidth,canvas.clientHeight],scale:scenePass.getResolutionScale(),samples:scenePass.renderTarget.samples,quality:settings.quality,level:activeGfx().name,fps:Math.round(perf.fps)});
 requestAnimationFrame(frame);

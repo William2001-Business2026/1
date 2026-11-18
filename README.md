@@ -93,6 +93,7 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
 - **Materials:** physically based (albedo, normal, roughness) scans for sand, wet sand, grassy ground, lava rock, deck boards and palm bark.
 - **Wind:** a shared wind with travelling gusts bends 12,000 tufts of real grass blades, shrubs and palm fronds; grass parts around the player.
 - **Character:** a rigged, animated islander seen in third person. The camera orbits freely while you walk; the body turns toward where you go and plays idle, walk, jog, jump, landing and swim animations. Held items sit in the right hand. Sitting, the hammock and the binoculars use first-person views.
+- **Animals:** rigged, textured hens, a rooster and a goat. Each keeps its wandering, pecking, grazing and feeding behaviour; the hen plays its own walk-and-peck animation, and the rooster's and goat's legs swing as they walk.
 - **Shadows:** dynamic sun shadows (up to 4096 px on High) and lantern shadows on High.
 
 ## Asset credits
@@ -100,6 +101,12 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
 Skies, materials and the boulder are from [Poly Haven](https://polyhaven.com) under CC0 (public domain). Each folder's JSON file lists the exact source asset.
 
 The character, hair and animations are from Quaternius's Universal Base Characters and Universal Animation Library ([quaternius.com](https://quaternius.com)), CC0 as downloaded. See `assets/models/README.txt`; please don't extract them for use as standalone assets.
+
+The animals are from Sketchfab under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/):
+[Goat](https://sketchfab.com/3d-models/goat-5d7431517b634f4e9e8c0f3729cd9c59) by GerardoA400,
+[Chicken](https://sketchfab.com/3d-models/chicken-4ab19d3a675343959815ae770f8b178e) by MAXDESIGN-3D and
+[Chicken walk](https://sketchfab.com/3d-models/chicken-walk-4f17286860b84c90b8e0671003a896a8) by LostBoyz2078.
+Textures were resized and compressed, and leg and neck motion is added in code.
 
 ## Licence
 

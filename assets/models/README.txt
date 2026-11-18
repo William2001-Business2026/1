@@ -11,3 +11,10 @@ islander.glb, islander_moves.glb
   License files. Quaternius now publishes new releases under the Quaternius Asset License, which allows
   use in games but not redistribution of the assets on their own; please do not extract these files
   for use as standalone assets. islander_moves.glb holds only the 17 animations the game plays.
+
+goat.glb, hen.glb, rooster.glb  (Creative Commons Attribution 4.0, https://creativecommons.org/licenses/by/4.0/)
+  "Goat" by GerardoA400            https://sketchfab.com/3d-models/goat-5d7431517b634f4e9e8c0f3729cd9c59
+  "Chicken" by MAXDESIGN-3D        https://sketchfab.com/3d-models/chicken-4ab19d3a675343959815ae770f8b178e
+  "Chicken walk" by LostBoyz2078   https://sketchfab.com/3d-models/chicken-walk-4f17286860b84c90b8e0671003a896a8
+  Changes: textures resized to 1024 px WebP, geometry meshopt-compressed; scaled and turned in the game,
+  with leg and neck motion added in code.
