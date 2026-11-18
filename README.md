@@ -2,7 +2,7 @@
 
 *An evening on a small island.*
 
-Hale Moku is a first-person 3D island you explore in the browser. You can walk the beach, jump, pick things up, build with them, sit or lie down, play the ukulele and take photos. The skies, ground materials and boulders are real-world scans; everything else, every sound included, is generated in code when the page loads.
+Hale Moku is a 3D island you explore in the browser, in third person (or first person, if you prefer). You can walk the beach, jump, pick things up, build with them, sit or lie down, play the ukulele and take photos. The skies, ground materials and boulders are real-world scans, and the character is a rigged, animated model; everything else, every sound included, is generated in code when the page loads.
 
 **Status:** pre-launch. Not yet published.
 
@@ -41,7 +41,8 @@ Very old or very weak graphics chips may still fall below 30 FPS at the lowest l
 | Key | Action |
 |---|---|
 | W A S D | Walk |
-| Mouse | Look around |
+| Mouse | Look around (in third person, turns the camera around you) |
+| V | Switch between third-person and first-person view |
 | Shift | Walk slowly |
 | Space | Jump |
 | E | Interact: pick up, sit, lie down, stand up |
@@ -91,11 +92,14 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
 - **Sky and light:** five photographed HDRI skies (day, golden hour, sunset, afterglow, dusk) cross-fade as the sun moves. Each is turned to match the sun and lights the island (image-based lighting); the computed starry sky takes over at night.
 - **Materials:** physically based (albedo, normal, roughness) scans for sand, wet sand, grassy ground, lava rock, deck boards and palm bark.
 - **Wind:** a shared wind with travelling gusts bends 12,000 tufts of real grass blades, shrubs and palm fronds; grass parts around the player.
+- **Character:** a rigged, animated islander seen in third person. The camera orbits freely while you walk; the body turns toward where you go and plays idle, walk, jog, jump, landing and swim animations. Held items sit in the right hand. Sitting, the hammock and the binoculars use first-person views.
 - **Shadows:** dynamic sun shadows (up to 4096 px on High) and lantern shadows on High.
 
 ## Asset credits
 
 Skies, materials and the boulder are from [Poly Haven](https://polyhaven.com) under CC0 (public domain). Each folder's JSON file lists the exact source asset.
+
+The character, hair and animations are from Quaternius's Universal Base Characters and Universal Animation Library ([quaternius.com](https://quaternius.com)), CC0 as downloaded. See `assets/models/README.txt`; please don't extract them for use as standalone assets.
 
 ## Licence
 
