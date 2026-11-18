@@ -1,6 +1,6 @@
 /* Hale Moku player chat.
    A small panel in the bottom-left corner where players talk about the game.
-   - Players choose to sign in with Google or carry on as a guest.
+   - Players sign in with their Google account to chat.
    - Everyone shares the "General" room. Anyone can create a private room and
      invite others with its code.
    - Messages are stored and delivered by Supabase (see supabase/migrations).
@@ -17,7 +17,7 @@
   var HISTORY = 50, MAX_SHOWN = 200, MAX_LEN = 500;
   var db = window.supabase.createClient(cfg.url, cfg.key);
 
-  var me = null;            // { id, name, guest }
+  var me = null;            // { id, name }
   var rooms = [];           // [{ id, name, is_private, invite_code }]
   var roomId = GENERAL;
   var channel = null;
@@ -42,13 +42,11 @@
   var root = h('div', { id: 'chat', 'aria-label': 'Player chat' });
 
   // Shown before the player has chosen how to join.
-  var nickIn = h('input', { type: 'text', maxlength: '24', placeholder: 'Nickname (optional)', 'aria-label': 'Guest nickname' });
   var joinView = h('div', {}, [
     h('div', { class: 'c-title', text: 'Talk story' }),
     h('div', { class: 'c-pad' }, [
-      h('p', { class: 'c-note', text: 'Chat with other players about the island. Join with Google or as a guest.' }),
-      h('button', { class: 'c-google', type: 'button', text: 'Continue with Google', onclick: signInGoogle }),
-      h('div', { class: 'c-row' }, [nickIn, h('button', { type: 'button', text: 'Play as guest', onclick: signInGuest })])
+      h('p', { class: 'c-note', text: 'Chat with other players about the island. Sign in with Google to join.' }),
+      h('button', { class: 'c-google', type: 'button', text: 'Continue with Google', onclick: signInGoogle })
     ])
   ]);
 
@@ -107,7 +105,7 @@
     if (/room_limit/.test(m)) return 'You have created the most private rooms allowed.';
     if (/not_signed_in|JWT|no_profile/.test(m)) return 'Please sign in again to chat.';
     if (/check constraint|violates/.test(m)) return 'That is too short or too long.';
-    if (/nonymous sign-ins are disabled/i.test(m)) return 'Guest chat is not switched on yet.';
+    if (/google_only/.test(m)) return 'Chat needs a Google account.';
     if (/provider is not enabled/i.test(m)) return 'Google sign-in is not switched on yet.';
     if (/fetch|network/i.test(m)) return 'Cannot reach the chat right now. Check your connection.';
     return 'Something went wrong. Please try again.';
@@ -130,40 +128,30 @@
 
   /* ───────── signing in and out ───────── */
   function signInGoogle() {
-    if (location.protocol === 'file:') { alert('Google sign-in only works on the hosted game, not when the file is opened from your computer. You can still play as a guest.'); return; }
+    if (location.protocol === 'file:') { alert('Google sign-in only works on the hosted game, not when the file is opened from your computer. The island itself still works.'); return; }
     db.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } })
       .then(function (r) { if (r.error) alert(explain(r.error)); });
   }
-  function signInGuest() {
-    var nick = nickIn.value.trim().replace(/\s+/g, ' ');
-    pendingNick = nick.length >= 2 ? nick : '';
-    db.auth.signInAnonymously().then(function (r) {
-      if (r.error) { pendingNick = ''; alert(explain(r.error)); }
-    });
-  }
-  var pendingNick = '';
-  function signOut() {
-    if (me && me.guest && !confirm('Guest accounts cannot be recovered. Sign out and lose this guest name and its private rooms?')) return;
-    db.auth.signOut();
-  }
+  function signOut() { db.auth.signOut(); }
 
   function onSession(session) {
     var uid = session && session.user ? session.user.id : null;
     if (!uid) { me = null; leaveChannel(); render(); return; }
+    // Guest accounts are no longer offered; end any guest session left over from before.
+    if (session.user.is_anonymous) { db.auth.signOut(); return; }
     if (me && me.id === uid) return;
-    me = { id: uid, name: '…', guest: !!session.user.is_anonymous };
+    me = { id: uid, name: '…' };
     render();
     loadProfile(0);
   }
   // The profile row is created by the database just after sign-up, so retry briefly.
   function loadProfile(attempt) {
     var uid = me && me.id; if (!uid) return;
-    db.from('profiles').select('display_name,is_guest').eq('id', uid).maybeSingle().then(function (r) {
+    db.from('profiles').select('display_name').eq('id', uid).maybeSingle().then(function (r) {
       if (!me || me.id !== uid) return;
       if (!r.data) { if (attempt < 5) setTimeout(function () { loadProfile(attempt + 1); }, 600); else showErr(explain(r.error)); return; }
-      me.name = r.data.display_name; me.guest = r.data.is_guest;
+      me.name = r.data.display_name;
       render();
-      if (pendingNick) { renameIn.value = pendingNick; pendingNick = ''; rename(); }
       loadRooms(store('halemoku-chat-room') || GENERAL);
     });
   }
@@ -255,7 +243,7 @@
     roomView.style.display = me ? '' : 'none';
     if (!me) return;
     nameEl.textContent = me.name;
-    kindEl.textContent = me.guest ? 'guest' : 'Google';
+    kindEl.textContent = 'Google';
     roomSel.textContent = '';
     rooms.forEach(function (r) {
       var o = h('option', { value: r.id, text: (r.is_private ? '🔒 ' : '') + r.name });

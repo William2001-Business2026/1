@@ -58,17 +58,18 @@ Very old or very weak graphics chips may still fall below 30 FPS at the lowest l
 
 ## Saving
 
-Your island is saved in the browser as you play, so it stays on that browser and device. To keep a copy or move it elsewhere, use **Settings → Your island → Save to file** and **Load from file**.
+Your island is saved in the browser as you play, so it stays on that browser and device. An island saved before the map was enlarged is moved onto the larger map when it loads: loose things and garden beds go to the same spots, and each building moves as one piece (fire pits start cold). To keep a copy or move it elsewhere, use **Settings → Your island → Save to file** and **Load from file**.
 
 ## Player chat
 
-Players can talk about the game in a chat panel in the bottom-left corner. They choose to join with Google or as a guest (with an optional nickname). Everyone shares the **General** room, and anyone can create a private room and invite others with its code.
+Players can talk about the game in a chat panel in the bottom-left corner. Chat needs a Google account; there are no guest accounts. Everyone shares the **General** room, and anyone can create a private room and invite others with its code.
 
 The chat runs on [Supabase](https://supabase.com) and is **off until it is configured**; the game works normally without it. To switch it on:
 
 1. Create a Supabase project and run `supabase/migrations/0001_chat.sql` in its SQL editor.
-2. In the Supabase dashboard, under Authentication, enable **Anonymous sign-ins** (for guests) and the **Google** provider, and add the game's web address as the Site URL.
-3. Put the project URL and the *publishable* (anon) key in `chat-config.js`. Never use the service-role or secret key.
+2. Then run `supabase/migrations/0002_google_only.sql`, which stops guest (anonymous) accounts from reading or posting.
+3. In the Supabase dashboard, under Authentication, enable the **Google** provider, keep **Anonymous sign-ins** off, and add the game's web address as the Site URL.
+4. Put the project URL and the *publishable* (anon) key in `chat-config.js`. Never use the service-role or secret key.
 
 Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds per player, a small word filter stars out listed words, and database rules stop players reading private rooms they have not joined or posting under another name.
 
@@ -92,7 +93,9 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
 
 - **Sky and light:** five photographed HDRI skies (day, golden hour, sunset, afterglow, dusk) cross-fade as the sun moves. Each is turned to match the sun and lights the island (image-based lighting); the computed starry sky takes over at night.
 - **Materials:** physically based (albedo, normal, roughness) scans for sand, wet sand, grassy ground, lava rock, deck boards and palm bark.
-- **Wind:** a shared wind with travelling gusts bends 12,000 tufts of real grass blades, shrubs and palm fronds; grass parts around the player.
+- **Island:** about 250 m across, with a lumpy grassy knoll, rolling ground inland, a lava coast to the west and 34 palms.
+- **Grass:** 120,000 tufts of blades. Close by they are full tufts; further out they are lighter tufts that thin out gradually, and past that the ground's own green takes over, so there is no hard edge. The blades are lit the way the ground is and share its colours and dry and lush patches, so they sit in the soil rather than on top of it. Lower quality levels draw a smaller area of grass.
+- **Wind:** a shared wind with travelling gusts bends the grass, shrubs and palm fronds; grass parts around the player.
 - **Character:** a rigged, animated islander seen in third person. The camera orbits freely while you walk; the body turns toward where you go and plays idle, walk, jog, jump, landing and swim animations. Held items sit in the right hand. Sitting, the hammock and the binoculars use first-person views.
 - **Plants:** scanned fern clumps and anthuriums replace the leaf-card shrubs and lean and flutter in the same wind as the grass.
 - **Props:** scanned binoculars, oil lantern, rocking chair, conch shells, lava stones, bananas, rain barrel, storage crate, clay pot and basket replace the shape-built versions, fitted to the same size so everything works as before.
