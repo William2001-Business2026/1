@@ -102,7 +102,7 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
   - **Ka Puna Huna, the hidden spring:** the river's source, high on the mountain behind fallen boulders. Finding it adds a page to the journal.
   - **Ke Kai, the open sea.**
   - **Lalo o ke Kai, under the sea:** a fringing reef rings the island 15–65 m offshore, 2–4 m down, then drops away to 18 m. See the Undersea section below.
-  - **Planned:** the Hawaiian rainforest is planned next.
+  - **Wao Nahele, the forest:** a Hawaiian rainforest inland on the east side, which also climbs the mountain. See the Forest section below.
 - **Sound by zone:** the surf fades as you go inland. The waterfall roars louder as you get near it, and the river babbles and plops over stones close by. The spring bubbles. Wind grows stronger with height and howls over the summit.
 - **Grass:** 120,000 tufts of blades. Close by they are full tufts; further out they are lighter tufts that thin out gradually, and past that the ground's own green takes over, so there is no hard edge. The blades are lit the way the ground is and share its colours and dry and lush patches, so they sit in the soil rather than on top of it. Lower quality levels draw a smaller area of grass.
 - **Wind:** a shared wind with travelling gusts bends the grass, shrubs and palm fronds; grass parts around the player.
@@ -128,6 +128,31 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
   - In the pot, heʻe with coconut makes heʻe lūʻau, and crab or lobster makes a seafood pot.
 - **Under water:** blue-green haze, red light absorbed, rippling light on the seabed, light shafts from the surface, and a bright window straight up through the surface. Sound is muffled, your breath bubbles, and the reef crackles.
 
+## Forest
+
+- **Trees:** ten Hawaiian trees, built in code from the scanned bark and hand-drawn leaf clusters that move in the wind. Each grows where it would in nature:
+  - koa, ʻōhiʻa lehua (with red lehua blossoms) and hāpuʻu tree ferns in the forest and up the mountain;
+  - loulu fan palms on the mountain;
+  - hala (pandanus) with prop roots along the shore;
+  - wiliwili on the dry lava side;
+  - ʻulu (breadfruit) near the lanai;
+  - kukui and ʻōhiʻa ʻai (mountain apple) through the forest;
+  - two great banyans with hanging aerial roots.
+- **Forest floor:** dark leaf litter, ferns and anthuriums, with little grass.
+- **Animals:** 15 kinds.
+  - **Hunted for food with the bamboo spear:** puaʻa (wild pigs), kia (axis deer), kao (feral goats) on the mountain, moa (jungle fowl) and nēnē. They graze, wander and bolt when you come close. Holding Shift lets you creep nearer and strike more surely. Butcher what you take (E) for pork, venison, goat meat or fowl, then roast it at the fire. Pork with taro or sweet potato in the pot makes kālua puaʻa.
+  - **To watch:**
+    - the mongoose;
+    - ʻiʻiwi and ʻapapane flitting between the ʻōhiʻa;
+    - a pueo that moves to another tree if you come too close;
+    - ʻio soaring over the mountain;
+    - ʻōpeʻapeʻa (bats) over the river at dusk;
+    - Kamehameha butterflies;
+    - Jackson's chameleons in the branches;
+    - moʻo (geckos) on the trunks;
+    - the tiny happy-face spider on fern leaves.
+- **Sound:** a canopy rustle, ʻapapane trills and ʻamakihi whistles by day, and a pueo calling after dark.
+
 ## Asset credits
 
 Skies, materials and the boulder are from [Poly Haven](https://polyhaven.com) under CC0 (public domain). Each folder's JSON file lists the exact source asset.
@@ -139,6 +164,18 @@ The animals are from Sketchfab under [CC BY 4.0](https://creativecommons.org/lic
 [Chicken](https://sketchfab.com/3d-models/chicken-4ab19d3a675343959815ae770f8b178e) by MAXDESIGN-3D and
 [Chicken walk](https://sketchfab.com/3d-models/chicken-walk-4f17286860b84c90b8e0671003a896a8) by LostBoyz2078.
 Textures were resized and compressed, and leg and neck motion is added in code.
+
+The forest animals are also from Sketchfab under CC BY 4.0, some standing in for close relatives and recoloured:
+[Deer](https://sketchfab.com/3d-models/deer-144b33ab9e3345cb92b41bf297a38b7d) by chemchamroeun1988 (axis deer (kia)),
+[Curious Pink Pig animal 3d model free](https://sketchfab.com/3d-models/curious-pink-pig-animal-3d-model-free-f40237ad33df4a2896e5978fe489d412) by rt699448 (wild pig (puaʻa), darkened),
+[Bat](https://sketchfab.com/3d-models/bat-28af38de4d2c401d809148c7f63a73f9) by matisosanimation (ʻōpeʻapeʻa),
+[Animated Flying Fluttering Butterfly Loop](https://sketchfab.com/3d-models/animated-flying-fluttering-butterfly-loop-80f8d9a6dadc411e89ca366cb0cfb0d9) by LasquetiSpice (Kamehameha butterfly, tinted),
+[Chameleon](https://sketchfab.com/3d-models/chameleon-c91b9fad77fc4af998da3ea252037fad) by nikohard (Jackson's chameleon, recoloured green),
+[Common Barn Owl](https://sketchfab.com/3d-models/common-barn-owl-19c989a6681145bc999c332699eb852e) by cmp_innovation_studio (pueo, tinted brown),
+[Red-tailed Hawk - in Flight](https://sketchfab.com/3d-models/red-tailed-hawk-in-flight-4abcab5af9044a939fb5a55bff9e5000) by OSU.Multimedia (ʻio),
+[Canada Goose](https://sketchfab.com/3d-models/canada-goose-50f4ace96846465f85f2e9a9f5c84453) by cmp_innovation_studio (nēnē),
+[Ferret](https://sketchfab.com/3d-models/ferret-a5c717c20b08461aa1d9ce462f3e019e) by sdpm (mongoose, tinted),
+[Animated Hovering Flying Hummingbird Loop](https://sketchfab.com/3d-models/animated-hovering-flying-hummingbird-loop-102884713a2742ce829e368d2a790c45) by LasquetiSpice (ʻiʻiwi and ʻapapane, recoloured).
 
 ## Licence
 

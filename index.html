@@ -348,7 +348,7 @@ function masks(x,z,S=MAP){
 const PEAK={x:-8,z:-132},PEAK_H=74;                     // Kuahiwi, the mountain
 const POOL={x:36,z:-70,r:10};                           // Wailele, the waterfall pool
 const SPRING={x:30,z:-112};                            // the hidden spring
-const FOREST={x:86,z:-6};                               // Wao Nahele, the forest, on the east side
+const FOREST={x:68,z:-4};                               // Wao Nahele, the forest, on the east side
 function northLobe(th){const a=Math.abs(Math.atan2(Math.sin(th-Math.PI),Math.cos(th-Math.PI)));return 62*Math.exp(-Math.pow(a/.8,2));} // the mountain pushes the coast north
 function coastAt(th,S){return S*coastR(th)+(S>1?northLobe(th):0);}
 function mountainH(x,z){
@@ -456,12 +456,12 @@ const groundAt=(x,z)=>onDeck(x,z)?DECK_Y:heightAt(x,z);
 function grassMask(x,z,h,m){return clamp(smooth(2.5,3.8,h)+smooth(24,34,m.d)*smooth(.3,.48,fbm(x*.07+3,z*.07,3)),0,1)*(1-m.lava);}
 // the island's zones (the forest joins in once its trees are planted)
 const ZONES={undersea:['Lalo o ke Kai','under the sea'],beach:['Kahakai','the beach'],mountain:['Kuahiwi','the mountain'],fountain:['Wailele','the waterfall pool'],forest:['Wao Nahele','the forest'],sea:['Ke Kai','the open sea']};
-const FOREST_READY=false;
+const FOREST_READY=true;
 function zoneAt(x,z){
   if(Math.hypot(x-POOL.x,z-POOL.z)<POOL.r+18)return'fountain';
   if(mountainH(x,z)>13)return'mountain';
   const m=masks(x,z);if(m.d<-14)return'sea';
-  if(FOREST_READY&&Math.hypot((x-FOREST.x)/38,(z-FOREST.z)/52)<1&&m.d>6)return'forest';
+  if(FOREST_READY&&forestW(x,z)>.4)return'forest';
   return'beach';
 }
 function surfaceAt(x,z){
@@ -617,7 +617,7 @@ const TERR=new Float32Array((SEG+1)*(SEG+1)),TGRASS=new Float32Array((SEG+1)*(SE
 {
   const g=new THREE.PlaneGeometry(SIZE,SIZE,SEG,SEG); g.rotateX(-Math.PI/2);
   const pos=g.attributes.position,col=new Float32Array(pos.count*3),am=new Float32Array(pos.count);
-  const cReef=srgb(.5,.47,.38),cReef2=srgb(.36,.36,.27),cCliff=srgb(.33,.31,.28),cMoss=srgb(.2,.25,.12),cSand=srgb(.88,.76,.56),cWet=srgb(.58,.48,.35),cGrass=srgb(.24,.33,.13),cDry=srgb(.45,.42,.22),cLava=srgb(.085,.08,.08),cLava2=srgb(.17,.15,.14),t=new THREE.Color();
+  const cLitter=srgb(.2,.19,.11),cReef=srgb(.5,.47,.38),cReef2=srgb(.36,.36,.27),cCliff=srgb(.33,.31,.28),cMoss=srgb(.2,.25,.12),cSand=srgb(.88,.76,.56),cWet=srgb(.58,.48,.35),cGrass=srgb(.24,.33,.13),cDry=srgb(.45,.42,.22),cLava=srgb(.085,.08,.08),cLava2=srgb(.17,.15,.14),t=new THREE.Color();
   for(let i=0;i<pos.count;i++){const h=heightAt(pos.getX(i),pos.getZ(i));pos.setY(i,h);TERR[i]=h;}
   g.computeVertexNormals();const nrm=g.attributes.normal;
   for(let i=0;i<pos.count;i++){
@@ -631,6 +631,7 @@ const TERR=new Float32Array((SEG+1)*(SEG+1)),TGRASS=new Float32Array((SEG+1)*(SE
     const reef=smooth(-1,-2.6,h)*smooth(10,24,-m.d)*smooth(.38,.55,fbm(x*.09+4,z*.09-6,3)+(h>-4.2?.12:-.1));  // the reef floor: coral rubble and rock, sand in the grooves
     const rk=Math.max(smooth(.25,.6,m.lava),smooth(.3,.7,rock),reef*.9);
     if(rk>0){const lc=reef>.3&&m.lava<.25?cReef.clone().lerp(cReef2,fbm(x*.4,z*.4,3)):m.lava>.25?cLava.clone().lerp(cLava2,fbm(x*.5,z*.5,3)):cCliff.clone().lerp(cMoss,smooth(.4,.65,fbm(x*.3,z*.3+5,3)));t.lerp(lc,rk);} // weathered, mossy cliffs
+    const fw=forestW(x,z);if(fw>0){t.lerp(cLitter,fw*.75);TGRASS[i]*=1-.7*fw;}                         // under the trees: dark leaf litter, little grass
     if(wetBank>0)t.multiplyScalar(1-.3*wetBank);                                               // dark, damp ground along the water
     am[i]=Math.max(gm,rk*2,wetBank*.7);col[i*3]=t.r;col[i*3+1]=t.g;col[i*3+2]=t.b;
   }
@@ -1018,7 +1019,7 @@ const GRASS=(()=>{
   {const {vec3,sin,dot,positionLocal,positionGeometry}=TSL; // shrubs lean with the wind; their outer leaves flutter
    const wd=windAt(positionLocal.xz),h=positionGeometry.y.add(.45).max(0),fl=sin(U.uTime.mul(7.3).add(dot(positionGeometry,vec3(9.1,5.3,7.7)))).mul(wd.z.add(.3)).mul(.012);
    sm.positionNode=positionLocal.add(vec3(wd.x,0,wd.y).mul(h).mul(.09)).add(vec3(fl,fl.mul(.6),fl.negate()));}
-  const SHRUBS=220,shr=new THREE.InstancedMesh(sg,sm,SHRUBS),d=new THREE.Object3D();let i=0,t=0;
+  const SHRUBS=360,shr=new THREE.InstancedMesh(sg,sm,SHRUBS),d=new THREE.Object3D();let i=0,t=0;
   while(i<SHRUBS&&t<60000){t++;const x=(R()-.5)*250,z=-170+R()*295,h=heightAt(x,z),mk=masks(x,z);if(h<1.5||mk.lava>.3||mk.d<12||grassMask(x,z,h,mk)<.35||freshAt(x,z)!=null||Math.hypot(x-SPRING.x,z-SPRING.z)<4)continue;
     if(Math.hypot(x-LANAI.x,z-LANAI.z)<12||Math.hypot(x-START.x,z-START.z)<16)continue; if(h>5&&R()>.3)continue;
     const s=.6+R()*1.1;d.position.set(x,h+.1*s,z);d.rotation.y=R()*6.28;d.scale.set(s*(1+R()*.5),s,s*(1+R()*.5));d.updateMatrix();shr.setMatrixAt(i++,d.matrix);
@@ -1373,6 +1374,7 @@ function initAudio(){
   // the river's babble, and the wind's howl over the summit
   AU.riverG=G(0,AU.amb);AU.riverF=filt('bandpass',1500,1.1,AU.riverG);loop(AU.pink,AU.riverF);
   AU.howlG=G(0,AU.amb);AU.howlF=filt('bandpass',760,6,AU.howlG);loop(AU.pink,AU.howlF);
+  AU.canopyG=G(0,AU.amb);loop(AU.pink,filt('highpass',1600,.4,filt('lowpass',7000,.4,AU.canopyG)));
   AU.uwG=G(0,AU.amb);loop(AU.brown,filt('lowpass',240,.5,AU.uwG));loop(AU.pink,filt('bandpass',900,2,G(.15,AU.uwG))); // the hush and crackle of the reef
   // night insects
   AU.crick=G(0,AU.amb);{const o=ctx.createOscillator();o.frequency.value=4350;const g1=G(.5),g2=G(0);
@@ -1438,6 +1440,13 @@ function scheduleAudio(dt,time){
   AU.surfG.gain.setTargetAtTime(prox*(.1+.2*sw),now,tc);AU.surfF.frequency.setTargetAtTime(380+900*sw,now,tc);
   AU.washG.gain.setTargetAtTime(prox*prox*(.02+.16*Math.pow(sw,1.6)),now,tc);AU.washF.frequency.setTargetAtTime(1200+2200*sw,now,tc);
   const gust=fbm(time*.13,3.3,3);
+  {const fw=Math.max(forestW(player.x,player.z),smooth(8,20,mountainH(player.x,player.z))*.6);AU.canopyG.gain.setTargetAtTime(fw*(.02+.06*gust)*(1-U.uUnder.value),now,.5);
+   if(fw>.25&&now>(T.song||0)&&!U.uUnder.value){const day=night<.5;T.song=now+(day?1.2+Math.random()*3.5:6+Math.random()*10);const p=c.createStereoPanner?c.createStereoPanner():AU.G(1);if(p.pan)p.pan.value=Math.random()*1.6-.8;p.connect(AU.amb);p.connect(AU.revSfx);
+     if(day){const kind=Math.random(),n=kind<.5?5+(Math.random()*6|0):3,base=kind<.5?3200+Math.random()*900:2100+Math.random()*500;   // ʻapapane trills and ʻamakihi whistles
+       for(let i=0;i<n;i++){const t=now+.05+i*(kind<.5?.07:.22),o=c.createOscillator(),g=AU.G(0,p),f=base*(1+(Math.random()-.5)*.2);o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(f*(kind<.5?1.25:.7),t+(kind<.5?.05:.18));
+         g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.018*fw,t+.012);g.gain.exponentialRampToValueAtTime(.0005,t+(kind<.5?.06:.2));o.connect(g);o.start(t);o.stop(t+.25);}}
+     else{for(let i=0;i<2;i++){const t=now+.05+i*.55,o=c.createOscillator(),g=AU.G(0,p);o.type='sine';o.frequency.setValueAtTime(420,t);o.frequency.linearRampToValueAtTime(380,t+.35); // a pueo calling
+       g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.03*fw,t+.06);g.gain.exponentialRampToValueAtTime(.0005,t+.4);o.connect(g);o.start(t);o.stop(t+.45);}}}}
   const und=U.uUnder.value;AU.uwF.frequency.setTargetAtTime(und?480:20000,now,.06);AU.uwG.gain.setTargetAtTime(und*.5,now,.25);
   if(und&&now>(T.exh||0)){T.exh=now+3.2+Math.random()*2.4;for(let i=0;i<7;i++){const o=c.createOscillator(),g=AU.G(0,AU.sfx),t=now+.05+i*.07+Math.random()*.05,f0=180+Math.random()*260; // breath out: a stream of bubbles
     o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(f0*2.4,t+.06);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.05,t+.01);g.gain.exponentialRampToValueAtTime(.0005,t+.09);o.connect(g);o.start(t);o.stop(t+.1);}}
@@ -1832,7 +1841,7 @@ function update(dt){
   sky.position.copy(camera.position);
   GRASS.update(camera.position.x,camera.position.z);
   updateFresh(dt);
-  SEA.update(dt,time);if(state==='play')DIVE.tick(dt);
+  SEA.update(dt,time);FLORA.update(camera.position.x,camera.position.z);FAUNA.tick(dt,time);if(state==='play')DIVE.tick(dt);
   {const c=camera.position,cw=freshAt(c.x,c.z),und=c.y<(cw!=null?cw:water.position.y)-.03?1:0; // under the surface: blue-green haze, muffled sound
    U.uUnder.value=und;postU.uUnder.value=und;postU.uLookUp.value=smooth(-.5,.8,player.pitch);
    scene.fog.density=und?(have('goggles')>0?.042:.062):0;const dl=.12+.88*U.uDay.value;scene.fog.color.setRGB(.03*dl,.2*dl,.23*dl);U.uFogCol.value.copy(scene.fog.color);
@@ -1923,6 +1932,10 @@ const K={
   hee:{n:'Heʻe (octopus)',mk(){const g=new THREE.Group();part(g,'sph',mt(.6,.32,.22,.5),.06,.07,.06,0,.06,0);for(let i=0;i<8;i++)part(g,'cyl',mt(.66,.36,.25,.5),.012,.2,.012,Math.cos(i*.785)*.08,.01,Math.sin(i*.785)*.08,0,-i*.785,Math.PI/2);return g;},food:1,cook:1},
   ula:{n:'Ula (spiny lobster)',mk(){const g=new THREE.Group();part(g,'cyl',mt(.5,.22,.14,.5),.035,.28,.035,0,.035,0,0,0,Math.PI/2);for(const z of[-.02,.02])part(g,'cyl',mt(.55,.25,.15,.5),.004,.35,.004,.25,.06,z,0,0,Math.PI/2-.3);return g;},food:1,cook:1},
   aama:{n:'ʻAʻama (rock crab)',mk(){const g=new THREE.Group();part(g,'sph',mt(.14,.08,.07,.4),.05,.02,.045,0,.02,0);return g;},food:1,cook:1},
+  pork:{n:'Wild pork',mk(){const g=new THREE.Group();part(g,'box',mt(.62,.3,.28,.6),.14,.06,.09,0,.03,0);part(g,'box',mt(.92,.88,.8,.6),.14,.015,.09,0,.065,0);return g;},food:1,cook:1},
+  venison:{n:'Venison',mk(){const g=new THREE.Group();part(g,'box',mt(.45,.15,.14,.55),.15,.05,.08,0,.025,0);return g;},food:1,cook:1},
+  goatmeat:{n:'Goat meat',mk(){const g=new THREE.Group();part(g,'box',mt(.55,.22,.2,.6),.13,.05,.08,0,.025,0);return g;},food:1,cook:1},
+  fowl:{n:'Fowl',mk(){const g=new THREE.Group();part(g,'sph',mt(.9,.78,.66,.6),.07,.05,.05,0,.05,0);part(g,'cyl',mt(.9,.78,.66,.6),.015,.08,.015,.07,.03,.02,0,0,1);return g;},food:1,cook:1},
   fish:{n:'Reef fish',mk(){const g=new THREE.Group();part(g,'sph',mt(.6,.66,.7,.25,{metalness:.5}),.11,.045,.02,0,.03,0);part(g,'cone',mt(.5,.56,.6,.3),.04,.06,.008,-.13,.03,0,0,0,-Math.PI/2);return g;},food:1,cook:1},
   poi:{n:'Poi',mk:bowlWith([.55,.45,.55]),food:3,back:'bowl'},laulau:{n:'Taro-leaf wrap',mk(){const g=new THREE.Group();part(g,'box',mt(.2,.3,.12,.7),.1,.05,.07,0,.03,0);part(g,'cyl',mt(.66,.53,.34),.052,.01,.037,0,.03,0,0,0,Math.PI/2);return g;},food:3},
   haupia:{n:'Coconut pudding',mk(){const g=new THREE.Group();part(g,'box',mt(.97,.96,.93,.3),.07,.04,.07,0,.02,0);return g;},food:3},stew:{n:'Island stew',mk:bowlWith([.75,.42,.18]),food:3,back:'bowl'},
@@ -1943,14 +1956,15 @@ const BROWN=new THREE.Color(.5,.36,.24),PALE=new THREE.Color(1.05,.95,.75);
 for(const k of Object.keys(K))if(K[k].cook){const b=K[k];
   K['c_'+k]={n:'Roasted '+b.n.toLowerCase(),food:2,mk:()=>tintClone(b.mk(),BROWN)};
   K['d_'+k]={n:'Dried '+b.n.toLowerCase(),food:2,mk:()=>{const g=tintClone(b.mk(),PALE);g.scale.setScalar(.82);return g;}};}
-K.heeluau={n:'Heʻe lūʻau (octopus in coconut)',mk:bowlWith([.82,.78,.6]),food:4,back:'bowl'};K.seapot={n:'Pot of crab and lobster',mk:bowlWith([.85,.45,.3]),food:3,back:'bowl'};
-for(const k of['poi','laulau','haupia','stew','heeluau','seapot'])K['s_'+k]={...K[k],n:'Spicy '+K[k].n.toLowerCase(),food:4};
+K.kalua={n:'Kālua puaʻa (slow-cooked pork)',mk:bowlWith([.7,.55,.45]),food:4,back:'bowl'};K.heeluau={n:'Heʻe lūʻau (octopus in coconut)',mk:bowlWith([.82,.78,.6]),food:4,back:'bowl'};K.seapot={n:'Pot of crab and lobster',mk:bowlWith([.85,.45,.3]),food:3,back:'bowl'};
+for(const k of['poi','laulau','haupia','stew','heeluau','seapot','kalua'])K['s_'+k]={...K[k],n:'Spicy '+K[k].n.toLowerCase(),food:4};
 const isFood=k=>K[k]&&K[k].food!=null;
 const CHICK_LIKES=k=>k==='beans'?1.5:(['onion','cocomeat','chili'].includes(k)||/^[cds]_/.test(k)||['poi','stew','laulau'].includes(k))?1:0;
 const GOAT_LIKES=k=>k==='vines'?1.5:['frond','banana','onion','spud','beans','seaweed'].includes(k)?1:0;
 
 /* ───────── notebook: the only guidance, written after the fact ───────── */
 const NOTES={
+  hunt:'Crept close with the spear, slow and low. Meat for the fire, and for the imu.',
   dive:'Under the surface the reef goes on and on. A breath lasts about a minute; the light and the cold tell me when to go up.',
   blackout:'I stayed down too long. I came to on the sand, and what I had gathered down there was gone.',
   spear:'A flake lashed to bamboo makes a spear. Fish that hover over the reef can be taken with it.',
@@ -2452,7 +2466,7 @@ function makeFire(key,x,z){
 }
 const cooked=c=>(Date.now()-c.t)/1000>(c.kind==='rawpot'?70:40);
 function dishOf(ing){const s=new Set(ing),hot=s.has('chili');let d='stew';
-  if(s.has('hee')&&s.has('cocomeat'))d='heeluau';else if(s.has('ula')||s.has('aama'))d='seapot';else if(s.has('taro')&&(s.has('egg')||s.has('fish')))d='laulau';else if(s.has('taro')&&[...s].every(k=>k==='taro'||k==='chili'))d='poi';else if(s.has('cocomeat')&&(s.has('honey')||s.has('milk')||s.has('banana')))d='haupia';
+  if(s.has('pork')&&(s.has('taro')||s.has('spud')))d='kalua';else if(s.has('hee')&&s.has('cocomeat'))d='heeluau';else if(s.has('ula')||s.has('aama'))d='seapot';else if(s.has('taro')&&(s.has('egg')||s.has('fish')))d='laulau';else if(s.has('taro')&&[...s].every(k=>k==='taro'||k==='chili'))d='poi';else if(s.has('cocomeat')&&(s.has('honey')||s.has('milk')||s.has('banana')))d='haupia';
   return(hot?'s_':'')+d;}
 function updateFires(dt,night){
   let nearLit=0;
@@ -3159,8 +3173,309 @@ const SEA=(()=>{
   };
 })();
 
+/* ───────────────────────── Wao Nahele: the Hawaiian rainforest ─────────────────────────
+   Ten Hawaiian trees, built in code: trunks and limbs from the scanned bark, leaves as clusters of hand-drawn sprigs that
+   share the island's wind. They grow where they would: koa, ʻōhiʻa and hāpuʻu in the forest and up the mountain, loulu on its
+   ridges, hala by the shore, wiliwili on the dry lava side, ʻulu, kukui and ʻōhiʻa ʻai near water and people, and a banyan or
+   two. Trees are instanced per kind in 64 m chunks. */
+function forestW(x,z){const e=Math.hypot((x-FOREST.x)/36,(z-FOREST.z)/52),m=masks(x,z);return smooth(1,.72,e+(fbm(x*.04+3,z*.04,2)-.5)*.35)*smooth(18,30,m.d)*(1-m.lava);}
+window.__tF0=performance.now();const FLORA=(()=>{
+  const R3=rng(9191),V3=THREE.Vector3,up=new V3(0,1,0),C=(h)=>new THREE.Color(h);
+  // ── leaf textures: sprigs drawn on a canvas, with alpha ──
+  // a dense cluster of leaves on a few twigs, darker toward its heart, with flowers or fruit on top
+  const sprig=(o)=>{const t=canvasTex(256,256,(g,w,h)=>{g.clearRect(0,0,w,h);const r=rng(o.seed||1);
+      g.strokeStyle=o.twig||'#5a4630';g.lineWidth=3;for(let k=0;k<5;k++){g.beginPath();g.moveTo(w*.5,h*.98);g.quadraticCurveTo(w*(.5+(r()-.5)*.3),h*.6,w*(.18+r()*.64),h*(.12+r()*.4));g.stroke();}
+      const leaf=(L)=>{g.beginPath();if(o.shape==='sickle'){g.moveTo(0,0);g.quadraticCurveTo(L*.5,-L*.14,L,-L*.42);g.quadraticCurveTo(L*.45,L*.06,0,0);}
+        else if(o.shape==='lobed'||o.shape==='ulu'){const lobes=o.shape==='ulu'?7:3;g.moveTo(0,0);for(let k=0;k<=lobes*2;k++){const u=k/(lobes*2),rr=L*(.35+.65*Math.sin(Math.PI*u))*(k%2?.55:1);g.lineTo(Math.cos((u-.5)*2.4)*rr+L*.15,Math.sin((u-.5)*2.4)*rr);}g.closePath();}
+        else if(o.shape==='trifol'){for(const q of[-.6,0,.6])g.ellipse(Math.cos(q)*L*.5,Math.sin(q)*L*.5,L*.42,L*.22,q,0,6.3);}
+        else g.ellipse(L*.5,0,L*.5,L*.2*(o.wide||1),0,0,6.3);g.fill();};
+      const c0=new THREE.Color(o.col[0]),c1=new THREE.Color(o.col[1]),c=new THREE.Color();
+      for(let i=0;i<o.n;i++){const a=r()*6.283,q=Math.sqrt(r()),x=w*.5+Math.cos(a)*q*w*.44,y=h*.5+Math.sin(a)*q*h*.42,L=w*o.len*(.7+r()*.6),shade=.55+.45*q+(r()-.5)*.15;
+        c.copy(c0).lerp(c1,r()).multiplyScalar(Math.min(1.15,shade));g.fillStyle='#'+c.getHexString();g.save();g.translate(x,y);g.rotate(a+(r()-.5)*1.4);leaf(L);
+        g.strokeStyle='rgba(0,0,0,.15)';g.lineWidth=1;g.beginPath();g.moveTo(0,0);g.lineTo(L*.85,o.shape==='sickle'?-L*.3:0);g.stroke();g.restore();}
+      if(o.flowers)for(let i=0;i<o.fl;i++){const x=w*(.2+r()*.6),y=h*(.15+r()*.6);g.strokeStyle=o.flowers;g.lineWidth=1.6; // lehua: a pompom of stamens
+        for(let k=0;k<30;k++){const a=r()*6.28,l=6+r()*9;g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);g.stroke();}}
+      if(o.fruit)for(let i=0;i<o.fruitN;i++){const x=w*(.3+r()*.4),y=h*(.35+r()*.4),rr=o.fruitR*(.8+r()*.4);g.fillStyle=o.fruit;g.beginPath();g.arc(x,y,rr,0,6.3);g.fill();g.fillStyle='rgba(255,255,255,.22)';g.beginPath();g.arc(x-rr*.3,y-rr*.3,rr*.35,0,6.3);g.fill();}
+    });t.colorSpace=THREE.SRGBColorSpace;return t;};
+  const frondTex=canvasTex(128,512,(g,w,h)=>{g.clearRect(0,0,w,h);g.strokeStyle='#4a3a22';g.lineWidth=3;g.beginPath();g.moveTo(w/2,h);g.lineTo(w/2,0);g.stroke(); // hāpuʻu: a frond of pinnae
+    for(let i=0;i<46;i++){const y=h*(1-i/46),L=w*.48*Math.sin(Math.PI*Math.min(1,(i+4)/50));for(const s of[-1,1]){g.fillStyle=i%3?'#4f7a2e':'#5e8a36';g.beginPath();g.moveTo(w/2,y);
+      for(let k=0;k<=8;k++){const u=k/8;g.lineTo(w/2+s*L*u,y-6*u+Math.sin(u*25)*1.6);}for(let k=8;k>=0;k--){const u=k/8;g.lineTo(w/2+s*L*u,y-6*u-5*(1-u));}g.fill();}}});
+  const strapTex=canvasTex(64,256,(g,w,h)=>{const gr=g.createLinearGradient(0,0,w,0);gr.addColorStop(0,'#b7a64a');gr.addColorStop(.12,'#4f6b2a');gr.addColorStop(.5,'#5f7d34');gr.addColorStop(.88,'#4f6b2a');gr.addColorStop(1,'#b7a64a');g.fillStyle=gr;g.fillRect(0,0,w,h);
+    g.strokeStyle='rgba(0,0,0,.2)';g.beginPath();g.moveTo(w/2,0);g.lineTo(w/2,h);g.stroke();});
+  const fanTex=canvasTex(256,128,(g,w,h)=>{g.fillStyle='#55712f';g.fillRect(0,0,w,h);for(let i=0;i<40;i++){g.strokeStyle=i%2?'rgba(0,0,0,.25)':'rgba(255,255,220,.15)';g.lineWidth=2;g.beginPath();g.moveTo(w*i/40,0);g.lineTo(w*i/40,h);g.stroke();}});
+  const LEAF={
+    koa:sprig({shape:'sickle',col:['#56724c','#76906a'],n:170,len:.11,seed:3}),
+    ohia:sprig({shape:'oval',col:['#3a5829','#557236'],n:300,len:.055,wide:1.6,flowers:'#c8202a',fl:6,seed:4}),
+    kukui:sprig({shape:'lobed',col:['#6f8558','#93a67c'],n:70,len:.14,seed:5}),
+    ulu:sprig({shape:'ulu',col:['#2b4a20','#43662d'],n:20,len:.3,fruit:'#7f9c3c',fruitN:3,fruitR:15,seed:6}),
+    banyan:sprig({shape:'oval',col:['#294520','#3e5d2c'],n:280,len:.06,wide:1.4,seed:7}),
+    wiliwili:sprig({shape:'trifol',col:['#82a05a','#a2b674'],n:110,len:.08,flowers:'#e98a34',fl:4,seed:8}),
+    ohiaai:sprig({shape:'oval',col:['#2a4522','#476631'],n:150,len:.09,fruit:'#a8173c',fruitN:5,fruitR:9,seed:9}),
+  };
+  // ── geometry builders ──
+  const parts=[],leafParts=[];
+  const tube=(from,to,r0,r1,seg=7,col)=>{const d=to.clone().sub(from),L=d.length(),g=new THREE.CylinderGeometry(r1,r0,L,seg,Math.max(1,Math.round(L/1.5)),true);
+    g.translate(0,L/2,0);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up,d.normalize()));g.translate(from.x,from.y,from.z);
+    const uv=g.attributes.uv;for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*Math.max(1,r0*6),uv.getY(i)*L*.6);return g;};
+  const card=(c,s,outward,flexBase=.4)=>{const g=new THREE.PlaneGeometry(s,s);const q=new THREE.Quaternion().setFromUnitVectors(new V3(0,0,1),outward.clone().add(new V3((R3()-.5)*.9,(R3()-.3)*.8,(R3()-.5)*.9)).normalize());
+    g.rotateZ(R3()*6.28);g.applyQuaternion(q);g.translate(c.x,c.y,c.z);const n=g.attributes.normal,fl=new Float32Array(4).fill(1);
+    for(let i=0;i<4;i++){const o=outward.clone().normalize().multiplyScalar(.7).add(new V3(n.getX(i),n.getY(i),n.getZ(i)).multiplyScalar(.3)).normalize();n.setXYZ(i,o.x,o.y,o.z);} // soft canopy shading
+    g.setAttribute('aFlex',new THREE.BufferAttribute(fl,1));return g;};
+  // a limb that forks: returns tip points where leaves go
+  function limb(from,dir,len,r,depth,spread,tips,bend=0){const to=from.clone().addScaledVector(dir,len);to.y+=bend*len;parts.push(tube(from,to,r,r*.68,depth>1?6:5));
+    if(depth<=0){tips.push(to);return;}const n=depth>2?3:2;for(let i=0;i<n;i++){const a=R3()*6.283,d=dir.clone().add(new V3(Math.cos(a)*spread,.25+R3()*.3,Math.sin(a)*spread)).normalize();
+      limb(to,d,len*(.62+R3()*.18),r*.66,depth-1,spread,tips,bend);}}
+  const crown=(tips,ctr,count,size,flex)=>{for(let i=0;i<count;i++){const tp=tips[i%tips.length],o=tp.clone().sub(ctr);o.y*=.6;const p=tp.clone().add(new V3((R3()-.5)*size*1.4,(R3()-.4)*size,(R3()-.5)*size*1.4));
+      leafParts.push(card(p,size*(.75+R3()*.5),o.lengthSq()<.01?up:o,flex));}};
+  const BUILD={
+    koa(){const H=15,tips=[],base=new V3(0,0,0),top=new V3(.3,H*.42,0);parts.push(tube(base,top,.55,.38,9));for(let k=0;k<5;k++){const a=k/5*6.283+R3();limb(top,new V3(Math.cos(a)*.9,.75,Math.sin(a)*.9).normalize(),H*.28,.3,3,.75,tips,-.05);}
+      crown(tips,new V3(0,H*.75,0),200,2.3);return{leaf:'koa',H};},
+    ohia(){const H=10,tips=[];let p=new V3(0,0,0),d=up.clone();for(let s=0;s<3;s++){const q=p.clone().addScaledVector(d,H*.16);q.x+=(R3()-.5)*.8;q.z+=(R3()-.5)*.8;parts.push(tube(p,q,.28-.05*s,.22-.05*s,8));p=q;}
+      for(let k=0;k<4;k++){const a=k/4*6.283+R3();limb(p,new V3(Math.cos(a)*.7,.9,Math.sin(a)*.7).normalize(),H*.2,.16,3,.9,tips);}crown(tips,new V3(0,H*.72,0),170,1.7);return{leaf:'ohia',H};},
+    kukui(){const H=12,tips=[],top=new V3(0,H*.38,0);parts.push(tube(new V3(),top,.38,.3,8));for(let k=0;k<4;k++){const a=k/4*6.283+R3();limb(top,new V3(Math.cos(a)*.8,.8,Math.sin(a)*.8).normalize(),H*.27,.22,3,.8,tips);}
+      crown(tips,new V3(0,H*.72,0),170,2);return{leaf:'kukui',H};},
+    ulu(){const H=11,tips=[],top=new V3(0,H*.3,0);parts.push(tube(new V3(),top,.4,.32,8));for(let k=0;k<5;k++){const a=k/5*6.283+R3();limb(top,new V3(Math.cos(a)*.75,.7,Math.sin(a)*.75).normalize(),H*.25,.22,2,.9,tips);}
+      crown(tips,new V3(0,H*.65,0),140,2.2);return{leaf:'ulu',H};},
+    ohiaai(){const H=10,tips=[],top=new V3(0,H*.45,0);parts.push(tube(new V3(),top,.25,.2,8));for(let k=0;k<4;k++){const a=k/4*6.283+R3();limb(top,new V3(Math.cos(a)*.45,1,Math.sin(a)*.45).normalize(),H*.22,.14,3,.55,tips);}
+      crown(tips,new V3(0,H*.75,0),160,1.8);return{leaf:'ohiaai',H};},
+    wiliwili(){const H=8,tips=[],top=new V3(0,H*.35,0);parts.push(tube(new V3(),top,.3,.24,8));for(let k=0;k<3;k++){const a=k/3*6.283+R3();limb(top,new V3(Math.cos(a)*1,.6,Math.sin(a)*1).normalize(),H*.3,.17,3,1.1,tips,-.08);}
+      crown(tips,new V3(0,H*.7,0),100,1.7);return{leaf:'wiliwili',H};},
+    banyan(){const H=16,tips=[],top=new V3(0,H*.28,0);parts.push(tube(new V3(),top,1.3,1,12));
+      for(let k=0;k<7;k++){const a=k/7*6.283+R3(),d=new V3(Math.cos(a),.28,Math.sin(a)).normalize(),end=top.clone().addScaledVector(d,6+R3()*3);parts.push(tube(top,end,.5,.3,8));
+        for(let j=0;j<4;j++){const p=top.clone().lerp(end,.35+j*.18+R3()*.08);parts.push(tube(new V3(p.x,0,p.z),p,.09+R3()*.08,.05,5));} // aerial roots hanging to the ground and thickening into trunks
+        limb(end,new V3(d.x*.6,1,d.z*.6).normalize(),H*.22,.25,2,.9,tips);}
+      for(let j=0;j<10;j++){const a=R3()*6.283,r=1.4+R3()*.6;parts.push(tube(new V3(Math.cos(a)*r,0,Math.sin(a)*r),new V3(Math.cos(a)*.7,H*.25,Math.sin(a)*.7),.22,.12,6));}
+      crown(tips,new V3(0,H*.7,0),360,2.4);return{leaf:'banyan',H};},
+    hapuu(){const H=4.2,top=new V3(0,H,0);parts.push(tube(new V3(),top,.24,.18,9));
+      for(let k=0;k<13;k++){const a=k/13*6.283+R3()*.3,L=2.4+R3()*.8,g=new THREE.PlaneGeometry(.9,L,1,10),p=g.attributes.position; // fronds arch out and droop
+        for(let i=0;i<p.count;i++){const t=p.getY(i)/L+.5,x=p.getX(i)*(1-t*.6);p.setXYZ(i,x,Math.sin(t*1.6)*L*.45-t*t*L*.55,t*L*.92);}
+        g.rotateY(a);g.translate(0,H,0);g.computeVertexNormals();const fl=new Float32Array(p.count);for(let i=0;i<p.count;i++)fl[i]=Math.min(1,Math.hypot(p.getX(i),p.getZ(i))/L);g.setAttribute('aFlex',new THREE.BufferAttribute(fl,1));leafParts.push(g);}
+      return{leaf:'frond',H};},
+    hala(){const H=6,tips=[];let p=new V3(),d=new V3(.25,1,0).normalize();const top=p.clone().addScaledVector(d,H*.45);parts.push(tube(p,top,.18,.15,7));
+      for(let j=0;j<6;j++){const a=j/6*6.283;parts.push(tube(new V3(Math.cos(a)*.7,0,Math.sin(a)*.7),new V3(d.x*1.2,1.3,0),.05,.04,5));} // prop roots
+      for(let k=0;k<3;k++){const a=k/3*6.283+R3();const d2=new V3(Math.cos(a)*.8,.9,Math.sin(a)*.8).normalize(),e=top.clone().addScaledVector(d2,H*.3);parts.push(tube(top,e,.12,.09,6));
+        for(let m=0;m<2;m++){const a2=a+(m-.5)*1.2,e2=e.clone().addScaledVector(new V3(Math.cos(a2)*.7,.7,Math.sin(a2)*.7).normalize(),H*.18);parts.push(tube(e,e2,.08,.06,5));tips.push(e2);}}
+      for(const t of tips)for(let i=0;i<22;i++){const a=i*2.4,L=1.4+R3()*.6,g=new THREE.PlaneGeometry(.1,L,1,6),p2=g.attributes.position; // spiral tufts of long strap leaves
+        for(let q=0;q<p2.count;q++){const u=p2.getY(q)/L+.5;p2.setXYZ(q,p2.getX(q)*(1-u*.7),Math.sin(u*1.4)*L*.45-u*u*L*.5,u*L*.9);}g.rotateY(a);g.rotateX(-.2);g.translate(t.x,t.y,t.z);g.computeVertexNormals();
+        const fl=new Float32Array(p2.count);for(let q=0;q<p2.count;q++)fl[q]=(p2.getY(q)-t.y+L)/L;g.setAttribute('aFlex',new THREE.BufferAttribute(fl,1));leafParts.push(g);}
+      return{leaf:'strap',H};},
+    loulu(){const H=7,top=new V3(.2,H,0);parts.push(tube(new V3(),top,.16,.13,8));
+      for(let k=0;k<16;k++){const a=k/16*6.283+R3()*.2,tilt=.2+R3()*.9,pet=new V3(Math.cos(a)*1.1,.5-tilt*.6,Math.sin(a)*1.1).normalize(),end=top.clone().addScaledVector(pet,1.3);parts.push(tube(top,end,.03,.025,4));
+        const g=new THREE.CircleGeometry(.85,14,-1.3,2.6),p=g.attributes.position;for(let i=0;i<p.count;i++){const an=Math.atan2(p.getY(i),p.getX(i)),r=Math.hypot(p.getX(i),p.getY(i));p.setZ(i,Math.sin(an*14)*.04*r-r*r*.12);} // a pleated fan
+        g.rotateX(-Math.PI/2);g.rotateY(-a);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up,new V3(pet.x*.3,1,pet.z*.3).normalize()));g.translate(end.x,end.y,end.z);g.computeVertexNormals();
+        const fl=new Float32Array(p.count).fill(1);g.setAttribute('aFlex',new THREE.BufferAttribute(fl,1));leafParts.push(g);}
+      return{leaf:'fan',H};},
+  };
+  const SPECIES={koa:{n:'Koa',bark:'#8a8174',scale:[.8,1.25]},ohia:{n:'ʻŌhiʻa lehua',bark:'#7c7064',scale:[.7,1.4]},hapuu:{n:'Hāpuʻu (tree fern)',bark:'#4d3524',scale:[.7,1.4]},
+    kukui:{n:'Kukui (candlenut)',bark:'#a39c90',scale:[.8,1.2]},hala:{n:'Hala (pandanus)',bark:'#8d7a62',scale:[.8,1.3]},ulu:{n:'ʻUlu (breadfruit)',bark:'#8f8577',scale:[.85,1.15]},
+    loulu:{n:'Loulu (fan palm)',bark:'#8a7f70',scale:[.8,1.3]},banyan:{n:'Banyan',bark:'#8d8579',scale:[.9,1.1]},wiliwili:{n:'Wiliwili',bark:'#b09a74',scale:[.8,1.2]},ohiaai:{n:'ʻŌhiʻa ʻai (mountain apple)',bark:'#7a6f62',scale:[.85,1.15]}};
+  // merge helper (positions, normals, uvs, aFlex)
+  const mergeG=(list,flexDefault)=>{let n=0,ni=0;for(const g of list){n+=g.attributes.position.count;ni+=g.index?g.index.count:g.attributes.position.count;}
+    const P=new Float32Array(n*3),N=new Float32Array(n*3),UVa=new Float32Array(n*2),F=new Float32Array(n),I=new Uint32Array(ni);let o=0,oi=0;
+    for(const g of list){const p=g.attributes.position,nr=g.attributes.normal,uv=g.attributes.uv,fl=g.attributes.aFlex;
+      for(let i=0;i<p.count;i++){P[(o+i)*3]=p.getX(i);P[(o+i)*3+1]=p.getY(i);P[(o+i)*3+2]=p.getZ(i);N[(o+i)*3]=nr.getX(i);N[(o+i)*3+1]=nr.getY(i);N[(o+i)*3+2]=nr.getZ(i);
+        if(uv){UVa[(o+i)*2]=uv.getX(i);UVa[(o+i)*2+1]=uv.getY(i);}F[o+i]=fl?fl.getX(i):(flexDefault==null?Math.min(1,p.getY(i)/12)*.3:flexDefault);}
+      if(g.index)for(let i=0;i<g.index.count;i++)I[oi++]=g.index.getX(i)+o;else for(let i=0;i<p.count;i++)I[oi++]=o+i;o+=p.count;}
+    const out=new THREE.BufferGeometry();out.setAttribute('position',new THREE.BufferAttribute(P,3));out.setAttribute('normal',new THREE.BufferAttribute(N,3));out.setAttribute('uv',new THREE.BufferAttribute(UVa,2));
+    out.setAttribute('aFlex',new THREE.BufferAttribute(F,1));out.setIndex(new THREE.BufferAttribute(I,1));out.computeBoundingSphere();return out;};
+  // materials
+  const bk=pbrTex('bark'),barkMats={},leafMats={};
+  const windLeaf=(m,amt)=>{const {attribute,vec3,sin,dot,positionLocal,positionGeometry}=TSL;const fl=attribute('aFlex','float'),wd=windAt(positionLocal.xz);
+    const flut=sin(U.uTime.mul(5.3).add(dot(positionGeometry,vec3(3.1,2.3,2.7)))).mul(wd.z.add(.25)).mul(.05);
+    m.positionNode=positionLocal.add(vec3(wd.x,0,wd.y).mul(fl).mul(amt)).add(vec3(flut,flut.mul(.4),flut.negate()).mul(fl));return m;};
+  for(const k in SPECIES){const m=new THREE.MeshStandardNodeMaterial({map:bk.a,normalMap:null,color:new THREE.Color(SPECIES[k].bark).multiplyScalar(1.6),roughness:.92});
+    {const {texture,uv,vec2}=TSL,nr=texture(bk.n,uv());m.normalNode=nrNormal(nr,1.2);}barkMats[k]=m;}
+  const leafMat=(tex,alpha=.5,amt=.35)=>windLeaf(leafy(new THREE.MeshStandardNodeMaterial({map:tex,alphaTest:alpha,side:THREE.DoubleSide,roughness:.62,metalness:0})),amt);
+  for(const k in LEAF)leafMats[k]=leafMat(LEAF[k]);leafMats.frond=leafMat(frondTex,.45,.5);leafMats.strap=leafMat(strapTex,.01,.25);leafMats.fan=leafMat(fanTex,.01,.3);
+  const TEMPL={};for(const k in BUILD){parts.length=0;leafParts.length=0;const info=BUILD[k]();TEMPL[k]={bark:mergeG(parts,0),leaf:mergeG(leafParts,1),leafKind:info.leaf,H:info.H};}
+
+  // ── where each tree grows ──
+  const spots=[],grid=new Map(),gk=(x,z)=>Math.floor(x/10)+','+Math.floor(z/10);
+  const clear=(x,z,r)=>{const gx=Math.floor(x/10),gz=Math.floor(z/10);for(let i=-2;i<=2;i++)for(let j=-2;j<=2;j++){const L=grid.get((gx+i)+','+(gz+j));if(L)for(const s of L)if(Math.hypot(s.x-x,s.z-z)<r*(s.big?1.6:1)||(s.big&&Math.hypot(s.x-x,s.z-z)<12))return false;}return true;};
+  const okGround=(x,z,h)=>{if(h<1.2||freshAt(x,z)!=null)return false;const q=riverQ(x,z);if(q&&q.d<q.w+2)return false;
+    if(Math.hypot(x-LANAI.x,z-LANAI.z)<14||Math.hypot(x-START.x,z-START.z)<18||Math.hypot(x-SPRING.x,z-SPRING.z)<6||Math.hypot(x-POOL.x,z-POOL.z)<POOL.r+3)return false;
+    const n=tnorm(x,z);return n.y>.55;};
+  const place=(kind,count,test,minGap,tries=count*60)=>{let c=0;for(let t=0;t<tries&&c<count;t++){const x=(R3()-.5)*290,z=-182+R3()*318,h=heightAt(x,z);if(!okGround(x,z,h)||!test(x,z,h))continue;
+    if(!clear(x,z,minGap))continue;const sp={kind,x,z,h,big:kind==='banyan'};spots.push(sp);const k=gk(x,z);(grid.get(k)||grid.set(k,[]).get(k)).push(sp);c++;}};
+  const mt=(x,z)=>mountainH(x,z);
+  place('banyan',2,(x,z,h)=>forestW(x,z)>.7,18);
+  place('ohiaai',30,(x,z,h)=>forestW(x,z)>.3,5);
+  place('koa',75,(x,z,h)=>forestW(x,z)>.45||(mt(x,z)>14&&h<45&&R3()<.5),6);
+  place('ohia',170,(x,z,h)=>forestW(x,z)>.35||(mt(x,z)>9&&h<66),4.5);
+  place('hapuu',150,(x,z,h)=>forestW(x,z)>.55||(mt(x,z)>10&&h<55&&fbm(x*.05,z*.05,2)>.48),2.6);
+  place('kukui',35,(x,z,h)=>forestW(x,z)>.2&&forestW(x,z)<.8||(h<12&&masks(x,z).d>30&&R3()<.15),7);
+  place('ulu',16,(x,z,h)=>Math.hypot(x-LANAI.x,z-LANAI.z)<70&&h<10&&masks(x,z).d>22,9);
+  place('loulu',40,(x,z,h)=>mt(x,z)>14&&h<72,5,8000);
+  place('hala',45,(x,z,h)=>{const m=masks(x,z);return m.d>5&&m.d<34&&m.lava<.3&&h<8;},5);
+  place('wiliwili',25,(x,z,h)=>{const m=masks(x,z);return m.lava<.25&&m.d>10&&x<-30&&h<14;},8);
+  // instanced per kind in 64 m chunks
+  const CH=64,chunks=new Map(),M=new THREE.Matrix4(),Q=new THREE.Quaternion(),S=new V3(),P=new V3();
+  for(const s of spots){const sp=SPECIES[s.kind],k=sp.scale[0]+R3()*(sp.scale[1]-sp.scale[0]),lean=s.kind==='hala'||s.kind==='loulu'?.12:.04;
+    Q.setFromEuler(new THREE.Euler((R3()-.5)*lean,R3()*6.283,(R3()-.5)*lean));S.set(k,k*(.9+R3()*.2),k);P.set(s.x,s.h-.15,s.z);M.compose(P,Q,S);
+    const key=Math.floor(s.x/CH)+','+Math.floor(s.z/CH);let c=chunks.get(key);if(!c){c={x0:Math.floor(s.x/CH)*CH,z0:Math.floor(s.z/CH)*CH,lists:{}};chunks.set(key,c);}(c.lists[s.kind]=c.lists[s.kind]||[]).push(M.clone());
+    const tr={hapuu:.2,hala:.18,loulu:.15,banyan:1.6}[s.kind]||.28*k;colliders.push({x:s.x,z:s.z,r:tr});s.scale=k;}
+  const list=[];
+  for(const c of chunks.values()){c.meshes=[];for(const kind in c.lists){const L=c.lists[kind],T=TEMPL[kind];
+    const b=new THREE.InstancedMesh(T.bark,barkMats[kind],L.length),l=new THREE.InstancedMesh(T.leaf,leafMats[T.leafKind],L.length);
+    L.forEach((m,i)=>{b.setMatrixAt(i,m);l.setMatrixAt(i,m);});for(const im of[b,l]){im.castShadow=true;im.receiveShadow=true;im.computeBoundingSphere();scene.add(im);c.meshes.push(im);}
+    const item={label:()=>SPECIES[kind].n,verb:''};b.userData.item=item;interact.push(b);l.raycast=()=>{};}
+    list.push(c);}
+  return{spots,count:spots.length,kinds:Object.fromEntries(Object.keys(SPECIES).map(k=>[k,spots.filter(s=>s.kind===k).length])),
+    update(cx,cz){for(const c of list){const dx=Math.max(c.x0-cx,0,cx-c.x0-CH),dz=Math.max(c.z0-cz,0,cz-c.z0-CH),d=Math.hypot(dx,dz);for(const m of c.meshes)m.visible=d<420;}},
+    crownPts(kind){return spots.filter(s=>!kind||s.kind===kind).map(s=>({x:s.x,z:s.z,y:s.h+TEMPL[s.kind].H*s.scale*.72,kind:s.kind}));}};
+})();
+
+/* ───────── the forest's animals ─────────
+   Fifteen kinds. Puaʻa (pigs), kia (axis deer), kao (feral goats), moa (jungle fowl) and nēnē can be hunted with a spear and
+   butchered for meat; the rest are there to watch: the mongoose, ʻiʻiwi and ʻapapane, pueo, ʻio, ʻōpeʻapeʻa, the Kamehameha
+   butterfly, Jackson's chameleon, moʻo (geckos) and the happy-face spider. Models are CC BY scans and rigs from Sketchfab
+   (credits in assets/models/README.txt); static ones get their legs swung in the vertex shader. */
+const FAUNA=(()=>{
+  const R4=rng(4242),V3=THREE.Vector3,list=[],loader=gltfLoader;
+  const night=()=>smooth(4,-6,evening.elev);
+  // bake a static model into one canonical mesh: y up, feet at 0, facing +z, scaled to `len` along its body
+  function bake(gl,spec){gl.scene.updateMatrixWorld(true);const meshes=[];gl.scene.traverse(o=>{if(o.isMesh)meshes.push(o);});
+    const out=new THREE.Group(),box=new THREE.Box3();
+    const geos=meshes.map(m=>{const g=floatGeo(m.geometry).applyMatrix4(m.matrixWorld);g.rotateY(spec.turn||0);return{g,mat:m.material};});
+    for(const {g} of geos){g.computeBoundingBox();box.union(g.boundingBox);}
+    if(spec.cut){const cy=box.min.y+(box.max.y-box.min.y)*spec.cut;for(const q of geos){const p=q.g.attributes.position,ix=q.g.index;if(!ix)continue;const keep=[];
+      for(let i=0;i<ix.count;i+=3){const a=ix.getX(i),b=ix.getX(i+1),c=ix.getX(i+2);if(Math.max(p.getY(a),p.getY(b),p.getY(c))>cy)keep.push(a,b,c);}q.g.setIndex(keep);}box.min.y=cy;} // cut away the display base
+    const size=box.getSize(new V3()),k=spec.len/Math.max(size.x,size.z),cx=(box.min.x+box.max.x)/2,cz=(box.min.z+box.max.z)/2;
+    for(const q of geos){q.g.translate(-cx,-box.min.y,-cz);q.g.scale(k,k,k);q.g.computeBoundingSphere();const mat=q.mat.clone();
+      if(spec.tint){mat.color=new THREE.Color(...spec.tint);if(mat.emissiveMap){mat.emissiveMap=null;mat.emissive&&mat.emissive.setRGB(0,0,0);}}const mesh=new THREE.Mesh(q.g,mat);mesh.castShadow=true;mesh.receiveShadow=true;mesh.raycast=()=>{};out.add(mesh);}
+    return{g:out,h:size.y*k};}
+  // legs of a static quadruped or bird swing about the hip, diagonal pairs (or alternate, for birds) in step
+  function legShader(group,hip,biped){const uW=TSL.uniform(0),uA=TSL.uniform(0);const {positionLocal,positionGeometry,sin,float,vec3,select,sign,clamp}=TSL;
+    group.traverse(o=>{if(!o.isMesh)return;const m=o.material=o.material.clone();const y=positionGeometry.y,z=positionGeometry.z,x=positionGeometry.x;
+      const w=clamp(float(hip).sub(y).div(hip*.7),0,1),side=sign(x),front=sign(z),ph=biped?side.mul(1.5708):side.mul(front).mul(1.5708);
+      const a=sin(uW.add(ph)).mul(uA).mul(w);m.positionNode=positionLocal.add(vec3(0,a.abs().mul(-.04*hip),a.mul(float(hip).sub(y).max(0))));});
+    return{uW,uA};}
+  // the moa and the feral goat reuse the island's own rigged chicken and goat models
+  const SKINNED={kao:{url:'assets/models/goat.glb',height:.9,turn:0,legs:/^thigh_stretch/,amp:.45,stride:7},moa:{url:'assets/models/rooster.glb',height:.5,turn:-Math.PI/2,legs:/thigh/i,amp:.6,stride:16}};
+  const SPEC={
+    puaa:{n:'Puaʻa (wild pig)',file:'pig',len:1.25,turn:0,tint:[.34,.28,.26],hip:.42,count:8,zone:'forest',speed:[.6,3.6],flee:13,sneak:6,food:['pork',2]},
+    kia:{n:'Kia (axis deer)',file:'deer',len:1.5,turn:Math.PI,rig:true,anims:{idle:'Idle',graze:'Grazing',walk:'WalkForward',run:'Gallop'},count:7,zone:'edge',speed:[.8,6],flee:18,sneak:8,food:['venison',3]},
+    kao:{n:'Kao (feral goat)',skinned:'kao',count:5,zone:'mountain',speed:[.7,3.5],flee:12,sneak:6,food:['goatmeat',2]},
+    moa:{n:'Moa (jungle fowl)',skinned:'moa',count:7,zone:'forest',speed:[.5,3],flee:6,sneak:3,food:['fowl',1]},
+    nene:{n:'Nēnē (Hawaiian goose)',file:'goose',len:.62,turn:'auto',cut:.17,hip:.3,biped:true,count:6,zone:'grass',speed:[.35,1.6],flee:7,sneak:3.5,food:['fowl',2]},
+    manakuke:{n:'Manakuke (mongoose)',file:'ferret',len:.5,turn:-Math.PI/2,tint:[.95,.85,.7],hip:.25,count:5,zone:'forest',speed:[.6,4],flee:5,sneak:2.5},
+    pueo:{n:'Pueo (Hawaiian owl)',file:'owl',len:.3,turn:0,cut:.28,tint:[.85,.7,.55],count:3,zone:'perch'},
+    io:{n:'ʻIo (Hawaiian hawk)',file:'hawk',len:1.1,turn:0,rig:true,anims:{fly:'Wings'},count:2,zone:'soar'},
+    opeapea:{n:'ʻŌpeʻapeʻa (hoary bat)',file:'bat',len:.32,turn:0,rig:true,anims:{fly:'flapping'},count:4,zone:'bat'},
+    iiwi:{n:'ʻIʻiwi (scarlet honeycreeper)',file:'hummer',len:.15,turn:0,rig:true,anims:{fly:'Animation'},recolour:'iiwi',count:6,zone:'flit'},
+    apapane:{n:'ʻApapane (crimson honeycreeper)',file:'hummer',len:.13,turn:0,rig:true,anims:{fly:'Animation'},recolour:'apapane',count:6,zone:'flit'},
+    pulelehua:{n:'Pulelehua (Kamehameha butterfly)',file:'butterfly',len:.07,turn:0,rig:true,anims:{fly:'Animation'},tint:[1,.75,.65],count:10,zone:'flutter'},
+    chameleon:{n:"Jackson's chameleon",file:'chameleon',len:.32,turn:Math.PI,recolour:'chameleon',count:4,zone:'branch'},
+    moo:{n:'Moʻo (gecko)',make:'gecko',count:8,zone:'trunk'},
+    nananana:{n:'Nananana makakiʻi (happy-face spider)',make:'spider',count:6,zone:'leaf'},
+  };
+  // ── small creatures built in code ──
+  function makeGecko(){const g=new THREE.Group(),m=new THREE.MeshStandardNodeMaterial({color:srgb(.55,.5,.38),roughness:.5});
+    const b=new THREE.Mesh(new THREE.CapsuleGeometry(.012,.07,4,8).rotateX(Math.PI/2),m);b.position.y=.008;g.add(b);
+    const t=new THREE.Mesh(new THREE.ConeGeometry(.01,.08,6).rotateX(-Math.PI/2),m);t.position.set(0,.008,-.075);g.add(t);
+    const hd=new THREE.Mesh(new THREE.SphereGeometry(.014,8,6).scale(1,.7,1.3),m);hd.position.set(0,.01,.055);g.add(hd);
+    for(const [x,z] of [[.02,.03],[-.02,.03],[.02,-.02],[-.02,-.02]]){const l=new THREE.Mesh(new THREE.CylinderGeometry(.003,.003,.025,4).rotateZ(Math.PI/2),m);l.position.set(x,.005,z);g.add(l);}
+    g.scale.setScalar(1.6);return{g,h:.02};}
+  function makeSpider(){const g=new THREE.Group(),y=new THREE.MeshStandardNodeMaterial({color:srgb(.95,.85,.25),roughness:.4}),blk=new THREE.MeshBasicNodeMaterial({color:srgb(.1,.05,.03)});
+    const ab=new THREE.Mesh(new THREE.SphereGeometry(.004,10,8).scale(1,.8,1.2),y);g.add(ab);for(const [x,z,s] of [[-.0015,.002,.0009],[.0015,.002,.0009],[0,-.0015,.0011]]){const d=new THREE.Mesh(new THREE.SphereGeometry(s,6,4),blk);d.position.set(x,.003,z);g.add(d);} // the "face"
+    for(let i=0;i<8;i++){const a=(i<4?-1:1)*(.4+(i%4)*.35),l=new THREE.Mesh(new THREE.CylinderGeometry(.0003,.0003,.012,3).rotateZ(Math.PI/2),y);l.position.set(Math.sign(a)*.006,0,Math.cos(a)*.004);l.rotation.y=a;g.add(l);}
+    g.scale.setScalar(4);return{g,h:.005};}
+  // ── where they live ──
+  const crowns=FLORA.crownPts(),ohiaCrowns=FLORA.crownPts('ohia'),trunks=FLORA.spots;
+  function spot(zone){for(let t=0;t<400;t++){const x=(R4()-.5)*280,z=-178+R4()*316,h=heightAt(x,z);if(h<1.3||freshAt(x,z)!=null)continue;const fw=forestW(x,z),mt=mountainH(x,z),m=masks(x,z);
+    if(zone==='forest'&&fw>.5)return{x,z,y:h};if(zone==='edge'&&fw<.4&&fw>.02&&m.d>20)return{x,z,y:h};if(zone==='mountain'&&mt>16&&h<55&&tnorm(x,z).y>.6)return{x,z,y:h};
+    if(zone==='grass'&&fw<.2&&mt<10&&m.d>28&&Math.hypot(x-START.x,z-START.z)>25)return{x,z,y:h};}return null;}
+  const pick=a=>a[Math.floor(R4()*a.length)];
+  function home(sp){const z=sp.zone;
+    if(['forest','edge','mountain','grass'].includes(z))return spot(z);
+    if(z==='perch'||z==='branch'){const c=pick(crowns.filter(c=>c.kind==='ohia'||c.kind==='koa'||c.kind==='kukui'));return c&&{x:c.x+(R4()-.5)*2,z:c.z+(R4()-.5)*2,y:c.y-1.2};}
+    if(z==='flit'||z==='flutter'){const c=pick(z==='flit'?ohiaCrowns:crowns);return c&&{x:c.x,z:c.z,y:z==='flit'?c.y:heightAt(c.x,c.z)+1.2};}
+    if(z==='trunk'){const t=pick(trunks.filter(t=>t.kind!=='hapuu'));return t&&{x:t.x,z:t.z,y:t.h+.8+R4()*1.5,trunk:t};}
+    if(z==='leaf'){const s=spot('forest');return s&&{...s,y:s.y+.35};}
+    if(z==='soar'){return{x:PEAK.x+(R4()-.5)*80,z:PEAK.z+60+(R4()-.5)*80,y:0};}
+    if(z==='bat'){const i=Math.floor(R4()*RIVER.P.length*.8)+10,p=RIVER.P[Math.min(RIVER.P.length-1,i)];return{x:p[0],z:p[1],y:heightAt(p[0],p[1])};}
+    return null;}
+  // ── load and make the animals ──
+  const cache={};const load=url=>cache[url]||(cache[url]=loader.loadAsync(url));
+  function recolour(root,how){root.traverse(o=>{if(!o.isMesh)return;const m=o.material=o.material.clone();const {texture,uv,vec3,vec4,dot,mix,smoothstep,materialColor}=TSL;
+    if(!m.map)return;const tx=texture(m.map,uv()),l=dot(tx.rgb,vec3(.3,.59,.11));
+    if(how==='iiwi')m.colorNode=vec4(mix(vec3(.02,.015,.012),vec3(.78,.06,.03),smoothstep(.06,.3,l)),tx.a);        // scarlet with black wings
+    else if(how==='apapane')m.colorNode=vec4(mix(vec3(.02,.015,.015),vec3(.5,.03,.04),smoothstep(.05,.3,l)),tx.a);   // deeper crimson
+    else if(how==='chameleon'&&/Default/.test(m.name))m.colorNode=vec4(mix(vec3(.08,.22,.05),vec3(.35,.62,.18),smoothstep(.15,.6,l)),tx.a);});}
+  function makeOne(key,sp,h0){const a={key,sp,g:new THREE.Group(),home:{...h0},p:new V3(h0.x,h0.y,h0.z),yaw:R4()*6.28,t:R4()*100,state:'idle',stT:R4()*4,
+      walk:0,speed:0,dead:false,gone:0,fleeT:0,mixer:null,acts:{},cur:null,legs:null,bones:null,phase:R4()*6.28};
+    a.g.position.copy(a.p);scene.add(a.g);
+    const px=new THREE.Mesh(geo.box,proxyMat);const sz=sp.len||(sp.skinned==='kao'?1:.45);px.scale.set(sz*.6,Math.max(.12,sz*.6),sz);px.position.y=sz*.3;a.g.add(px);
+    a.g.userData.item={label:()=>a.dead?sp.n+', dead':sp.n,get verb(){return a.dead?'butcher it':sp.food&&selKind()==='spear'?'click to strike':'';},
+      e(){if(!a.dead)return;give(sp.food[0],sp.food[1]);note('hunt');SFX.chop&&SFX.chop();a.dead=false;a.gone=nowS()+600;a.g.visible=false;},
+      use(k){if(k!=='spear'||!sp.food||a.dead)return false;handAnim=1;const sneak=keys.ShiftLeft||keys.ShiftRight;
+        if(Math.random()<(sneak?.75:.45)){a.dead=true;a.state='dead';a.g.rotation.z=Math.PI/2*(Math.random()<.5?1:-1);a.g.position.y=a.p.y+sz*.25;SFX.thud&&SFX.thud(.6);note('hunt');}
+        else{a.fleeT=4;a.state='run';toast('Missed. It bolts.',1.8);}return true;}};
+    interact.push(a.g);list.push(a);
+    if(sp.make){const r=sp.make==='gecko'?makeGecko():makeSpider();a.g.add(r.g);a.body=r.g;return a;}
+    if(sp.skinned){const S=SKINNED[sp.skinned];load(S.url).then(gl=>{const box=new THREE.Box3().setFromObject(gl.scene),k=S.height/box.getSize(new V3()).y;
+      const m=cloneSkinned(gl.scene);m.rotation.y=S.turn;m.scale.setScalar(k);m.position.y=-box.min.y*k;m.traverse(x=>{if(x.isMesh){x.castShadow=true;x.frustumCulled=false;x.raycast=()=>{};}});a.g.add(m);a.body=m;
+      if(sp.skinned==='moa')m.traverse(x=>{if(x.isMesh&&x.material){x.material=x.material.clone();x.material.color=new THREE.Color(.75,.62,.5);}}); // wilder, darker colouring than the farm birds
+      const mixer=new THREE.AnimationMixer(m);if(gl.animations[0]){const act=mixer.clipAction(gl.animations[0]);act.play();}a.mixer=mixer;
+      const legs=[];m.traverse(x=>{if(x.isBone&&S.legs.test(x.name))legs.push(x);});m.updateMatrixWorld(true);a.g.updateMatrixWorld(true);
+      const lp=legs.map(b=>({b,p:a.g.worldToLocal(b.getWorldPosition(new V3()))})),mid=lp.reduce((s,l)=>s+l.p.z,0)/Math.max(1,lp.length);
+      a.bones={S,legs:lp.map(({b,p})=>({b,ph:(lp.length<3?p.x>0:(p.z>mid)!==(p.x>0))?0:Math.PI}))};}).catch(e=>console.warn('Animal',key,e));return a;}
+    load('assets/models/fauna/'+sp.file+'.glb').then(gl=>{
+      if(sp.rig){const box=new THREE.Box3().setFromObject(gl.scene),s=box.getSize(new V3()),k=sp.len/Math.max(s.x,s.z);const m=cloneSkinned(gl.scene);
+        m.rotation.y=sp.turn||0;m.scale.setScalar(k);m.position.y=-box.min.y*k;m.traverse(x=>{if(x.isMesh){x.castShadow=true;x.frustumCulled=false;x.raycast=()=>{};if(sp.tint&&x.material){x.material=x.material.clone();x.material.color=new THREE.Color(...sp.tint);}}});
+        if(sp.recolour)recolour(m,sp.recolour);a.g.add(m);a.body=m;const mixer=new THREE.AnimationMixer(m);a.mixer=mixer;
+        for(const [role,name] of Object.entries(sp.anims||{})){const clip=gl.animations.find(c=>c.name.includes(name));if(clip)a.acts[role]=mixer.clipAction(clip);}
+        const first=a.acts.idle||a.acts.fly;if(first){first.play();a.cur=first;mixer.update(R4()*3);}
+      }else{let spec=sp;if(sp.turn==='auto'){ // birds: face the head, the highest point
+          let hi=null,hy=-1e9,c=new V3(),n=0;gl.scene.updateMatrixWorld(true);gl.scene.traverse(o=>{if(!o.isMesh)return;const p=o.geometry.attributes.position,v=new V3();for(let i=0;i<p.count;i+=7){v.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld);c.add(v);n++;if(v.y>hy){hy=v.y;hi=v.clone();}}});
+          c.multiplyScalar(1/n);spec={...sp,turn:-Math.atan2(hi.x-c.x,hi.z-c.z)};}
+        const r=bake(gl,spec);if(sp.recolour)recolour(r.g,sp.recolour);a.g.add(r.g);a.body=r.g;if(sp.hip)a.legs=legShader(r.g,sp.hip*r.h,sp.biped);}
+    }).catch(e=>console.warn('Animal',key,e));
+    return a;}
+  for(const key in SPEC){const sp=SPEC[key];for(let i=0;i<sp.count;i++){const h=home(sp);if(h)makeOne(key,sp,h);}}
+
+  // ── behaviour ──
+  const play=(a,role,fade=.3)=>{const act=a.acts[role];if(!act||a.cur===act)return;act.reset().play();if(a.cur)a.cur.crossFadeTo(act,fade,false);a.cur=act;};
+  const ground=(a,dt,pd,sneak)=>{const sp=a.sp;
+    if(a.fleeT>0||pd<(sneak?sp.sneak:sp.flee)){if(a.fleeT<=0)a.fleeT=3+Math.random()*2;a.fleeT-=dt;a.state='run';const ang=Math.atan2(a.p.x-player.x,a.p.z-player.z);a.tx=a.p.x+Math.sin(ang)*8;a.tz=a.p.z+Math.cos(ang)*8;}
+    else{a.stT-=dt;if(a.stT<=0){const r=Math.random();if(r<.45){a.state='walk';const an=Math.random()*6.28,d=3+Math.random()*9;a.tx=a.home.x+Math.sin(an)*d;a.tz=a.home.z+Math.cos(an)*d;a.stT=4+Math.random()*6;}
+      else{a.state=r<.8?'graze':'idle';a.stT=3+Math.random()*6;}}}
+    const moving=a.state==='walk'||a.state==='run',spd=moving?(a.state==='run'?sp.speed[1]:sp.speed[0]):0;
+    if(moving){const dx=a.tx-a.p.x,dz=a.tz-a.p.z,d=Math.hypot(dx,dz);if(d<.3){if(a.state==='walk'){a.state='idle';a.stT=2;}}
+      else{const nx=a.p.x+dx/d*spd*dt,nz=a.p.z+dz/d*spd*dt,nh=heightAt(nx,nz);if(nh<.6||freshAt(nx,nz)!=null||tnorm(nx,nz).y<.55){a.tx=a.p.x;a.tz=a.p.z;a.state='idle';}
+        else{a.p.x=nx;a.p.z=nz;let t=Math.atan2(dx,dz)-a.yaw;t=Math.atan2(Math.sin(t),Math.cos(t));a.yaw+=t*Math.min(1,dt*6);a.walk+=spd*dt;}}}
+    a.p.y=heightAt(a.p.x,a.p.z);a.speed=spd;
+    if(a.mixer&&a.acts.walk)play(a,a.state==='run'?'run':a.state==='walk'?'walk':a.state==='graze'?'graze':'idle');};
+  function tick(dt,t){const sneak=keys.ShiftLeft||keys.ShiftRight,nt=night();
+    for(const a of list){const sp=a.sp;
+      if(a.gone){if(nowS()<a.gone)continue;a.gone=0;const h=home(sp);if(h){a.home=h;a.p.set(h.x,h.y,h.z);}a.g.visible=true;a.g.rotation.set(0,a.yaw,0);a.state='idle';}
+      const dc=Math.hypot(a.p.x-camera.position.x,a.p.z-camera.position.z),far=dc>(sp.zone==='soar'?400:sp.zone==='leaf'||sp.make?30:150);a.g.visible=!far&&!a.gone;if(far&&!a.dead)continue;
+      if(a.dead){a.g.position.copy(a.p);a.g.position.y+=.05;continue;}
+      a.t+=dt;const pd=Math.hypot(a.p.x-player.x,a.p.z-player.z);
+      if(['forest','edge','mountain','grass'].includes(sp.zone))ground(a,dt,pd,sneak);
+      else if(sp.zone==='soar'){const R=45+20*Math.sin(a.t*.01+a.phase),an=a.t*.045+a.phase;a.p.set(a.home.x+Math.sin(an)*R,Math.max(heightAt(a.home.x,a.home.z),40)+35+Math.sin(a.t*.07)*6,a.home.z+Math.cos(an)*R);a.yaw=an+Math.PI/2;
+        if(a.acts.fly)a.acts.fly.timeScale=Math.sin(a.t*.3+a.phase)>.6?1:0.05;}                                   // mostly soaring, now and then a few wingbeats
+      else if(sp.zone==='bat'){a.g.visible=a.g.visible&&nt>.3;const an=a.t*1.3+a.phase,r=4+2*Math.sin(a.t*.7);a.p.set(a.home.x+Math.sin(an)*r+Math.sin(a.t*3.1)*.6,a.home.y+3+Math.sin(a.t*2.3)*1.2,a.home.z+Math.cos(an*1.3)*r);a.yaw=an+Math.PI/2;}
+      else if(sp.zone==='flit'||sp.zone==='flutter'){a.g.visible=a.g.visible&&nt<.6;a.stT-=dt;if(a.stT<=0||!a.tgt){const c=sp.zone==='flit'?pick(ohiaCrowns.filter(c=>Math.hypot(c.x-a.home.x,c.z-a.home.z)<30)||ohiaCrowns):null;
+          a.tgt=c?new V3(c.x+(Math.random()-.5)*3,c.y+(Math.random()-.5)*2,c.z+(Math.random()-.5)*3):new V3(a.home.x+(Math.random()-.5)*8,heightAt(a.home.x,a.home.z)+.6+Math.random()*1.8,a.home.z+(Math.random()-.5)*8);a.stT=2+Math.random()*4;}
+        const d=a.tgt.clone().sub(a.p),l=d.length();if(l>.1){a.p.addScaledVector(d,Math.min(1,dt*(sp.zone==='flit'?1.5:.8)));a.yaw=Math.atan2(d.x,d.z);}if(sp.zone==='flutter')a.p.y+=Math.sin(a.t*6)*.01;}
+      else if(sp.zone==='perch'){if(pd<5&&!a.fleeT){a.fleeT=1;const c=pick(crowns);a.home={x:c.x,z:c.z,y:c.y-1.2};}a.fleeT=Math.max(0,a.fleeT-dt*.1);a.p.lerp(new V3(a.home.x,a.home.y,a.home.z),Math.min(1,dt*.6));a.yaw+=Math.sin(a.t*.4)*.004;}
+      else if(sp.zone==='branch'){a.p.set(a.home.x,a.home.y,a.home.z);a.yaw=a.phase;}
+      else if(sp.zone==='trunk'){const tr=a.home.trunk;if(!tr){continue;}a.stT-=dt;if(a.stT<=0){a.tgtY=tr.h+.5+Math.random()*2.2;a.stT=1+Math.random()*5;}if(pd<2)a.tgtY=tr.h+3;
+        const ang=a.phase,r=.22*(tr.scale||1);a.p.set(tr.x+Math.sin(ang)*r,lerp(a.p.y,a.tgtY||a.p.y,Math.min(1,dt*1.5)),tr.z+Math.cos(ang)*r);a.g.position.copy(a.p);a.g.rotation.set(-Math.PI/2,ang,0,'YXZ');continue;}
+      else if(sp.zone==='leaf'){}
+      a.g.position.copy(a.p);a.g.rotation.set(0,a.yaw,0);
+      if(a.mixer){a.mixer.update(dt);}
+      if(a.legs){a.legs.uW.value=a.walk*(sp.biped?9:6);a.legs.uA.value=lerp(a.legs.uA.value,a.speed>.05?Math.min(.7,.25+a.speed*.12):0,Math.min(1,dt*6));}
+      if(a.bones&&a.speed>.05){a.g.updateMatrixWorld(true);const S=a.bones.S,ax=new V3(1,0,0).applyQuaternion(a.g.getWorldQuaternion(new THREE.Quaternion())),q2=new THREE.Quaternion(),q3=new THREE.Quaternion(),ax2=new V3();
+        const ph=a.walk*S.stride;for(const L of a.bones.legs){L.b.parent.getWorldQuaternion(q2).invert();ax2.copy(ax).applyQuaternion(q2);L.b.quaternion.premultiply(q3.setFromAxisAngle(ax2,Math.sin(ph+L.ph)*S.amp*(a.state==='run'?1.3:1)));}}
+    }
+  }
+  return{list,tick,get counts(){const n={};for(const a of list)n[a.key]=(n[a.key]||0)+1;return n;}};
+})();
+
 scene.fog=new THREE.FogExp2(0x0b4a58,0); // only thickens under water
-window.__hm={get SEA(){return SEA;},get DIVE(){return DIVE;},get scene(){return scene;},player,groundAt,surfaceAt,pickUp,cup,lantern,coco,chickens,goat,PHYS,useHeld,sysDrop,settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
+window.__tF1=performance.now();window.FLORA_INFO=()=>({count:FLORA.count,kinds:FLORA.kinds});window.__hm={get FAUNA(){return FAUNA;},get FLORA(){return FLORA;},get SEA(){return SEA;},get DIVE(){return DIVE;},get scene(){return scene;},player,groundAt,surfaceAt,pickUp,cup,lantern,coco,chickens,goat,PHYS,useHeld,sysDrop,settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
 /* ───────── physics: Rapier (Apache-2.0, vendor/rapier) ─────────
    Things you let go of or throw become rigid bodies until they come to rest: they fall, bounce, tumble, roll downhill,
    float (coconuts, wood, fronds) or sink, and your body pushes them as you walk. Once still, the body is removed and the
