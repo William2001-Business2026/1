@@ -23,6 +23,12 @@ props/  (Poly Haven, CC0 1.0, https://polyhaven.com)
   binoculars, wooden_lantern_01, Rockingchair_01, lambis_shell, stone_01, bananas, wine_barrel_01,
   wooden_crate_01, planter_pot_clay, wicker_basket_02. 1K WebP textures, meshopt geometry.
 
+trees/  (Poly Haven, CC0 1.0, https://polyhaven.com)
+  island_tree_01, island_tree_02, island_tree_03, jacaranda_tree, tree_small_02, each as <name>.glb (near) and
+  <name>_far.glb (distant). Stand-ins: jacaranda as koa; island_tree_01 as ʻōhiʻa and kukui; island_tree_02 as ʻulu
+  and ʻōhiʻa ʻai; island_tree_03 as milo; tree_small_02 as wiliwili. Leaf cards thinned, enlarged and simplified
+  (about 30-45k triangles near, 5-9k far), trunks simplified, 1K/512 px WebP textures, meshopt geometry.
+
 fern.glb, anthurium.glb  (Poly Haven "fern_02" and "anthurium_botany_01", CC0 1.0)
   The undergrowth. Anthuriums simplified to 4,000 triangles per plant; 1K WebP textures.
 

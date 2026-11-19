@@ -149,14 +149,14 @@ Rain squalls blow through now and then, more often in the wet season.
 
 ## Forest
 
-- **Trees:** ten Hawaiian trees, built in code from the scanned bark and hand-drawn leaf clusters that move in the wind. Each grows where it would in nature:
+- **Trees:** ten Hawaiian trees. Most are now real photo-scanned trees, every leaf moving in the one wind, with a lighter version drawn when they are far away. Each grows where it would in nature:
   - koa, ʻōhiʻa lehua (with red lehua blossoms) and hāpuʻu tree ferns in the forest and up the mountain;
   - loulu fan palms on the mountain;
-  - hala (pandanus) with prop roots along the shore;
+  - milo, the spreading shade tree of the shore;
   - wiliwili on the dry lava side;
   - ʻulu (breadfruit) near the lanai;
   - kukui and ʻōhiʻa ʻai (mountain apple) through the forest;
-  - two great banyans with hanging aerial roots.
+  - two great banyans with hanging aerial roots (these, the loulu and the hāpuʻu trunks are still built in code).
 - **Forest floor:** dark leaf litter, ferns and anthuriums, with little grass.
 - **Animals:** 15 kinds.
   - **Hunted for food with the bamboo spear:** puaʻa (wild pigs), kia (axis deer), kao (feral goats) on the mountain, moa (jungle fowl) and nēnē. They graze, wander and bolt when you come close. Holding Shift lets you creep nearer and strike more surely. Butcher what you take (E) for pork, venison, goat meat or fowl, then roast it at the fire. Pork with taro or sweet potato in the pot makes kālua puaʻa.
@@ -175,6 +175,8 @@ Rain squalls blow through now and then, more often in the wet season.
 ## Asset credits
 
 Skies, materials and the boulder are from [Poly Haven](https://polyhaven.com) under CC0 (public domain). Each folder's JSON file lists the exact source asset.
+
+The scanned trees are Poly Haven's island_tree_01, island_tree_02, island_tree_03, jacaranda_tree and tree_small_02 (CC0), standing in for the Hawaiian species named in the game; the tree-fern crowns are fern_02. Leaves were thinned and simplified so a forest of them runs in a browser.
 
 The character, hair and animations are from Quaternius's Universal Base Characters and Universal Animation Library ([quaternius.com](https://quaternius.com)), CC0 as downloaded. See `assets/models/README.txt`; please don't extract them for use as standalone assets.
 
