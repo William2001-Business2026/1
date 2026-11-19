@@ -159,7 +159,7 @@ Rain squalls blow through now and then, more often in the wet season.
   - two great banyans with hanging aerial roots (these, the loulu and the hāpuʻu trunks are still built in code).
 - **Forest floor:** dark leaf litter, ferns and anthuriums, with little grass.
 - **Animals:** 15 kinds.
-  - **Hunted for food with the bamboo spear:** puaʻa (wild pigs), kia (axis deer), kao (feral goats) on the mountain, moa (jungle fowl) and nēnē. They graze, wander and bolt when you come close. Holding Shift lets you creep nearer and strike more surely. Butcher what you take (E) for pork, venison, goat meat or fowl, then roast it at the fire. Pork with taro or sweet potato in the pot makes kālua puaʻa.
+  - **Hunted for food with the bamboo spear:** puaʻa (wild pigs), kia (axis deer), kao (feral goats) on the mountain, moa (jungle fowl) and nēnē. They graze and wander. When they notice you they freeze, heads up, and watch; come closer and they bolt, gathering speed as they go. Bodies follow the slope, feet keep pace with the ground, and a clean strike drops the animal onto its side. Holding Shift lets you creep nearer and strike more surely. Butcher what you take (E) for pork, venison, goat meat or fowl, then roast it at the fire. Pork with taro or sweet potato in the pot makes kālua puaʻa.
   - **To watch:**
     - the mongoose;
     - ʻiʻiwi and ʻapapane flitting between the ʻōhiʻa;
@@ -188,7 +188,7 @@ Textures were resized and compressed, and leg and neck motion is added in code.
 
 The forest animals are also from Sketchfab under CC BY 4.0, some standing in for close relatives and recoloured:
 [Deer](https://sketchfab.com/3d-models/deer-144b33ab9e3345cb92b41bf297a38b7d) by chemchamroeun1988 (axis deer (kia)),
-[Curious Pink Pig animal 3d model free](https://sketchfab.com/3d-models/curious-pink-pig-animal-3d-model-free-f40237ad33df4a2896e5978fe489d412) by rt699448 (wild pig (puaʻa), darkened),
+[Wild Boar](https://sketchfab.com/3d-models/wild-boar-0a4b91157dac470a9551755bcad9b5b3) by emptypen2477 (wild pig (puaʻa), with its own grazing, walking, trotting, running and alarm animations; the dark coat is painted in code),
 [Bat](https://sketchfab.com/3d-models/bat-28af38de4d2c401d809148c7f63a73f9) by matisosanimation (ʻōpeʻapeʻa),
 [Animated Flying Fluttering Butterfly Loop](https://sketchfab.com/3d-models/animated-flying-fluttering-butterfly-loop-80f8d9a6dadc411e89ca366cb0cfb0d9) by LasquetiSpice (Kamehameha butterfly, tinted),
 [Chameleon](https://sketchfab.com/3d-models/chameleon-c91b9fad77fc4af998da3ea252037fad) by nikohard (Jackson's chameleon, recoloured green),

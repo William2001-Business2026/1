@@ -1,4 +1,4 @@
-// node prep_model.mjs in.glb out.glb '{"keepAnims":["Idle"],"tris":8000,"tex":1024,"dropMeshes":["Base"]}'
+// node prep_model.mjs in.glb out.glb '{"keepAnims":["Idle"],"rename":{"long_clip_name":"Idle"},"tris":8000,"tex":1024,"dropMeshes":["Base"]}'
 import {NodeIO} from '@gltf-transform/core';import {ALL_EXTENSIONS} from '@gltf-transform/extensions';
 import {metalRough,prune,dedup,resample,textureCompress,meshopt,weld} from '@gltf-transform/functions';
 import {MeshoptEncoder,MeshoptDecoder,MeshoptSimplifier} from 'meshoptimizer';import sharp from 'sharp';
@@ -6,7 +6,8 @@ const [,,inp,out,optS]=process.argv;const opt=JSON.parse(optS||'{}');
 await MeshoptEncoder.ready;await MeshoptDecoder.ready;await MeshoptSimplifier.ready;
 const io=new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({'meshopt.encoder':MeshoptEncoder,'meshopt.decoder':MeshoptDecoder});
 const doc=await io.read(inp);const root=doc.getRoot();
-if(opt.keepAnims)for(const a of root.listAnimations())if(!opt.keepAnims.some(k=>a.getName().includes(k)))a.dispose();
+if(opt.keepAnims)for(const a of root.listAnimations())if(!opt.keepAnims.some(k=>a.getName().includes(k))){for(const s of a.listSamplers()){s.getInput()?.dispose();s.getOutput()?.dispose();s.dispose();}for(const c of a.listChannels())c.dispose();a.dispose();} // samplers and their keyframes too, or they stay in the file
+if(opt.rename)for(const a of root.listAnimations())for(const [from,to] of Object.entries(opt.rename))if(a.getName().includes(from))a.setName(to);
 if(root.listExtensionsUsed().some(e=>e.extensionName==='KHR_materials_pbrSpecularGlossiness'))await doc.transform(metalRough());
 if(opt.dropMeshes)for(const n of root.listNodes()){const m=n.getMesh();if(m&&opt.dropMeshes.some(k=>m.getName().includes(k)||n.getName().includes(k)))n.setMesh(null);}
 if(opt.tris){for(const mesh of root.listMeshes())for(const p of mesh.listPrimitives()){if(p.listTargets().length)continue;const pos=p.getAttribute('POSITION').getArray(),idx=p.getIndices().getArray(),uv=p.getAttribute('TEXCOORD_0')?.getArray();

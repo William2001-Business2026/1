@@ -3641,7 +3641,7 @@ const FAUNA=(()=>{
   // the moa and the feral goat reuse the island's own rigged chicken and goat models
   const SKINNED={kao:{url:'assets/models/goat.glb',height:.9,turn:0,legs:/^thigh_stretch/,amp:.45,stride:7},moa:{url:'assets/models/rooster.glb',height:.5,turn:-Math.PI/2,legs:/thigh/i,amp:.6,stride:16}};
   const SPEC={
-    puaa:{n:'Puaʻa (wild pig)',file:'pig',len:1.25,turn:0,recolour:'feral',hip:.42,count:8,zone:'forest',speed:[.6,3.6],flee:13,sneak:6,food:['pork',2]},
+    puaa:{n:'Puaʻa (wild pig)',file:'boar',len:1.3,turn:0,rig:true,anims:{idle:'Idle',graze:'Graze',walk:'Walk',trot:'Trot',run:'Run',alert:'Alert',die:'Die'},recolour:'boar',count:8,zone:'forest',speed:[.6,3.6],flee:13,sneak:6,food:['pork',2]},
     kia:{n:'Kia (axis deer)',file:'deer',len:1.5,turn:Math.PI,rig:true,anims:{idle:'Idle',graze:'Grazing',walk:'WalkForward',run:'Gallop'},count:7,zone:'edge',speed:[.8,6],flee:18,sneak:8,food:['venison',3]},
     kao:{n:'Kao (feral goat)',skinned:'kao',count:5,zone:'mountain',speed:[.7,3.5],flee:12,sneak:6,food:['goatmeat',2]},
     moa:{n:'Moa (jungle fowl)',skinned:'moa',count:7,zone:'forest',speed:[.5,3],flee:6,sneak:3,food:['fowl',1]},
@@ -3686,6 +3686,14 @@ const FAUNA=(()=>{
   // ── load and make the animals ──
   const cache={};const load=url=>cache[url]||(cache[url]=loader.loadAsync(url));
   function recolour(root,how){root.traverse(o=>{if(!o.isMesh)return;const m=o.material=toNode(o.material);const {texture,uv,vec3,vec4,dot,mix,smoothstep,materialColor}=TSL;
+    if(how==='boar'){const {positionGeometry:pg,float,clamp}=TSL;m.roughness=.86;m.metalness=0;
+      if(/Material/.test(m.name)){m.colorNode=vec4(.5,.45,.36,1);m.roughness=.4;return;}                    // the tusks
+      const bristle=vn(pg.xz.mul(90).add(pg.y.mul(40))),grizzle=vn(pg.xy.mul(14).add(pg.z.mul(9))).mul(.6).add(vn(pg.yz.mul(33)).mul(.4));
+      const back=smoothstep(.55,1,pg.y),snout=smoothstep(.95,1.12,pg.z).mul(smoothstep(.75,.5,pg.y)),hoof=smoothstep(.09,.04,pg.y);
+      let c=mix(vec3(.009,.0075,.006),vec3(.026,.02,.015),grizzle);                                         // near-black, with brown grizzle
+      c=mix(c,vec3(.055,.042,.032),back.mul(smoothstep(.55,.8,bristle)).mul(.7));                           // pale bristle tips along the back
+      c=mix(c,vec3(.045,.03,.026),snout);c=mix(c,vec3(.004,.0035,.003),hoof);
+      m.colorNode=vec4(c.mul(mix(.75,1.15,bristle)),1);m.roughnessNode=mix(float(.92),float(.6),snout);return;}
     if(!m.map)return;const tx=texture(m.map,uv()),l=dot(tx.rgb,vec3(.3,.59,.11));
     if(how==='iiwi')m.colorNode=vec4(mix(vec3(.02,.015,.012),vec3(.78,.06,.03),smoothstep(.06,.3,l)),tx.a);        // scarlet with black wings
     else if(how==='apapane')m.colorNode=vec4(mix(vec3(.02,.015,.015),vec3(.5,.03,.04),smoothstep(.05,.3,l)),tx.a);   // deeper crimson
@@ -3698,7 +3706,7 @@ const FAUNA=(()=>{
     a.g.userData.item={label:()=>a.dead?sp.n+', dead':sp.n,get verb(){return a.dead?'butcher it':sp.food&&selKind()==='spear'?'click to strike':'';},
       e(){if(!a.dead)return;give(sp.food[0],sp.food[1]);note('hunt');SFX.chop&&SFX.chop();a.dead=false;a.gone=nowS()+600;a.g.visible=false;},
       use(k){if(k!=='spear'||!sp.food||a.dead)return false;handAnim=1;const sneak=keys.ShiftLeft||keys.ShiftRight;
-        if(Math.random()<(sneak?.75:.45)){a.dead=true;a.state='dead';a.g.rotation.z=Math.PI/2*(Math.random()<.5?1:-1);a.g.position.y=a.p.y+sz*.25;SFX.thud&&SFX.thud(.6);note('hunt');}
+        if(Math.random()<(sneak?.75:.45)){a.dead=true;a.state='dead';a.dieT=0;a.dieSide=Math.random()<.5?1:-1;if(a.acts.die){const d=a.acts.die;d.setLoop(THREE.LoopOnce,1);d.clampWhenFinished=true;d.timeScale=.7;play(a,'die',.15);}SFX.thud&&SFX.thud(.6);note('hunt');}
         else{a.fleeT=4;a.state='run';toast('Missed. It bolts.',1.8);}return true;}};
     interact.push(a.g);list.push(a);
     if(sp.make){const r=sp.make==='gecko'?makeGecko():makeSpider();a.g.add(r.g);a.body=r.g;return a;}
@@ -3726,21 +3734,27 @@ const FAUNA=(()=>{
 
   // ── behaviour ──
   const play=(a,role,fade=.3)=>{const act=a.acts[role];if(!act||a.cur===act)return;act.reset().play();if(a.cur)a.cur.crossFadeTo(act,fade,false);a.cur=act;};
-  const ground=(a,dt,pd,sneak)=>{const sp=a.sp;
-    if(a.fleeT>0||pd<(sneak?sp.sneak:sp.flee)){if(a.fleeT<=0)a.fleeT=3+Math.random()*2;a.fleeT-=dt;a.state='run';const ang=Math.atan2(a.p.x-player.x,a.p.z-player.z);a.tx=a.p.x+Math.sin(ang)*8;a.tz=a.p.z+Math.cos(ang)*8;}
-    else{a.stT-=dt;if(a.stT<=0){const r=Math.random();if(r<.45){a.state='walk';const an=Math.random()*6.28,d=3+Math.random()*9;a.tx=a.home.x+Math.sin(an)*d;a.tz=a.home.z+Math.cos(an)*d;a.stT=4+Math.random()*6;}
+  const ground=(a,dt,pd,sneak)=>{const sp=a.sp,fr=sneak?sp.sneak:sp.flee;
+    if(a.fleeT>0||pd<fr||a.state==='alert'&&a.alertT<=0&&pd<fr*1.6){if(a.fleeT<=0)a.fleeT=3+Math.random()*2;a.fleeT-=dt;a.state='run';const ang=Math.atan2(a.p.x-player.x,a.p.z-player.z);a.tx=a.p.x+Math.sin(ang)*8;a.tz=a.p.z+Math.cos(ang)*8;}
+    else if(pd<fr*1.6&&(a.state!=='alert'||a.alertT>0)){if(a.state!=='alert'){a.state='alert';a.alertT=.8+Math.random()*1.2;}a.alertT-=dt;    // it has noticed you: head up, still, watching
+      let t=Math.atan2(player.x-a.p.x,player.z-a.p.z)-a.yaw;t=Math.atan2(Math.sin(t),Math.cos(t));a.yaw+=t*Math.min(1,dt*3);}
+    else{if(a.state==='alert'){a.state='idle';a.stT=1+Math.random()*2;}a.stT-=dt;if(a.stT<=0){const r=Math.random();if(r<.45){a.state='walk';const an=Math.random()*6.28,d=3+Math.random()*9;a.tx=a.home.x+Math.sin(an)*d;a.tz=a.home.z+Math.cos(an)*d;a.stT=4+Math.random()*6;}
       else{a.state=r<.8?'graze':'idle';a.stT=3+Math.random()*6;}}}
-    const moving=a.state==='walk'||a.state==='run',spd=moving?(a.state==='run'?sp.speed[1]:sp.speed[0]):0;
-    if(moving){const dx=a.tx-a.p.x,dz=a.tz-a.p.z,d=Math.hypot(dx,dz);if(d<.3){if(a.state==='walk'){a.state='idle';a.stT=2;}}
+    const moving=a.state==='walk'||a.state==='run',want=moving?(a.state==='run'?sp.speed[1]:sp.speed[0]):0;
+    const spd=a.vel=lerp(a.vel||0,want,Math.min(1,dt*(want>(a.vel||0)?(a.state==='run'?3.5:2):5)));                  // animals have weight: they speed up and pull up
+    if(moving||spd>.05){const dx=a.tx-a.p.x,dz=a.tz-a.p.z,d=Math.hypot(dx,dz);if(d<.3){if(a.state==='walk'){a.state='idle';a.stT=2;}}
       else{const nx=a.p.x+dx/d*spd*dt,nz=a.p.z+dz/d*spd*dt,nh=heightAt(nx,nz);if(nh<.6||freshAt(nx,nz)!=null||tnorm(nx,nz).y<.55){a.tx=a.p.x;a.tz=a.p.z;a.state='idle';}
         else{a.p.x=nx;a.p.z=nz;let t=Math.atan2(dx,dz)-a.yaw;t=Math.atan2(Math.sin(t),Math.cos(t));a.yaw+=t*Math.min(1,dt*6);a.walk+=spd*dt;}}}
     a.p.y=heightAt(a.p.x,a.p.z);a.speed=spd;
-    if(a.mixer&&a.acts.walk)play(a,a.state==='run'?'run':a.state==='walk'?'walk':a.state==='graze'?'graze':'idle');};
+    if(a.mixer&&a.acts.walk){const role=a.state==='run'?(a.acts.trot&&spd<sp.speed[1]*.55?'trot':'run'):a.state==='walk'?'walk':a.state==='graze'?'graze':a.state==='alert'&&a.acts.alert?'alert':'idle';play(a,role);
+      if(role==='walk'||role==='run'||role==='trot')a.cur.timeScale=clamp(spd/(role==='walk'?sp.speed[0]:role==='trot'?sp.speed[1]*.45:sp.speed[1]),.45,1.6);else a.cur.timeScale=1;}}; // feet keep pace with the ground
   function tick(dt,t){const sneak=keys.ShiftLeft||keys.ShiftRight,nt=night();
     for(const a of list){const sp=a.sp;
-      if(a.gone){if(nowS()<a.gone)continue;a.gone=0;const h=home(sp);if(h){a.home=h;a.p.set(h.x,h.y,h.z);}a.g.visible=true;a.g.rotation.set(0,a.yaw,0);a.state='idle';}
+      if(a.gone){if(nowS()<a.gone)continue;a.gone=0;const h=home(sp);if(h){a.home=h;a.p.set(h.x,h.y,h.z);}a.g.visible=true;a.g.rotation.set(0,a.yaw,0);a.state='idle';if(a.acts.die){a.acts.die.stop();a.cur=null;play(a,'idle',0);}}
       const dc=Math.hypot(a.p.x-camera.position.x,a.p.z-camera.position.z),far=dc>(sp.zone==='soar'?400:sp.zone==='leaf'||sp.make?30:150);a.g.visible=!far&&!a.gone;if(far&&!a.dead)continue;
-      if(a.dead){a.g.position.copy(a.p);a.g.position.y+=.05;continue;}
+      if(a.dead){a.dieT=(a.dieT||0)+dt;a.g.position.copy(a.p);
+        const k=Math.min(1,a.dieT/.6),e=k*k*(3-2*k);a.g.rotation.set(0,a.yaw,a.dieSide*Math.PI/2*e*.92);a.g.position.y+=(sp.len||.45)*.22*e+.03; // legs buckle and it rolls onto its side
+        if(a.mixer)a.mixer.update(a.acts.die?dt:dt*(1-k));continue;} // a rigged animal flinches as it goes down
       a.t+=dt;const pd=Math.hypot(a.p.x-player.x,a.p.z-player.z);if(pd<(sp.zone==='soar'?60:12)&&a.g.visible)W.seen[sp.n]=1;   // counts as seen in the book
       if(['forest','edge','mountain','grass'].includes(sp.zone))ground(a,dt,pd,sneak);
       else if(sp.zone==='soar'){const R=45+20*Math.sin(a.t*.01+a.phase),an=a.t*.045+a.phase;a.p.set(a.home.x+Math.sin(an)*R,Math.max(heightAt(a.home.x,a.home.z),40)+35+Math.sin(a.t*.07)*6,a.home.z+Math.cos(an)*R);a.yaw=an+Math.PI/2;
@@ -3755,6 +3769,8 @@ const FAUNA=(()=>{
         const ang=a.phase,r=.22*(tr.scale||1);a.p.set(tr.x+Math.sin(ang)*r,lerp(a.p.y,a.tgtY||a.p.y,Math.min(1,dt*1.5)),tr.z+Math.cos(ang)*r);a.g.position.copy(a.p);a.g.rotation.set(-Math.PI/2,ang,0,'YXZ');continue;}
       else if(sp.zone==='leaf'){}
       a.g.position.copy(a.p);a.g.rotation.set(0,a.yaw,0);
+      if(['forest','edge','mountain','grass'].includes(sp.zone)){const nn=tnorm(a.p.x,a.p.z),ty=new V3(nn.x,1,nn.z).normalize();a.tilt=(a.tilt||new V3(0,1,0)).lerp(ty,Math.min(1,dt*4));
+        a.g.quaternion.premultiply(new THREE.Quaternion().setFromUnitVectors(new V3(0,1,0),a.tilt));}                // standing on the slope, not plumb on it
       if(a.mixer){a.mixer.update(dt);}
       if(a.legs){a.legs.uW.value=a.walk*(sp.biped?9:6);a.legs.uA.value=lerp(a.legs.uA.value,a.speed>.05?Math.min(.7,.25+a.speed*.12):0,Math.min(1,dt*6));}
       if(a.bones&&a.speed>.05){a.g.updateMatrixWorld(true);const S=a.bones.S,ax=new V3(1,0,0).applyQuaternion(a.g.getWorldQuaternion(new THREE.Quaternion())),q2=new THREE.Quaternion(),q3=new THREE.Quaternion(),ax2=new V3();
