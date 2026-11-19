@@ -623,6 +623,7 @@ sun.shadow.camera.left=-46;sun.shadow.camera.right=46;sun.shadow.camera.top=46;s
 sun.shadow.camera.near=1;sun.shadow.camera.far=420;sun.shadow.bias=-.0005;sun.shadow.normalBias=.06;sun.shadow.autoUpdate=false;sun.shadow.needsUpdate=true;
 scene.add(sun,sun.target);
 const hemi=new THREE.HemisphereLight(0xffffff,0xffffff,1); scene.add(hemi);
+const moon=new THREE.DirectionalLight(0x8ea4e6,0);moon.position.set(0,90,-60);scene.add(moon,moon.target);
 
 /* ───────────────────────── terrain ───────────────────────── */
 const SIZE=640,SEG=511; // terrain: 640 m square, 512×512 points (1.25 m apart)
@@ -1069,11 +1070,11 @@ const GRASS=(()=>{
   const SPRING_ROCKS=16,FALL_ROCKS=18,ROCKS=380+SPRING_ROCKS+FALL_ROCKS,rocks=new THREE.InstancedMesh(rg,rm,ROCKS);i=0;t=0;
   // fallen boulders screen the hidden spring, with one narrow way in beside the stream
   for(let k=0;k<SPRING_ROCKS;k++){const a=k/SPRING_ROCKS*6.283+.25,gap=Math.abs(Math.atan2(Math.sin(a-Math.PI*.05),Math.cos(a-Math.PI*.05)))<.32;if(gap)continue;
-    const rr=4.4+R()*1.4,x=SPRING.x+Math.sin(a)*rr,z=SPRING.z+Math.cos(a)*rr,s=1.3+R()*1.1,h=heightAt(x,z);
-    d.position.set(x,h+s*.25,z);d.rotation.set(R()*6,R()*6,R()*6);d.scale.set(s*(1+R()*.5),s*1.2,s*(1+R()*.5));d.updateMatrix();rocks.setMatrixAt(i++,d.matrix);colliders.push({x,z,r:s*.95});}
+    const rr=4.4+R()*1.4,x=SPRING.x+Math.sin(a)*rr,z=SPRING.z+Math.cos(a)*rr,s=1.3+R()*1.1,h=Math.min(heightAt(x,z),heightAt(x+s*.7,z),heightAt(x-s*.7,z),heightAt(x,z+s*.7),heightAt(x,z-s*.7));
+    d.position.set(x,h+s*.15,z);d.rotation.set(R()*6,R()*6,R()*6);d.scale.set(s*(1+R()*.5),s*1.2,s*(1+R()*.5));d.updateMatrix();rocks.setMatrixAt(i++,d.matrix);colliders.push({x,z,r:s*.95});}
   // boulders round the plunge pool and either side of the waterfall's lip
   {const out=Math.atan2(RIVER.P[RIVER.iPool+14][0]-POOL.x,RIVER.P[RIVER.iPool+14][1]-POOL.z),inn=Math.atan2(RIVER.P[RIVER.iIn][0]-POOL.x,RIVER.P[RIVER.iIn][1]-POOL.z);
-   const put=(x,z,s)=>{const h=heightAt(x,z);d.position.set(x,h+s*.2,z);d.rotation.set(R()*6,R()*6,R()*6);d.scale.set(s*(1+R()*.5),s,s*(1+R()*.4));d.updateMatrix();rocks.setMatrixAt(i++,d.matrix);colliders.push({x,z,r:s*.9});};
+   const put=(x,z,s)=>{const h=Math.min(heightAt(x,z),heightAt(x+s*.7,z),heightAt(x-s*.7,z),heightAt(x,z+s*.7),heightAt(x,z-s*.7));d.position.set(x,h+s*.15,z);d.rotation.set(R()*6,R()*6,R()*6);d.scale.set(s*(1+R()*.5),s,s*(1+R()*.4));d.updateMatrix();rocks.setMatrixAt(i++,d.matrix);colliders.push({x,z,r:s*.9});};
    for(let k=0;k<13;k++){const a=k/13*6.283,da=b=>Math.abs(Math.atan2(Math.sin(a-b),Math.cos(a-b)));if(da(out)<.5||da(inn)<.35)continue;const r=POOL.r+.6+R()*1.6;put(POOL.x+Math.sin(a)*r,POOL.z+Math.cos(a)*r,.9+R()*1.3);}
    const P=RIVER.P,j=RIVER.iTop,tx=P[j+1][0]-P[j-1][0],tz=P[j+1][1]-P[j-1][1],l=Math.hypot(tx,tz),nx=-tz/l,nz=tx/l,w=RIVER.w[j]+1.4;
    for(const sd of[-1,1])for(let k=0;k<2;k++)put(P[j-k*3][0]+nx*sd*(w+k*.8),P[j-k*3][1]+nz*sd*(w+k*.8),1.2+R()*.9);}
@@ -1353,6 +1354,8 @@ function applyTime(force){
   hemi.color.setRGB(...zen).lerp(new THREE.Color(...hor),.55); hemi.groundColor.setRGB(hor[0]*.5+.1*day,hor[1]*.45+.08*day,hor[2]*.4+.05*day);
   const hw=pickSky(e,hI); // with a photographed sky, the sky itself lights the island instead of the flat hemisphere light
   hemi.intensity=hemiBase=hI*(1-hw); scene.environmentIntensity=envBase=.55+.45*hw;
+  {const nt=smooth(-3,-11,e);moon.intensity=.32*nt;moon.color.setRGB(.55,.64,.9);moon.position.set(-hx*60,90,-hz*60);  // moonlight: cool, from high in the east, so night is dark but readable
+   if(nt>0){hemi.intensity=hemiBase=Math.max(hemiBase,.14*nt);hemi.color.lerp(new THREE.Color(.45,.55,.85),nt*.6);}}
   renderer.toneMappingExposure=expo;
   farMat.color.setRGB(...hor).lerp(new THREE.Color(...zen),.45).multiplyScalar(.8);
   if(force)sun.shadow.needsUpdate=true;
@@ -1826,6 +1829,11 @@ function update(dt){
       const cp=Math.cos(player.pitch),sy=Math.sin(player.yaw),cy=Math.cos(player.yaw),fx=-sy*cp,fy=Math.sin(player.pitch),fz=-cy*cp;
       const d=hero.camDist*(1-.3*Math.max(0,fy)),py=player.uw?player.y+1.55:Math.max(player.y+1.55,water.position.y+.4);
       _v.set(player.x-fx*d+cy*.42,py-fy*d,player.z-fz*d-sy*.42);
+      {const hx=player.x,hz=player.z,dx=_v.x-hx,dz=_v.z-hz,L2=dx*dx+dz*dz;let tHit=1;
+       for(const c of colliders){const ox=c.x-hx,oz=c.z-hz;if(Math.abs(ox)>d+2||Math.abs(oz)>d+2)continue;const t=clamp((ox*dx+oz*dz)/Math.max(L2,1e-6),0,1),px=dx*t-ox,pz=dz*t-oz;
+         if(px*px+pz*pz<(c.r+.25)*(c.r+.25)&&t<tHit)tHit=Math.max(.12,t-(c.r+.3)/Math.sqrt(Math.max(L2,1e-6)));}
+       hero.camK=lerp(hero.camK??1,tHit,1-Math.exp(-dt*(tHit<(hero.camK??1)?14:3)));  // pull in fast, ease back out
+       _v.set(hx+dx*hero.camK,lerp(player.y+1.55,_v.y,hero.camK),hz+dz*hero.camK);}
       const gy=(player.uw?groundAt(_v.x,_v.z):Math.max(groundAt(_v.x,_v.z),water.position.y))+.3;if(_v.y<gy)_v.y=gy;if(player.uw&&_v.y>water.position.y-.3)_v.y=water.position.y-.3;roll=0;}
     if(player.trans<1){player.trans=Math.min(1,player.trans+dt/.9);const k=player.trans*player.trans*(3-2*player.trans);camera.position.lerpVectors(player.from,_v,k);}
     else camera.position.copy(_v);
@@ -2217,6 +2225,7 @@ Promise.all([gltfLoader.loadAsync('assets/models/islander.glb'),gltfLoader.loadA
   hero.root.add(model);hero.mixer=new THREE.AnimationMixer(model);
   for(const clip of mv.animations){const a=hero.mixer.clipAction(clip);if(/Start|Land|Enter|Exit|Interact|PickUp/.test(clip.name)){a.setLoop(THREE.LoopOnce,1);a.clampWhenFinished=true;}hero.acts[clip.name]=a;}
   hero.hand=model.getObjectByName('hand_r');hero.px=player.x;hero.pz=player.z;hero.ready=true;heroPlay('Idle_Loop',0);applyView();
+  try{dressMalo(model);}catch(e){console.warn('Malo:',e);}
   // hair and beard come as separate meshes skinned to the same 65-bone rig: bind them to this body's bones
   gltfLoader.loadAsync('assets/models/islander_hair.glb').then(h=>{let body=null;model.traverse(o=>{if(o.isSkinnedMesh&&!body)body=o;});
     for(const sc of h.scenes)sc.traverse(o=>{if(!o.isSkinnedMesh)return;const bones=o.skeleton.bones.map(b=>model.getObjectByName(b.name));if(bones.some(b=>!b))return;
@@ -2225,6 +2234,23 @@ Promise.all([gltfLoader.loadAsync('assets/models/islander.glb'),gltfLoader.loadA
         mesh.castShadow=mesh.receiveShadow=true;mesh.frustumCulled=false;body.parent.add(mesh);},0);});})
     .catch(e=>console.warn('Hair did not load:',e));
 }).catch(e=>console.warn('The character did not load, so the game stays in first person:',e));
+const kapaTex=canvasTex(256,256,(g,w,h)=>{g.fillStyle='#b48a5a';g.fillRect(0,0,w,h);for(let i=0;i<4000;i++){g.fillStyle=`rgba(${90+Math.random()*60|0},${60+Math.random()*40|0},30,.08)`;g.fillRect(Math.random()*w,Math.random()*h,2,1);} // beaten bark cloth
+  g.fillStyle='#3a2416';for(let y=0;y<h;y+=64){for(let x=0;x<w;x+=32){g.beginPath();g.moveTo(x,y+14);g.lineTo(x+16,y);g.lineTo(x+32,y+14);g.fill();}g.fillRect(0,y+22,w,5);g.fillRect(0,y+40,w,2);}},true); // kapa triangles and bands
+function dressMalo(model){
+  let body=null,pelvis=null;model.traverse(o=>{if(o.isSkinnedMesh&&!body)body=o;if(o.isBone&&!pelvis&&/pelvis|hips/i.test(o.name))pelvis=o;});if(!body||!pelvis)return;
+  model.updateMatrixWorld(true);
+  // measure the waist in the body's own frame (up the body, facing its front), around the pelvis height
+  const pos=body.geometry.attributes.position,v=new THREE.Vector3(),pw=pelvis.getWorldPosition(new THREE.Vector3()),mq=model.getWorldQuaternion(new THREE.Quaternion()),mqi=mq.clone().invert();
+  let rx=0,rz=0,zmin=0,zmax=0,n=0;for(let i=0;i<pos.count;i+=2){v.fromBufferAttribute(pos,i);body.applyBoneTransform(i,v);v.applyMatrix4(body.matrixWorld).sub(pw).applyQuaternion(mqi);
+    if(Math.abs(v.y)>.05)continue;n++;rx=Math.max(rx,Math.abs(v.x));rz=Math.max(rz,Math.abs(v.z));zmin=Math.min(zmin,v.z);zmax=Math.max(zmax,v.z);}
+  if(n<10){rx=.17;rz=.12;zmin=-.11;zmax=.12;}
+  const m=new THREE.MeshStandardNodeMaterial({map:kapaTex,roughness:.95,side:THREE.DoubleSide});
+  const g=new THREE.Group();pelvis.add(g);const ps=pelvis.getWorldScale(new THREE.Vector3()).x,pq=pelvis.getWorldQuaternion(new THREE.Quaternion());
+  g.quaternion.copy(pq.invert().multiply(mq));g.scale.setScalar(1/Math.max(1e-4,ps));                       // the wrap keeps the body's frame and real-world size
+  const band=new THREE.Mesh(new THREE.CylinderGeometry(1,1,.08,28,1,true),m);band.scale.set(rx*1.07,1,rz*1.1);band.position.y=.03;band.castShadow=true;g.add(band);
+  const flap=(z)=>{const piv=new THREE.Group();piv.position.set(0,.0,z);const p=new THREE.Mesh(new THREE.PlaneGeometry(.2,.42,1,4).translate(0,-.21,0),m);p.castShadow=true;piv.add(p);g.add(piv);return piv;};
+  hero.malo={front:flap(zmax*1.1+.006),back:flap(zmin*1.1-.006)};
+}
 function heroPlay(name,fade=.22){if(hero.cur===name)return;const a=hero.acts[name];if(!a)return;const p=hero.acts[hero.cur];
   a.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).play();if(p&&fade>0)a.crossFadeFrom(p,fade,false);else if(p)p.stop();hero.cur=name;}
 function heroOneShot(name){if(!heroShown()||!hero.acts[name])return;hero.shot=name;hero.shotT=hero.acts[name].getClip().duration*.8;}
@@ -2258,6 +2284,7 @@ function updateHero(dt,moving){
   heroPlay(want,player.air||hero.landT>0?.12:.25);
   if(/Walk_Loop|Jog_Fwd/.test(hero.cur))hero.acts[hero.cur].setEffectiveTimeScale(ts); // feet match the ground speed
   hero.mixer.update(dt);
+  if(hero.malo){const sp=Math.min(1,moving/3),sw=Math.sin(performance.now()/1000*7.5)*.25*sp;hero.malo.front.rotation.x=-sw-.15*sp;hero.malo.back.rotation.x=sw+.12*sp;}
   // the hand socket follows the right hand but stays upright, so a full cup or a lantern does not tip
   hero.root.updateMatrixWorld(true);hero.hand.getWorldPosition(hero.socket.position);hero.socket.rotation.set(0,hero.bodyYaw,0);
 }
@@ -3399,9 +3426,10 @@ window.__tF0=performance.now();const FLORA=(()=>{
         const fl=new Float32Array(p2.count);for(let q=0;q<p2.count;q++)fl[q]=(p2.getY(q)-t.y+L)/L;g.setAttribute('aFlex',new THREE.BufferAttribute(fl,1));leafParts.push(g);}
       return{leaf:'strap',H};},
     loulu(){const H=7,top=new V3(.2,H,0);parts.push(tube(new V3(),top,.16,.13,8));
-      for(let k=0;k<16;k++){const a=k/16*6.283+R3()*.2,tilt=.2+R3()*.9,pet=new V3(Math.cos(a)*1.1,.5-tilt*.6,Math.sin(a)*1.1).normalize(),end=top.clone().addScaledVector(pet,1.3);parts.push(tube(top,end,.03,.025,4));
-        const g=new THREE.CircleGeometry(.85,14,-1.3,2.6),p=g.attributes.position;for(let i=0;i<p.count;i++){const an=Math.atan2(p.getY(i),p.getX(i)),r=Math.hypot(p.getX(i),p.getY(i));p.setZ(i,Math.sin(an*14)*.04*r-r*r*.12);} // a pleated fan
-        g.rotateX(-Math.PI/2);g.rotateY(-a);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up,new V3(pet.x*.3,1,pet.z*.3).normalize()));g.translate(end.x,end.y,end.z);g.computeVertexNormals();
+      for(let k=0;k<20;k++){const a=k/20*6.283*2.3+R3()*.3,tilt=R3(),pet=new V3(Math.cos(a),1.1-tilt*1.6,Math.sin(a)).normalize(),end=top.clone().addScaledVector(pet,1.2+R3()*.4);parts.push(tube(top,end,.03,.025,4));
+        const g=new THREE.CircleGeometry(.95,18,-1.4,2.8,),p=g.attributes.position;for(let i=0;i<p.count;i++){const an=Math.atan2(p.getY(i),p.getX(i)),r=Math.hypot(p.getX(i),p.getY(i));p.setZ(i,Math.sin(an*16)*.06*r-r*r*.28);} // a pleated fan, drooping at the tips
+        const d=pet.clone().normalize(),l=new V3().crossVectors(d,up).normalize(),nn=new V3().crossVectors(d,l).normalize(),rot=new THREE.Matrix4().makeBasis(d,l,nn);
+        g.applyMatrix4(rot);g.rotateOnAxis?0:0;{const q=new THREE.Quaternion().setFromAxisAngle(d,(R3()-.5)*1.4);g.applyQuaternion(q);}g.translate(end.x,end.y,end.z);g.computeVertexNormals();
         const fl=new Float32Array(p.count).fill(1);g.setAttribute('aFlex',new THREE.BufferAttribute(fl,1));leafParts.push(g);}
       return{leaf:'fan',H};},
   };
@@ -3565,7 +3593,8 @@ const FAUNA=(()=>{
       a.bones={S,legs:lp.map(({b,p})=>({b,ph:(lp.length<3?p.x>0:(p.z>mid)!==(p.x>0))?0:Math.PI}))};}).catch(e=>console.warn('Animal',key,e));return a;}
     load('assets/models/fauna/'+sp.file+'.glb').then(gl=>{
       if(sp.rig){const box=new THREE.Box3().setFromObject(gl.scene),s=box.getSize(new V3()),k=sp.len/Math.max(s.x,s.z);const m=cloneSkinned(gl.scene);
-        m.rotation.y=sp.turn||0;m.scale.setScalar(k);m.position.y=-box.min.y*k;m.traverse(x=>{if(x.isMesh){x.castShadow=true;x.frustumCulled=false;x.raycast=()=>{};if(sp.tint&&x.material){x.material=x.material.clone();x.material.color=new THREE.Color(...sp.tint);}}});
+        m.rotation.y=sp.turn||0;m.scale.setScalar(k);m.position.y=-box.min.y*k;m.traverse(x=>{if(x.isMesh){x.castShadow=true;x.frustumCulled=false;x.raycast=()=>{};if(x.material&&x.material.emissiveMap){x.material=x.material.clone();x.material.emissiveMap=null;x.material.emissive&&x.material.emissive.setRGB(0,0,0);} // no glowing eyes
+          if(sp.tint&&x.material){x.material=x.material.clone();x.material.color=new THREE.Color(...sp.tint);}}});
         if(sp.recolour)recolour(m,sp.recolour);a.g.add(m);a.body=m;const mixer=new THREE.AnimationMixer(m);a.mixer=mixer;
         for(const [role,name] of Object.entries(sp.anims||{})){const clip=gl.animations.find(c=>c.name.includes(name));if(clip)a.acts[role]=mixer.clipAction(clip);}
         const first=a.acts.idle||a.acts.fly;if(first){first.play();a.cur=first;mixer.update(R4()*3);}
@@ -3618,7 +3647,7 @@ const FAUNA=(()=>{
 })();
 
 scene.fog=new THREE.FogExp2(0x0b4a58,0); // only thickens under water
-window.__tF1=performance.now();window.STAMv=()=>STAM.v;window.__forceWet=()=>{U.uWet.value=1;U.uSwell.value=1;raining=1;};window.WETv=()=>U.uWet.value;window.FLORA_INFO=()=>({count:FLORA.count,kinds:FLORA.kinds});window.__hm={get FAUNA(){return FAUNA;},get FLORA(){return FLORA;},get SEA(){return SEA;},get DIVE(){return DIVE;},get scene(){return scene;},player,groundAt,surfaceAt,pickUp,cup,lantern,coco,chickens,goat,PHYS,useHeld,sysDrop,settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
+window.__tF1=performance.now();window.STAMv=()=>STAM.v;window.__forceWet=()=>{U.uWet.value=1;U.uSwell.value=1;raining=1;};window.WETv=()=>U.uWet.value;window.FLORA_INFO=()=>({count:FLORA.count,kinds:FLORA.kinds});window.__hm={get FAUNA(){return FAUNA;},get RECIPES(){return RECIPES;},get FORMS(){return FORMS;},get CROPS(){return CROPS;},dishOf,eat,zoneAt,have,takeFrom,get GUIDE(){return GUIDE;},interactE,get looked(){return looked;},get FLORA(){return FLORA;},get SEA(){return SEA;},get DIVE(){return DIVE;},get scene(){return scene;},player,groundAt,surfaceAt,pickUp,cup,lantern,coco,chickens,goat,PHYS,useHeld,sysDrop,settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
 /* ───────── physics: Rapier (Apache-2.0, vendor/rapier) ─────────
    Things you let go of or throw become rigid bodies until they come to rest: they fall, bounce, tumble, roll downhill,
    float (coconuts, wood, fronds) or sink, and your body pushes them as you walk. Once still, the body is removed and the

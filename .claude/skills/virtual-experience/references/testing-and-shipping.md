@@ -30,7 +30,9 @@ Drive the game through `window.__hm` in Playwright:
 - climb (the hint shows "Climbing" and strength drains);
 - old saves load (`loadSave` of a v1 save, then check items on land and buildings moved rigidly);
 - surfaces (`surfaceAt` gives water or rock where expected);
-- count checks (`SEA.counts`, `FAUNA.counts`, `FLORA.kinds`) to confirm every species exists.
+- count checks (`SEA.counts`, `FAUNA.counts`, `FLORA.kinds`) to confirm every species exists;
+- a full flow audit: every recipe produces its output, every food can be eaten, every pot dish resolves, every building piece places, growth and a new day run, a save/load round trip keeps items, plots, pieces and seen marks, `zoneAt` is right for each zone, and every species has a book entry;
+- a tour in the **default view (third person)** from where a player stands in each zone, plus night, rain and under water.
 
 Always check the console for page errors and TSL errors, in both renderers.
 

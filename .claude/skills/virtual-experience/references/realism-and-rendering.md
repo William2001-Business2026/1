@@ -29,6 +29,10 @@
 6. **Physically plausible light:** under water, sunlight and sky light drop with depth. Falling water is white, not a mirror. Pale materials (kukui, white fish) must not bloom.
 7. **Shapes from nature:** fluted ridges rather than cones or domes, tapered and twisting blades rather than flat strips, beaked heads rather than balls.
 8. **Distance:** fog or haze fills what is past the terrain; the horizon island has light and shade and haze, not a flat cut-out.
+9. **Night is dark but readable:** cool moonlight and a bluish hemisphere floor after dusk, never pitch black.
+10. **Loaded models:** strip emissive maps (glowing eyes) and sink boulders to the lowest ground under their footprint, so none overhangs a slope.
+11. **The third-person camera** pulls in when a trunk, palm or boulder blocks the view (test the segment from head to camera against `colliders`), and eases back out.
+12. **The character is dressed for the setting** (Hale Moku: a kapa malo fitted to the body's measured waist, swaying with the stride). A bare base mesh breaks immersion in every third-person shot.
 
 ## Performance rules
 - Instancing plus chunks (16 m grass, 24 m reef, 64 m trees); visibility by distance; whole systems hidden when irrelevant (the reef while above water).

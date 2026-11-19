@@ -51,6 +51,11 @@ Each entry says what the system does, how, and why it was done that way. Keep th
 - **Rain by surface:** open ground, canopy patter, roof drumming, sea hush.
 - If realistic recordings are wanted, they need a CC0 source and network access; ask first.
 
+## The book (J)
+- **Pages:** a field guide, open anywhere. Journal (first-person notes and hints); one page per zone with plants, animals (tagged food, hunt, catch, gather, protected, watch) and what you can do; then Making, Food and Building & growing, generated from `RECIPES`, `K`, `FORMS` and `CROPS`, so the book can never drift from the game.
+- **Seen marks:** everything is readable from the start; `W.seen[label]` marks what the player has looked at or come near.
+- **When adding a species, item or activity:** add it to the guide too. The flow test checks that every species in the world has a guide entry.
+
 ## Items, food and the journal
 - The `K` table holds the shape (`mk()`), food tier, `cook:1` (which generates roasted and dried versions), and a tool flag. Recipes are "hold one thing, use it on another".
 - Pot dishes come from ingredient sets (`dishOf`).

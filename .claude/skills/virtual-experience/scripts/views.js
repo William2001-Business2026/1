@@ -8,7 +8,7 @@ const { chromium } = require('playwright'); const fs=require('fs'),path=require(
   const b=await chromium.launch({args}); const p=await b.newPage({viewport:{width:960,height:540}}); const errs=new Set();
   p.on('pageerror',e=>errs.add(String(e).slice(0,300)));p.on('console',m=>{if(m.type()==='error')errs.add(m.text().slice(0,300))});
   if(mode==='webgpu') await p.addInitScript({path:path.join(__dirname,'fakegpu.js')});
-  await p.addInitScript(q=>localStorage.setItem('halemoku',JSON.stringify({v:2,quality:q,bob:false,view:'first'})),process.env.Q||'medium');
+  await p.addInitScript(q=>localStorage.setItem('halemoku',JSON.stringify({v:2,quality:q[0],bob:false,view:q[1]})),[process.env.Q||'medium',process.env.VIEW||'first']);
   await p.goto(`http://localhost:${port}/index.html`+(mode==='webgl'?'?renderer=webgl':'')); await p.waitForFunction(()=>window.__hm,null,{timeout:150000});
   await p.evaluate(()=>{document.getElementById('b-begin').click();window.__hm.player.trans=1;}); await p.waitForTimeout(4000);
   if(process.env.TIME)await p.evaluate(v=>{const s=document.getElementById('s-time');s.value=v;s.dispatchEvent(new Event('input'));},+process.env.TIME);

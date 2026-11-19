@@ -102,7 +102,7 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
 
 ## Realism
 
-- **Sky and light:** five photographed HDRI skies (day, golden hour, sunset, afterglow, dusk) cross-fade as the sun moves. Each is turned to match the sun and lights the island (image-based lighting); the computed starry sky takes over at night.
+- **Sky and light:** after dusk, cool moonlight keeps the night dark but readable. Five photographed HDRI skies (day, golden hour, sunset, afterglow, dusk) cross-fade as the sun moves. Each is turned to match the sun and lights the island (image-based lighting); the computed starry sky takes over at night.
 - **Materials:** physically based (albedo, normal, roughness) scans for sand, wet sand, grassy ground, lava rock, deck boards and palm bark.
 - **Island:** about 250 m across and 310 m from north to south, with a lumpy grassy knoll, rolling ground inland, a lava coast to the west and 34 palms.
 - **Zones:** the island is divided into zones, and the zone's name appears as you walk into it.
@@ -117,7 +117,7 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
 - **Sound by zone:** the surf fades as you go inland. The waterfall roars louder as you get near it, and the river babbles and plops over stones close by. The spring bubbles. Wind grows stronger with height and howls over the summit.
 - **Grass:** 120,000 tufts of blades. Close by they are full tufts; further out they are lighter tufts that thin out gradually, and past that the ground's own green takes over, so there is no hard edge. The blades are lit the way the ground is and share its colours and dry and lush patches, so they sit in the soil rather than on top of it. Lower quality levels draw a smaller area of grass.
 - **Wind:** a shared wind with travelling gusts bends the grass, shrubs and palm fronds; grass parts around the player.
-- **Character:** a rigged, animated islander seen in third person. The camera orbits freely while you walk; the body turns toward where you go and plays idle, walk, jog, jump, landing and swim animations. Held items sit in the right hand. Sitting, the hammock and the binoculars use first-person views.
+- **Character:** a rigged, animated islander seen in third person, wearing a malo of patterned kapa that sways as you walk. The camera pulls in when a tree or boulder is in the way. The camera orbits freely while you walk; the body turns toward where you go and plays idle, walk, jog, jump, landing and swim animations. Held items sit in the right hand. Sitting, the hammock and the binoculars use first-person views.
 - **Plants:** scanned fern clumps and anthuriums replace the leaf-card shrubs and lean and flutter in the same wind as the grass.
 - **Props:** scanned binoculars, oil lantern, rocking chair, conch shells, lava stones, bananas, rain barrel, storage crate, clay pot and basket replace the shape-built versions, fitted to the same size so everything works as before.
 - **Animals:** rigged, textured hens, a rooster and a goat. Each keeps its wandering, pecking, grazing and feeding behaviour; the hen plays its own walk-and-peck animation, and the rooster's and goat's legs swing as they walk.
