@@ -109,7 +109,7 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
   - **Kahakai, the beach:** where you arrive, with coconuts and building.
   - **Kuahiwi, the mountain:** a green, fluted mountain about 75 m high, with sea cliffs on its north side and a cap of cloud drifting around the summit.
     - **Climbing:** gentle slopes you walk. Steeper ones slow you down. Past about 43° you climb hand over hand while holding W, using the **Strength** bar. If it runs out, or you let go on very steep ground, you slide back down. Strength returns when you stand on easier ground.
-  - **Wailele, the waterfall pool:** a 14 m waterfall drops into a cliff-backed pool you can swim in. From there a river winds east to the sea, and its current carries you downstream.
+  - **Wailele, the waterfall pool:** a 14 m waterfall pours over a glassy lip and falls white down a gorge of wet, dark rock into a pool you can swim in. Spray bursts where it lands, foam spreads and rings ripple across the pool, and mist rolls downstream on the wind. With the sun behind you, look for a rainbow in the mist. From there a river winds east to the sea, and its current carries you downstream.
   - **Ka Puna Huna, the hidden spring:** the river's source, high on the mountain behind fallen boulders. Finding it adds a page to the journal.
   - **Ke Kai, the open sea.**
   - **Lalo o ke Kai, under the sea:** a fringing reef rings the island 15–65 m offshore, 2–4 m down, then drops away to 18 m. See the Undersea section below.
