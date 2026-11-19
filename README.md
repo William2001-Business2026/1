@@ -2,7 +2,9 @@
 
 *An evening on a small island.*
 
-Hale Moku is a 3D island you explore in the browser, in third person (or first person, if you prefer). You can walk the beach, jump, pick things up, build with them, sit or lie down, play the ukulele and take photos. The skies, ground materials and boulders are real-world scans, and the character is a rigged, animated model; everything else, every sound included, is generated in code when the page loads.
+Hale Moku is a 3D island you explore in the browser, in third person (or first person, if you prefer). You can walk the beach, jump, pick things up, build with them, sit or lie down, play the ukulele and take photos. The skies, ground materials, boulders, most trees and the character are real-world scans, and the animals are rigged models; the rest, every sound included, is generated in code when the page loads.
+
+**Home screen:** before you begin, a slow film of the island plays behind the menu. The camera drifts through the beach, the forest, the waterfall pool, the mountain and the reef, then descends over your lanai, with each zone's name and a line about it. It is the live world at the time of day you chose.
 
 **Status:** pre-launch. Not yet published.
 
