@@ -2298,13 +2298,58 @@ const hero={ready:false,root:new THREE.Group(),mixer:null,acts:{},cur:'',bodyYaw
 scene.add(hero.root,hero.socket);hero.root.visible=false;
 const heroShown=()=>hero.ready&&settings.view!=='first'&&player.mode==='walk';
 const thirdView=()=>heroShown()&&player.zoom<.05;
-Promise.all([gltfLoader.loadAsync('assets/models/islander.glb'),gltfLoader.loadAsync('assets/models/islander_moves.glb')]).then(([c,mv])=>{
-  const model=c.scene;model.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=true;o.frustumCulled=false;
-    if(/hair/i.test(o.material.name))o.material.color.setRGB(.055,.035,.022);}}); // eyebrows share the greyscale hair material
-  model.rotation.y=Math.PI; // the model faces +Z; the game's "forward" is -Z
+/* The body is a real person, photo-scanned (in3D, CC BY 4.0): a modern islander in a polo shirt and shorts. It has its own
+   27-bone skeleton, so the animation library (made for the base character's 65-bone rig) is retargeted onto it once, at load:
+   each bone's rotation away from its rest pose is carried across in world space, after the two rest poses are lined up limb
+   by limb (one stands in a T, the other in an A). The pelvis moves by the same amount, scaled to the scan's leg length. */
+const RIG_MAP={pelvis:'pelvis_01',spine_01:'spine1_08',spine_02:'spine2_09',spine_03:'spine3_010',neck_01:'neck_011',Head:'head_012',
+  clavicle_l:'left_collar_013',upperarm_l:'left_shoulder_014',lowerarm_l:'left_elbow_015',hand_l:'left_wrist_016',
+  clavicle_r:'right_collar_017',upperarm_r:'right_shoulder_018',lowerarm_r:'right_elbow_019',hand_r:'right_wrist_020',
+  thigh_l:'left_hip_02',calf_l:'left_knee_03',foot_l:'left_ankle_04',thigh_r:'right_hip_05',calf_r:'right_knee_06',foot_r:'right_ankle_07'};
+const RIG_AIM={spine_01:['spine_02','spine2_09'],spine_02:['spine_03','spine3_010'],spine_03:['neck_01','neck_011'],neck_01:['Head','head_012'],
+  clavicle_l:['upperarm_l','left_shoulder_014'],upperarm_l:['lowerarm_l','left_elbow_015'],lowerarm_l:['hand_l','left_wrist_016'],hand_l:['middle_01_l','left_wrist_end_024'],
+  clavicle_r:['upperarm_r','right_shoulder_018'],upperarm_r:['lowerarm_r','right_elbow_019'],lowerarm_r:['hand_r','right_wrist_020'],hand_r:['middle_01_r','right_wrist_end_025'],
+  thigh_l:['calf_l','left_knee_03'],calf_l:['foot_l','left_ankle_04'],foot_l:['ball_l','left_ankle_end_021'],
+  thigh_r:['calf_r','right_knee_06'],calf_r:['foot_r','right_ankle_07'],foot_r:['ball_r','right_ankle_end_022']};
+function retargetHero(src,tgt,clips){
+  const V=THREE.Vector3,Q=THREE.Quaternion,wrap=new THREE.Group();wrap.add(tgt);src.updateMatrixWorld(true);wrap.updateMatrixWorld(true);
+  const wp=(o)=>o.getWorldPosition(new V()),wq=(o,q)=>o.getWorldQuaternion(q||new Q());
+  const sBox=new THREE.Box3().setFromObject(src),fwd=wp(tgt.getObjectByName('left_ankle_end_021')).sub(wp(tgt.getObjectByName('left_ankle_04')));
+  wrap.rotation.y=-Math.atan2(fwd.x,fwd.z);wrap.updateMatrixWorld(true);                                       // face +Z, like the base character
+  let b=new THREE.Box3().setFromObject(tgt);wrap.scale.setScalar((sBox.max.y-sBox.min.y)/(b.max.y-b.min.y));wrap.updateMatrixWorld(true);
+  b=new THREE.Box3().setFromObject(tgt);wrap.position.y=sBox.min.y-b.min.y;wrap.updateMatrixWorld(true);       // the same height, feet on the same ground
+  const P=[];for(const [sn,tn] of Object.entries(RIG_MAP)){const so=src.getObjectByName(sn),to=tgt.getObjectByName(tn);if(!so||!to)continue;
+    const p={s:so,t:to,sRi:wq(so).invert(),A:new Q()},aim=RIG_AIM[sn];
+    if(aim){const sa=src.getObjectByName(aim[0]),ta=tgt.getObjectByName(aim[1]);if(sa&&ta)p.A.setFromUnitVectors(wp(ta).sub(wp(to)).normalize(),wp(sa).sub(wp(so)).normalize());}
+    p.AT=p.A.clone().multiply(wq(to));p.rest=to.quaternion.clone();P.push(p);}
+  if(P.length<16)throw new Error('skeletons do not match');
+  const pS=src.getObjectByName('pelvis'),pT=tgt.getObjectByName('pelvis_01'),sP0=wp(pS),tP0=wp(pT),restPos=pT.position.clone();
+  const ratio=(tP0.y-wp(tgt.getObjectByName('left_ankle_04')).y)/(sP0.y-wp(src.getObjectByName('foot_l')).y);
+  const mixer=new THREE.AnimationMixer(src),q1=new Q(),q2=new Q(),q3=new Q(),v1=new V(),out=[];
+  for(const clip of clips){mixer.stopAllAction();mixer.clipAction(clip).play();
+    const n=Math.max(2,Math.ceil(clip.duration*30)+1),times=new Float32Array(n),vals=P.map(()=>new Float32Array(n*4)),pv=new Float32Array(n*3);
+    for(let i=0;i<n;i++){const t=Math.min(clip.duration,i/30);times[i]=t;mixer.setTime(t);src.updateMatrixWorld(true);
+      P.forEach((p,j)=>{q2.multiplyQuaternions(wq(p.s,q1),p.sRi);q3.multiplyQuaternions(q2,p.AT);                 // the source's turn from rest, applied to the lined-up target
+        const loc=wq(p.t.parent,q1).invert().multiply(q3),a=vals[j];if(i>0&&a[i*4-4]*loc.x+a[i*4-3]*loc.y+a[i*4-2]*loc.z+a[i*4-1]*loc.w<0)loc.set(-loc.x,-loc.y,-loc.z,-loc.w);
+        p.t.quaternion.copy(loc);loc.toArray(a,i*4);});
+      v1.copy(wp(pS)).sub(sP0).multiplyScalar(ratio).add(tP0);pT.parent.updateWorldMatrix(true,false);pT.parent.worldToLocal(v1);v1.toArray(pv,i*3);}
+    const tracks=P.map((p,j)=>new THREE.QuaternionKeyframeTrack(p.t.name+'.quaternion',times,vals[j]));tracks.push(new THREE.VectorKeyframeTrack(pT.name+'.position',times,pv));
+    out.push(new THREE.AnimationClip(clip.name,clip.duration,tracks));}
+  mixer.stopAllAction();P.forEach(p=>p.t.quaternion.copy(p.rest));pT.position.copy(restPos);
+  return{model:wrap,clips:out};}
+Promise.all([gltfLoader.loadAsync('assets/models/islander.glb'),gltfLoader.loadAsync('assets/models/islander_moves.glb'),
+  gltfLoader.loadAsync('assets/models/islander_scan.glb').catch(e=>{console.warn('The scanned body did not load:',e);return null;})]).then(([c,mv,sc])=>{
+  let model=null,clips=mv.animations;
+  if(sc)try{const r=retargetHero(c.scene,sc.scene,mv.animations);model=r.model;clips=r.clips;hero.scan=true;}catch(e){console.warn('Retargeting failed, so the base character is used:',e);}
+  if(!model)model=c.scene;
+  model.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=true;o.frustumCulled=false;
+    if(!hero.scan&&/hair/i.test(o.material.name))o.material.color.setRGB(.055,.035,.022);
+    if(hero.scan&&o.material){o.material.side=THREE.FrontSide;o.material.roughness=.85;}}}); // eyebrows share the greyscale hair material
+  model.rotation.y+=Math.PI; // the model faces +Z; the game's "forward" is -Z
   hero.root.add(model);hero.mixer=new THREE.AnimationMixer(model);
-  for(const clip of mv.animations){const a=hero.mixer.clipAction(clip);if(/Start|Land|Enter|Exit|Interact|PickUp/.test(clip.name)){a.setLoop(THREE.LoopOnce,1);a.clampWhenFinished=true;}hero.acts[clip.name]=a;}
-  hero.hand=model.getObjectByName('hand_r');hero.px=player.x;hero.pz=player.z;hero.ready=true;heroPlay('Idle_Loop',0);applyView();
+  for(const clip of clips){const a=hero.mixer.clipAction(clip);if(/Start|Land|Enter|Exit|Interact|PickUp/.test(clip.name)){a.setLoop(THREE.LoopOnce,1);a.clampWhenFinished=true;}hero.acts[clip.name]=a;}
+  hero.hand=model.getObjectByName(hero.scan?'right_wrist_020':'hand_r');hero.px=player.x;hero.pz=player.z;hero.ready=true;heroPlay('Idle_Loop',0);applyView();
+  if(hero.scan)return;                                                   // the scanned islander wears his own clothes and hair
   try{dressMalo(model);}catch(e){console.warn('Malo:',e);}
   // hair and beard come as separate meshes skinned to the same 65-bone rig: bind them to this body's bones
   gltfLoader.loadAsync('assets/models/islander_hair.glb').then(h=>{let body=null;model.traverse(o=>{if(o.isSkinnedMesh&&!body)body=o;});
@@ -3781,7 +3826,7 @@ const FAUNA=(()=>{
 })();
 
 scene.fog=new THREE.FogExp2(0x0b4a58,0); // only thickens under water
-window.__tF1=performance.now();window.STAMv=()=>STAM.v;window.__forceWet=()=>{U.uWet.value=1;U.uSwell.value=1;raining=1;};window.WETv=()=>U.uWet.value;window.FLORA_INFO=()=>({count:FLORA.count,kinds:FLORA.kinds});window.__hm={get FAUNA(){return FAUNA;},get RECIPES(){return RECIPES;},get FORMS(){return FORMS;},get CROPS(){return CROPS;},dishOf,eat,zoneAt,have,takeFrom,get GUIDE(){return GUIDE;},interactE,get looked(){return looked;},get FLORA(){return FLORA;},get SEA(){return SEA;},get DIVE(){return DIVE;},get scene(){return scene;},player,groundAt,surfaceAt,pickUp,cup,lantern,coco,chickens,goat,PHYS,useHeld,sysDrop,settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
+window.__tF1=performance.now();window.STAMv=()=>STAM.v;window.__forceWet=()=>{U.uWet.value=1;U.uSwell.value=1;raining=1;};window.WETv=()=>U.uWet.value;window.FLORA_INFO=()=>({count:FLORA.count,kinds:FLORA.kinds});window.__hm={get hero(){return hero;},heroPlay,get keys(){return keys;},get FAUNA(){return FAUNA;},get RECIPES(){return RECIPES;},get FORMS(){return FORMS;},get CROPS(){return CROPS;},dishOf,eat,zoneAt,have,takeFrom,get GUIDE(){return GUIDE;},interactE,get looked(){return looked;},get FLORA(){return FLORA;},get SEA(){return SEA;},get DIVE(){return DIVE;},get scene(){return scene;},player,groundAt,surfaceAt,pickUp,cup,lantern,coco,chickens,goat,PHYS,useHeld,sysDrop,settle,supportedAt,get pieceCols(){return pieceCols;},get homeTier(){return homeTier;},W,K,give,spawn,addPlot,addPiece,recompute,tick,newDay,sysClick,sysKey,saveNow,loadSave,serialize,tryRecipe,harvest,chickens,goat,build,get looked(){return looked;},set looked(v){looked=v;},get aim(){return aimPt;},render:()=>composer.render(),renderer,player,evening,applyTime,settings,begin,sit,lie,standUp,pickUp,putDown,useHeld,items,camera,restartEvening,update,get state(){return state;},set state(v){state=v;},U,AU};
 /* ───────── physics: Rapier (Apache-2.0, vendor/rapier) ─────────
    Things you let go of or throw become rigid bodies until they come to rest: they fall, bounce, tumble, roll downhill,
    float (coconuts, wood, fronds) or sink, and your body pushes them as you walk. Once still, the body is removed and the

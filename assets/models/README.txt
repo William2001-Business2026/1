@@ -4,6 +4,11 @@ boulder.glb
   Poly Haven "boulder_01" (https://polyhaven.com/a/boulder_01), CC0 1.0 (public domain).
   Simplified to 5,000 triangles, meshopt-compressed, WebP textures.
 
+islander_scan.glb  (Creative Commons Attribution 4.0, https://creativecommons.org/licenses/by/4.0/)
+  "Human 3D model scanned with iPhone X" by in3D_io  https://sketchfab.com/3d-models/human-3d-model-scanned-with-iphone-x-73e467dfc8a04914bb314a9410077858
+  Changes: its own animation removed, WebP texture, meshopt geometry. The game retargets the Quaternius animations
+  below onto its 27-bone skeleton at load time.
+
 islander.glb, islander_moves.glb
   Quaternius "Universal Base Characters" (Superhero Male, Standard version) and
   "Universal Animation Library" (Standard version), https://quaternius.com
