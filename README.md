@@ -42,7 +42,8 @@ Very old or very weak graphics chips may still fall below 30 FPS at the lowest l
 |---|---|
 | W A S D | Walk |
 | Mouse | Look around (in third person, turns the camera around you) |
-| V | Switch between third-person and first-person view |
+| V | Switch between third-person and first-person view (or click the switch at the bottom right, or Settings → Camera) |
+| J | Open the book |
 | Shift | Walk slowly |
 | Space | Jump (under water: swim up) |
 | C | Dive when you are swimming; hold to go deeper |
@@ -56,6 +57,15 @@ Very old or very weak graphics chips may still fall below 30 FPS at the lowest l
 | P | Save a photo |
 | Enter | Type in the chat (when chat is switched on) |
 | Esc | Pause |
+
+## The book
+
+Press **J** anywhere to open the book. It has:
+- **Journal:** your own notes, written as you discover things, with hints of what to try next.
+- **A page for each zone** (Kahakai, Kuahiwi, Wailele, Wao Nahele, Lalo o ke Kai): its plants, its animals (tagged food, hunt, catch, gather, protected or watch) and what you can do there. Everything is readable from the start, and entries you haven't seen yourself yet are marked "not yet seen".
+- **Making, Food, and Building & growing:** every recipe, which foods to eat raw or cook, the pot dishes, the building pieces and homes, and the crops.
+
+Turn pages with ← → or A D, or click a tab.
 
 ## Saving
 

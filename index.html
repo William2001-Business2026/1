@@ -60,10 +60,20 @@
   .keys{display:grid;grid-template-columns:auto 1fr;gap:8px 18px;font-size:14px;margin-top:12px}
   .keys b{font-weight:600;letter-spacing:.05em;color:#e8c48a;white-space:nowrap}
   p.c{font-size:14px;line-height:1.6;opacity:.9}
-  #book{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(10,8,5,.45)}
+  #book{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;background:rgba(10,8,5,.45)}
   #book.on{display:flex}
   #bookpage{width:min(460px,calc(100vw - 40px));max-height:calc(100vh - 60px);overflow:auto;padding:28px 34px;border-radius:4px;
     background:linear-gradient(90deg,#e9dfc6,#f3ead4 12%,#efe5cc);color:#3a2f22;font-family:Georgia,"Times New Roman",serif;font-style:italic;font-size:16px;line-height:1.55;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  #bookpage{width:min(820px,calc(100vw - 40px))!important}
+  #bookpage nav{display:flex;flex-wrap:wrap;gap:4px;margin:-8px 0 14px;border-bottom:1px solid rgba(60,45,30,.25);padding-bottom:8px}
+  #bookpage nav button{font:inherit;font-size:14px;background:none;border:1px solid rgba(60,45,30,.25);border-radius:3px;padding:3px 9px;color:inherit;cursor:pointer;opacity:.75}
+  #bookpage nav button.on{background:rgba(60,45,30,.12);opacity:1}#bookpage h3{margin:0 0 6px;font-weight:400;font-size:22px}
+  #bookpage h5{margin:16px 0 6px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;opacity:.6;font-style:normal}#bookpage .intro{opacity:.85}
+  #bookpage .ent{margin:0 0 9px}#bookpage .ent p{margin:2px 0 0;font-size:15px}#bookpage .ent i{opacity:.7}#bookpage .ent.unseen b{opacity:.65}
+  #bookpage .tag{display:inline-block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-style:normal;padding:0 5px;border-radius:3px;margin-left:3px;border:1px solid rgba(60,45,30,.3);vertical-align:2px}
+  #bookpage .tag.hunt,#bookpage .tag.catch{color:#8a3b1c}#bookpage .tag.food{color:#5a6b1f}#bookpage .tag.protected{color:#1f5f7a}
+  #bookpage em.pencil{font-size:12px;margin-left:6px;font-style:italic}#bookpage ul{margin:4px 0 10px;padding-left:20px}#bookpage li{margin:0 0 4px;font-size:15px}#bookpage .foot{font-size:12.5px;margin-top:14px}
+  #camtog{position:absolute;right:14px;bottom:12px;font:600 12px Quicksand,system-ui,sans-serif;color:#eaf6f7;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:4px 10px;cursor:pointer;pointer-events:auto;text-shadow:0 1px 2px #0008}
   #bookpage h4{margin:0 0 12px;font-weight:400;letter-spacing:.08em;font-size:13px;text-transform:uppercase;font-style:normal;opacity:.6}
   #bookpage p{margin:0 0 10px}#bookpage p.pencil{color:#8d8474;font-size:15px}#bookpage hr{border:0;border-top:1px solid rgba(60,45,30,.25);margin:14px 0}
   #fade{position:fixed;inset:0;background:#05070c;opacity:0;pointer-events:none;transition:opacity 2s}#fade.on{opacity:1}
@@ -139,7 +149,9 @@
     <div class="box"><div class="keys">
       <b>W A S D</b><span>Walk</span>
       <b>Mouse</b><span>Look around (turns the camera around you in third person)</span>
-      <b>V</b><span>Switch between third-person and first-person view</span>
+      <b>V</b><span>Switch between third-person and first-person view (or click the switch at the bottom right)</span>
+      <b>J</b><span>Open the book: a guide to every zone, its plants and animals, and what you can make, cook and build</span>
+      <b>C</b><span>Dive when swimming; hold to go deeper</span>
       <b>Shift</b><span>Walk slowly</span>
       <b>Space</b><span>Jump</span>
       <b>E</b><span>Interact: pick up, sit, lie down, stand up</span>
@@ -1548,6 +1560,8 @@ function swimUnder(f,s,dt,wy){
   const m=Math.hypot(nx-player.x,nz-player.z,ny-player.y)/dt;player.x=nx;player.y=ny;player.z=nz;return m;
 }
 const airEl=document.createElement('div');airEl.id='air';airEl.innerHTML='<span>Air</span><b><i></i></b>';hud.appendChild(airEl);const airFill=airEl.querySelector('i');
+const camTog=document.createElement('button');camTog.id='camtog';hud.appendChild(camTog);const camLabel=()=>{camTog.textContent=(settings.view==='first'?'First person':'Third person')+'  ·  V to switch  ·  J book';};camLabel();
+camTog.onclick=e=>{e.stopPropagation();settings.view=settings.view==='first'?'third':'first';saveSettings();$('s-view').value=settings.view;applyView();camLabel();};
 const stamEl=document.createElement('div');stamEl.id='air';stamEl.className='stam';stamEl.innerHTML='<span>Strength</span><b><i></i></b>';hud.appendChild(stamEl);const stamFill=stamEl.querySelector('i');
 const fadeEl=document.createElement('div');fadeEl.id='fade';document.body.appendChild(fadeEl);
 let toastT=0; function toast(msg,secs=4){toastEl.textContent=msg;toastEl.classList.add('on');toastT=secs;}
@@ -1637,7 +1651,8 @@ function restartEvening(){
 addEventListener('keydown',e=>{
   if(e.repeat)return;keys[e.code]=true;
   if(state!=='play')return;
-  if(bookOpen){if(['KeyE','Escape','KeyG','Space'].includes(e.code))closeBook();return;}
+  if(bookOpen){if(['KeyE','Escape','KeyG','Space','KeyJ'].includes(e.code))closeBook();else if(e.code==='ArrowLeft'||e.code==='KeyA')GUIDE.turn(-1);else if(e.code==='ArrowRight'||e.code==='KeyD')GUIDE.turn(1);return;}
+  if(e.code==='KeyJ'){openBook();return;}
   if(sysKey(e))return;
   if(e.code==='KeyV'){settings.view=settings.view==='first'?'third':'first';saveSettings();$('s-view').value=settings.view;applyView();toast(settings.view==='first'?'First person':'Third person',1.5);return;}
   if(e.code==='Space'){e.preventDefault();
@@ -1836,14 +1851,14 @@ function update(dt){
       for(const h of hits){if(tp&&Math.hypot(h.point.x-player.x,h.point.z-player.z)>2.4)continue;let o=h.object;while(o&&!o.userData.item)o=o.parent;if(o&&o.userData.item!==held){looked=o.userData.item;if(h.instanceId!=null)looked.hitId=h.instanceId;break;}}
     }
     let lt='',ht='';
-    if(looked){const v=looked.verb;lt=itemLabel(looked)+(v?'  ·  E to '+v:'')+(looked.pc?'  ·  X to take apart':'');}
+    if(looked){const sl=itemLabel(looked);if(sl&&!W.seen[sl])W.seen[sl]=1;const v=looked.verb;lt=itemLabel(looked)+(v?'  ·  E to '+v:'')+(looked.pc?'  ·  X to take apart':'');}
     if(player.mode==='sit')ht='E to stand up';else if(player.mode==='hammock')ht='E to get up';
     if(held)ht=(ht?ht+'   ·   ':'')+(held.kind==='cup'&&held.sips===0?(held.rinsed?'':'Click to rinse in the sea   ·   '):held.hint+'   ·   ')+'G to put down';
     if(!held){const sh=sysHint();if(sh)ht=(ht?ht+'   ·   ':'')+sh;}
     if(player.climb)ht='Climbing   ·   let go of W to stop'+(ht?'   ·   '+ht:'');
     if(player.uw)ht='Space to rise   ·   C to go deeper'+(ht?'   ·   '+ht:'');
     else if(player.mode==='walk'&&!player.air&&(freshAt(player.x,player.z)??water.position.y)-heightAt(player.x,player.z)>1.7)ht='C to dive'+(ht?'   ·   '+ht:'');
-    if(introHint>0){introHint-=dt;if(!ht&&!locked)ht='Click to look around';else if(!ht)ht='W A S D to walk   ·   E to interact   ·   Esc for the menu';}
+    if(introHint>0){introHint-=dt;if(!ht&&!locked)ht='Click to look around';else if(!ht)ht='W A S D to walk   ·   E to interact   ·   J for the book   ·   V to switch camera   ·   Esc for the menu';}
     else if(!locked&&playing&&!ht)ht='Click to look around';
     if(lt!==lastLabel){label.textContent=lt;label.classList.toggle('on',!!lt);dot.classList.toggle('on',!!lt);lastLabel=lt;}
     if(ht!==lastHint){hint.textContent=ht;lastHint=ht;}
@@ -1889,7 +1904,7 @@ function frame(now){frameNo++;
 
 /* ═══════════════════════ the living island: things, tools, crops, creatures, building ═══════════════════════ */
 const SAVE_KEY='halemoku-island-1';
-const W={day:0,inv:[],sel:-1,basket:false,items:[],plots:[],pieces:[],fires:{},notes:{},flags:{},
+const W={seen:{},day:0,inv:[],sel:-1,basket:false,items:[],plots:[],pieces:[],fires:{},notes:{},flags:{},
   chick:{fed:.45,egg:0,man:0,bold:false},goat:{fed:.4,trust:0,milk:0},buff:{until:0,speed:1,carry:0},
   clock:{phase:'golden',dayT:1,fast:false},stamp:Date.now(),rainIn:500,rainLeft:0,nodes:{wash:0,stone:0,frond:0,nut:0,flower:0}};
 const SEEP=enlarge(-22,6),GROVE=enlarge(-8,-22),OLDPLOT=enlarge(17,13),CHICKHOME=enlarge(21,9),CHILIPLOT=enlarge(12,2);
@@ -2050,13 +2065,105 @@ const IDEAS=[ // [text, shown when..., hidden once...]
   ['Something moves on the knoll at dusk.',()=>W.day>=3,'goat'],
 ];
 function note(id){if(!id||W.notes[id]||!NOTES[id])return;W.notes[id]=1;SFX.page&&SFX.page();$('book').dataset.fresh='1';}
-function openBook(){
-  const b=$('book'),n=W.notes;let h='<h4>Day '+(W.day+1)+' · '+(season()?'the wet months':'the dry months')+'</h4>';
-  const found=Object.keys(n).filter(k=>NOTES[k]);
-  h+=found.length?found.map(k=>'<p>'+NOTES[k]+'</p>').join(''):'<p class="pencil">Nothing written yet.</p>';
-  const id=IDEAS.filter(i=>i[1](n)&&!n[i[2]]);if(id.length)h+='<hr>'+id.map(i=>'<p class="pencil">'+i[0]+'</p>').join('');
-  $('bookpage').innerHTML=h;b.classList.add('on');bookOpen=true;SFX.page();
-}
+/* ───────── the book: a field guide to the island ─────────
+   Everything the island knows, for the player to look up at any time (J): one page per zone with its plants, animals and what
+   can be done there, then making things, food and building. Entries are all readable from the start; a mark shows the ones you
+   have seen for yourself. The journal page keeps the first-person notes written as you discover things. */
+const GUIDE=(()=>{
+  const T={food:'Food',hunt:'Hunt',catch:'Catch',gather:'Gather',protected:'Protected',watch:'Watch',use:'Useful'};
+  const E=(n,e,d,tags,see,when)=>({n,e,d,tags:tags||[],see,when});
+  const ZONES=[
+    {id:'beach',t:'Kahakai',s:'the beach',intro:'Where you arrive: pale coral sand, the lanai with its hammock and chair, coconut palms, and the black lava coast to the west. Each tide brings things in.',
+     flora:[E('Niu','coconut palm','Palms line the shore and drop coconuts and fronds. A stone flake opens a coconut: meat to eat, husk for fibre. An axe brings down fronds.',['food','use'],'Coconut palm'),
+       E('Hala','pandanus','Stands on stilt-like prop roots near the shore, with spiral tufts of long strap leaves.',['watch'],'Hala (pandanus)'),
+       E('Naupaka','beach naupaka','A low shrub with white half-flowers. Pick five to string a lei.',['use'],'Naupaka'),
+       E('ʻUlu','breadfruit','Planted near the lanai: broad lobed leaves and round green fruit.',['watch'],'ʻUlu (breadfruit)'),
+       E('Wiliwili','Hawaiian coral tree','On the dry lava side to the west: pale bark, three-part leaves, orange flowers.',['watch'],'Wiliwili')],
+     fauna:[E('Moa','the farm hens and rooster','They peck about near home, eat beans, greens and scraps, and leave eggs, more with a nest box.',['food','watch']),
+       E('Kao','the knoll goat','Comes down from the knoll at dusk. Feed it vines, fronds, bananas or limu and it learns to trust you; then a bowl brings milk.',['food','watch'],'Goat'),
+       E('ʻAʻama','black rock crab','Scuttles over the wet lava at the waterline and bolts into the surge if you crowd it. Grab it quickly.',['catch','food'],'ʻAʻama (rock crab)'),
+       E('ʻOpihi','limpet','Clings to the wet black rock where the waves break. Pry one loose with a stone flake.',['gather','food'],'ʻOpihi')],
+     todo:['Strike a lava stone on the black rock to split off a sharp flake: the first tool.','Gather sticks, driftwood, shells and limu washed up on the sand.',
+       'Ring stones for a fire, add wood, and light it from the lantern. Cook beside it.','Build on the half-metre grid: posts, rails, floors, walls, thatch. A roof keeps rain off.',
+       'Sit in the chair, lie in the hammock, play the ukulele (1–4), listen to the radio, and take photos (P).','Set a bamboo fish trap in the shallows; it fills by itself.']},
+    {id:'mountain',t:'Kuahiwi',s:'the mountain',intro:'A green, fluted mountain about 75 m high to the north, with sea cliffs on its far side and cloud drifting round the summit. The wind grows with every metre you climb.',
+     flora:[E('ʻŌhiʻa lehua','Metrosideros polymorpha','The first tree on new lava and the most common on the mountain. Small dark leaves and red pompom blossoms that the honeycreepers feed from.',['watch'],'ʻŌhiʻa lehua'),
+       E('Koa','Acacia koa','Tall, with a broad crown and sickle-shaped grey-green leaves. Its wood made canoes.',['watch'],'Koa'),
+       E('Hāpuʻu','Hawaiian tree fern','Fibrous trunks crowned with arching fronds, in the wetter gullies.',['watch'],'Hāpuʻu (tree fern)'),
+       E('Loulu','Hawaiian fan palm','Slender palms with pleated fans, high on the ridges.',['watch'],'Loulu (fan palm)')],
+     fauna:[E('Kao','feral goat','Herds on the steep slopes. Wary; creep close (Shift) and strike with the spear.',['hunt','food'],'Kao (feral goat)'),
+       E('ʻIo','Hawaiian hawk','Soars in wide circles over the mountain, now and then beating its wings.',['watch','protected'],'ʻIo (Hawaiian hawk)')],
+     todo:['Climb: gentle slopes you walk; past about 43° hold W to climb hand over hand on your Strength. Rest on easier ground before it runs out, or you slide.',
+       'Find Ka Puna Huna, the hidden spring, behind fallen boulders on the south-east flank. The river starts there.','Stand on the summit for the view, the wind and the cloud.']},
+    {id:'fountain',t:'Wailele',s:'the waterfall pool and the river',intro:'The river falls 14 m into a cliff-backed pool, then winds east through the forest to the sea. After heavy rain it rises, runs faster and roars louder.',
+     flora:[E('Hāpuʻu','tree fern','Thrives in the spray and shade around the pool.',['watch'],'Hāpuʻu (tree fern)'),E('Ferns and anthuriums','the undergrowth','Crowd the damp banks.',['watch'])],
+     fauna:[E('ʻŌpeʻapeʻa','Hawaiian hoary bat','Hawaiʻi’s only native land mammal. Flits low over the river at dusk and after dark.',['watch','protected'],'ʻŌpeʻapeʻa (hoary bat)'),
+       E('Kia','axis deer','Comes down to drink at the forest edge. Very wary.',['hunt','food'],'Kia (axis deer)')],
+     todo:['Swim in the pool; the river’s current carries you downstream.','Fill a bowl with fresh water at the spring under the knoll, or from a rain barrel.',
+       'Dig grey clay from the spring mud with the digging stick.']},
+    {id:'forest',t:'Wao Nahele',s:'the forest',intro:'A Hawaiian rainforest inland on the east side, climbing onto the mountain: tall koa and ʻōhiʻa over tree ferns, leaf litter underfoot, birdsong by day and an owl at night. Mist hangs here after rain.',
+     flora:[E('Koa','Acacia koa','The tallest trees of the forest.',['watch'],'Koa'),E('ʻŌhiʻa lehua','with red lehua blossoms','The heart of the forest; the birds follow its flowers.',['watch'],'ʻŌhiʻa lehua'),
+       E('Hāpuʻu','tree fern','The understorey: fronds at head height.',['watch'],'Hāpuʻu (tree fern)'),E('Kukui','candlenut','Pale silvery-green leaves; its oily nuts once lit lamps.',['watch'],'Kukui (candlenut)'),
+       E('ʻŌhiʻa ʻai','mountain apple','Glossy leaves and red fruit.',['watch'],'ʻŌhiʻa ʻai (mountain apple)'),E('Banyan','an introduced giant','Two great banyans with hanging aerial roots that thicken into new trunks.',['watch'],'Banyan')],
+     fauna:[E('Puaʻa','wild pig','Roots through the forest floor. Bolts at about 13 m unless you creep (Shift). Strike, then butcher it (E) for pork.',['hunt','food'],'Puaʻa (wild pig)'),
+       E('Moa','red jungle fowl','Wild descendants of the birds the voyagers brought. Skittish.',['hunt','food'],'Moa (jungle fowl)'),
+       E('Nēnē','Hawaiian goose','Grazes in pairs on the open grass near the forest. Hawaiʻi’s state bird.',['hunt','food'],'Nēnē (Hawaiian goose)'),
+       E('Manakuke','small Indian mongoose','Darts across clearings; an introduced predator.',['watch'],'Manakuke (mongoose)'),
+       E('ʻIʻiwi','scarlet honeycreeper','Scarlet with black wings and a curved bill made for lehua flowers.',['watch','protected'],'ʻIʻiwi (scarlet honeycreeper)'),
+       E('ʻApapane','crimson honeycreeper','Deep crimson; its trills fill the canopy.',['watch','protected'],'ʻApapane (crimson honeycreeper)'),
+       E('Pueo','Hawaiian short-eared owl','Perches by day and moves to another tree if you come too close. Calls after dark.',['watch','protected'],'Pueo (Hawaiian owl)'),
+       E('Pulelehua','Kamehameha butterfly','Orange-red and black, one of only two native butterflies.',['watch'],'Pulelehua (Kamehameha butterfly)'),
+       E("Jackson's chameleon",'introduced','Green, sitting still in the branches.',['watch'],"Jackson's chameleon"),
+       E('Moʻo','gecko','Runs up and down the trunks.',['watch'],'Moʻo (gecko)'),
+       E('Nananana makakiʻi','happy-face spider','Tiny and yellow, under fern leaves; each one’s markings are its own.',['watch'],'Nananana makakiʻi (happy-face spider)')],
+     todo:['Hunt with the bamboo spear: approach slowly (Shift), strike, then butcher what you take (E) and roast the meat at the fire.',
+       'Watch for the honeycreepers in the flowering ʻōhiʻa, and for bats over the river at dusk.','Gather fronds and bamboo with the axe.']},
+    {id:'sea',t:'Lalo o ke Kai',s:'under the sea',intro:'A fringing reef rings the island 15–65 m offshore, 2–4 m down, then drops away to 18 m. Swim out until your feet leave the bottom and press C to dive.',
+     flora:[E('Pōhaku puna','lobe and finger coral','Lumpy mounds and thickets of blunt fingers, the builders of the reef.',['watch'],null,n=>n.dive),
+       E('Koʻa','cauliflower coral','Knobbly bushes in the surge on the reef crest.',['watch'],null,n=>n.dive),E('Pāpaua','rice coral plates','Overlapping brown plates with pale rims.',['watch'],null,n=>n.dive),
+       E('ʻAkoʻakoʻa','mushroom coral','Loose discs with fine ridges on the sand.',['watch'],null,n=>n.dive),E('ʻĒkaha kū moana','black coral','Fine branching trees on the drop-off. Hawaiʻi’s state gem.',['watch','protected'],null,n=>n.dive),
+       E('Limu','seaweed','Everywhere on the reef. Eat it as it is, feed it to the goat, or dig it into tired soil.',['gather','food'],'Limu')],
+     fauna:[E('Lauʻīpala','yellow tang','Bright yellow schools over the reef.',['catch','food'],'Lauʻīpala (yellow tang)'),E('Kihikihi','Moorish idol','Banded, with a long trailing fin.',['catch','food'],'Kihikihi (Moorish idol)'),
+       E('Manini','convict tang','Pale, with dark bars; big schools.',['catch','food'],'Manini (convict tang)'),E('Humuhumunukunukuāpuaʻa','reef triggerfish','Hawaiʻi’s state fish.',['catch','food'],'Humuhumunukunukuāpuaʻa (reef triggerfish)'),
+       E('Uhu','parrotfish','Blue-green, grinding coral into sand.',['catch','food'],'Uhu (parrotfish)'),
+       E('Heʻe','day octopus','Hides in holes and changes colour. It may ink and jet away; a spear helps.',['catch','food'],'Heʻe (octopus)'),
+       E('Ula','spiny lobster','Under ledges with long feelers out. Flicks backwards if you miss.',['catch','food'],'Ula (spiny lobster)'),
+       E('Wana','sea urchin','Black and spiny on the reef. The roe is rich.',['gather','food'],'Wana (sea urchin)'),
+       E('Honu','green sea turtle','Grazes on limu and rises to breathe. Protected: swim with it, never take it.',['watch','protected'],'Honu (green sea turtle)'),
+       E('Hāhālua','manta ray','Glides along the reef edge.',['watch'],'Hāhālua (manta ray)'),E('Manō','whitetip reef shark','Patrols the drop-off and circles you for a while if you come close. Harmless if left alone.',['watch'],'Manō (whitetip reef shark)')],
+     todo:['Dive: C down, W where you look, Space up, Shift to glide. One breath lasts about 60 seconds; shell goggles (2 shells + fibre) add 25 and clear the view.',
+       'Run out of air and you black out, waking on the beach without what you gathered on that dive. Your heartbeat warns you below 15 seconds.',
+       'Spear fish with a bamboo spear (stone flake + bamboo); catch heʻe, ula and ʻaʻama by hand; gather wana and limu.','Past the reef’s edge the current turns you back.']},
+  ];
+  const place={'@rock':'the black lava rock','@self':'by itself (click)','@seep':'the spring mud','@bamboo':'a bamboo clump','@palm':'a palm'};
+  const nm=k=>place[k]||(K[k]?K[k].n.toLowerCase():k);
+  const making=()=>RECIPES.map(r=>`<li><b>${K[r.out[0][0]]?K[r.out[0][0]].n:r.out[0][0]}</b>: hold ${r.n>1?r.n+' × ':''}${nm(r.h)} and ${r.t==='@self'?'click':'use it on '+nm(r.t)}${r.hits>1?` (${r.hits} strikes)`:''}${r.keep?'; you keep the tool':''}.</li>`).join('');
+  const food=()=>{const raw=[],cook=[];for(const k in K){const f=K[k];if(f.food==null||/^[cds]_/.test(k))continue;(f.cook?cook:raw).push(f.n);}
+    return `<p><b>Eat as it is:</b> ${raw.join(', ')}.</p><p><b>Better cooked</b> (set by a lit fire for about 40 s; roasted food carries you further, dried food keeps): ${cook.join(', ')}.</p>
+      <p><b>In the clay pot</b> with water, by the fire:</p><ul><li>pork with taro or sweet potato: kālua puaʻa</li><li>heʻe with coconut: heʻe lūʻau</li><li>crab or lobster: a seafood pot</li><li>taro with egg or fish: laulau</li><li>taro alone: poi</li><li>coconut with honey, milk or banana: haupia</li><li>anything else: island stew</li><li>add chili to any dish to make it spicy</li></ul>
+      <p>Food gives strength in tiers: raw keeps you going, cooked and pot dishes let you walk faster and carry more for longer.</p>`;};
+  const building=()=>`<p>Hold a building material and press <b>B</b>. R turns, F changes shape, the wheel sets the height; click to place. X takes a piece apart.</p><ul>${Object.values(FORMS).map(f=>`<li><b>${f.n}</b> from ${K[f.from]?K[f.from].n.toLowerCase():f.from}</li>`).join('')}</ul>
+      <p><b>Homes:</b> two posts and a little thatch make a lean-to; four posts under six fronds a hale, where the fire stays lit in rain; twelve fronds, six wall boards and six floor boards a house.</p>
+      <p><b>Growing:</b> till with the digging stick, plant what you can eat, water with a bowl. ${Object.values(CROPS).map(c=>c.n).join(', ')} grow here; taro wants wet ground by the spring, beans enrich the soil, the same crop twice tires it, and limu and droppings restore it.</p>
+      <p><b>Animals at home:</b> a trough feeds the hens and the goat; a nest box gathers eggs; a bamboo hive near flowers gives honey and heavier beans.</p>`;
+  const tagHtml=tags=>tags.map(t=>`<span class="tag ${t}">${T[t]}</span>`).join('');
+  const entry=(x,n)=>{const seen=x.see?!!W.seen[x.see]:x.when?!!x.when(n):true;return `<div class="ent${seen?'':' unseen'}"><div><b>${x.n}</b> <i>${x.e}</i> ${tagHtml(x.tags)}${seen?'':'<em class="pencil">not yet seen</em>'}</div><p>${x.d}</p></div>`;};
+  const pages=[{id:'journal',t:'Journal'},...ZONES.map(z=>({id:z.id,t:z.t,z})),{id:'making',t:'Making'},{id:'food',t:'Food'},{id:'build',t:'Building & growing'}];
+  let cur=0;
+  function render(){const pg=pages[cur],n=W.notes;let h='<nav>'+pages.map((p,i)=>`<button data-i="${i}" class="${i===cur?'on':''}">${p.t}</button>`).join('')+'</nav><div class="pg">';
+    if(pg.id==='journal'){h+='<h4>Day '+(W.day+1)+' · '+(season()?'the wet months':'the dry months')+'</h4>';const found=Object.keys(n).filter(k=>NOTES[k]);
+      h+=found.length?found.map(k=>'<p>'+NOTES[k]+'</p>').join(''):'<p class="pencil">Nothing written yet.</p>';const id=IDEAS.filter(i=>i[1](n)&&!n[i[2]]);if(id.length)h+='<hr>'+id.map(i=>'<p class="pencil">'+i[0]+'</p>').join('');}
+    else if(pg.z){const z=pg.z;h+=`<h3>${z.t} · ${z.s}</h3><p class="intro">${z.intro}</p><h5>Plants</h5>${z.flora.map(x=>entry(x,n)).join('')}<h5>Animals</h5>${z.fauna.map(x=>entry(x,n)).join('')}<h5>What you can do</h5><ul>${z.todo.map(t=>'<li>'+t+'</li>').join('')}</ul>`;}
+    else if(pg.id==='making')h+=`<h3>Making things</h3><p class="intro">Hold one thing and use it on another (left click). Everything you can make:</p><ul>${making()}</ul>`;
+    else if(pg.id==='food')h+='<h3>Food and cooking</h3>'+food();
+    else h+='<h3>Building and growing</h3>'+building();
+    h+='</div><p class="foot pencil">← → or A D to turn the page · click a tab · J, E or Esc to close</p>';
+    const el=$('bookpage');el.innerHTML=h;el.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{cur=+b.dataset.i;render();SFX.page();});}
+  return{open(){const z=zoneState.cur,i=pages.findIndex(p=>p.id===z||(z==='undersea'&&p.id==='sea'));if(i>=0&&!this.opened)cur=i;this.opened=true;render();},
+    turn(d){cur=(cur+d+pages.length)%pages.length;render();SFX.page();},zones:ZONES,pages};
+})();
+
+function openBook(){GUIDE.open();$('book').classList.add('on');bookOpen=true;SFX.page();$('book').dataset.fresh='';if(document.pointerLockElement)document.exitPointerLock();}
 let bookOpen=false;function closeBook(){$('book').classList.remove('on');bookOpen=false;}
 
 /* ───────── things lying in the world ───────── */
@@ -2127,6 +2234,7 @@ function holdItem(it){const g=it.group;
   if(heroShown()){hero.socket.add(g);const h=HOLD3[it.kind]||[0,-.03,.05,0,0,0];g.position.set(h[0],h[1],h[2]);g.rotation.set(h[3],h[4],h[5]);}
   else{camera.add(g);g.position.set(...it.hold.p);g.rotation.set(...it.hold.r);}}
 function applyView(){
+  if(typeof camLabel==='function')camLabel();
   if(held)holdItem(held);
   if(heroShown()){hero.socket.add(handG);handG.position.set(0,-.03,.05);handG.rotation.set(0,0,0);}else camera.add(handG);
 }
@@ -2862,7 +2970,7 @@ function fromSmallIsland(d){
 
 /* ───────── saving: browser storage twice over, plus a file you can keep ───────── */
 let fileHandle=null,saveT=0;
-function serialize(){return JSON.stringify({v:2,day:W.day,inv:W.inv,sel:W.sel,basket:W.basket,notes:W.notes,flags:W.flags,chick:W.chick,goat:W.goat,buff:W.buff,clock:W.clock,rainIn:W.rainIn,nodes:W.nodes,fires:W.fires,stamp:Date.now(),
+function serialize(){return JSON.stringify({v:2,seen:W.seen,day:W.day,inv:W.inv,sel:W.sel,basket:W.basket,notes:W.notes,flags:W.flags,chick:W.chick,goat:W.goat,buff:W.buff,clock:W.clock,rainIn:W.rainIn,nodes:W.nodes,fires:W.fires,stamp:Date.now(),
   items:W.items.map(o=>({kind:o.kind,n:o.n,x:+o.x.toFixed(2),z:+o.z.toFixed(2),...(o.y!=null?{y:+o.y.toFixed(2)}:{})})),
   plots:W.plots.map(p=>({x:p.x,z:p.z,soil:p.soil,moist:p.moist,crop:p.crop,g:p.g,over:p.over,health:p.health,last:p.last,dry:p.dry,wild:p.wild})),
   pieces:W.pieces.map(p=>({f:p.f,x:p.x,y:p.y,z:p.z,r:p.r,t:p.t,d:p.d}))});}
@@ -2873,7 +2981,7 @@ function loadSave(str){
   let d;try{d=JSON.parse(str);}catch(e){return false;}if(!d||(d.v!==1&&d.v!==2))return false;
   if(d.v===1)fromSmallIsland(d);
   [...W.items].forEach(despawn);[...W.plots].forEach(removePlot);[...W.pieces].forEach(p=>removePiece(p,false));
-  for(const k of['day','inv','sel','basket','notes','flags','chick','goat','buff','clock','rainIn','nodes','fires'])if(d[k]!=null)W[k]=d[k];
+  for(const k of['seen','day','inv','sel','basket','notes','flags','chick','goat','buff','clock','rainIn','nodes','fires'])if(d[k]!=null)W[k]=d[k];
   if(W.buff.until>nowS()+3600)W.buff.until=0;
   for(const o of d.items||[])if(K[o.kind]){const it=spawn(o.kind,o.x,o.z,o.n,o.y);if(o.y!=null)it.y=o.y;}
   for(const p of d.plots||[])if(!p.crop||CROPS[p.crop])addPlot(p);
@@ -3078,7 +3186,7 @@ const SEA=(()=>{
   const fwd=new V3(1,0,0),tmp=new V3(),tq=new THREE.Quaternion(),side=new V3(0,0,1);
   function updateSchools(dt,t,near){
     for(const sc of schools){const far=sc.home.x-camera.position.x,fz=sc.home.z-camera.position.z,dd=Math.hypot(far,fz);sc.im.visible=near&&dd<60;if(!sc.im.visible)continue;
-      sc.t+=dt;const s=sc.home,bed=heightAt(sc.c.x,sc.c.z);
+      sc.t+=dt;const s=sc.home,bed=heightAt(sc.c.x,sc.c.z);if(Math.hypot(sc.c.x-player.x,sc.c.z-player.z)<8)W.seen[sc.sp.n]=1;
       tmp.set(s.x+Math.sin(sc.t*.09)*sc.r,Math.max(bed+1.1,Math.min(seaY()-1,s.h+1.4+Math.sin(sc.t*.21)*.6)),s.z+Math.cos(sc.t*.07)*sc.r);
       const px=player.x-sc.c.x,pz=player.z-sc.c.z,py=player.y+1.4-sc.c.y,pd=Math.hypot(px,py,pz);if(pd<5)tmp.add(new V3(-px,-py*.3,-pz).multiplyScalar(2.2/Math.max(pd,.5))); // keep a few body lengths from you
       sc.c.lerp(tmp,1-Math.exp(-dt*.8));
@@ -3173,7 +3281,7 @@ const SEA=(()=>{
   function updateAnimals(dt,t,near){
     for(const a of animals){const g=a.g;if(a.gone){if(nowS()>a.gone){a.gone=0;const s=a.k==='aama'?a.home:(reefSpot(14,66,a.k==='ula'?-12:-11,a.k==='ula'?-4:-2)||a.home);a.p.set(s.x,s.h,s.z);a.home={...s};}else{g.visible=false;continue;}}
       const dd=Math.hypot(a.p.x-camera.position.x,a.p.z-camera.position.z);g.visible=(near||a.k==='aama')&&dd<(a.k==='manta'||a.k==='shark'?80:45);if(!g.visible&&a.k!=='shark'&&a.k!=='manta')continue;
-      a.t+=dt;const h0=a.home,pd=Math.hypot(a.p.x-player.x,a.p.z-player.z);
+      a.t+=dt;const h0=a.home,pd=Math.hypot(a.p.x-player.x,a.p.z-player.z);if(pd<10&&g.visible)W.seen[KIND[a.k].n]=1;
       if(a.k==='honu'){const r=10;const tx=h0.x+Math.sin(a.t*.035)*r,tz=h0.z+Math.cos(a.t*.028)*r,bed=heightAt(a.p.x,a.p.z);const breathe=Math.sin(a.t*.02)>.93; // now and then a honu rises to breathe
         const ty=breathe?seaY()-.25:Math.max(bed+.5,Math.min(seaY()-1.2,h0.h+1.2));moveTo(a,tx,ty,tz,.55,dt);
         for(const f of g.userData.fl){const ph=a.t*(f.front?1.6:2.2);f.piv.rotation.x=f.sx*Math.sin(ph)*(f.front?.55:.25);f.piv.rotation.y=f.sx*(.2+Math.sin(ph+1.2)*.25);}}
@@ -3486,7 +3594,7 @@ const FAUNA=(()=>{
       if(a.gone){if(nowS()<a.gone)continue;a.gone=0;const h=home(sp);if(h){a.home=h;a.p.set(h.x,h.y,h.z);}a.g.visible=true;a.g.rotation.set(0,a.yaw,0);a.state='idle';}
       const dc=Math.hypot(a.p.x-camera.position.x,a.p.z-camera.position.z),far=dc>(sp.zone==='soar'?400:sp.zone==='leaf'||sp.make?30:150);a.g.visible=!far&&!a.gone;if(far&&!a.dead)continue;
       if(a.dead){a.g.position.copy(a.p);a.g.position.y+=.05;continue;}
-      a.t+=dt;const pd=Math.hypot(a.p.x-player.x,a.p.z-player.z);
+      a.t+=dt;const pd=Math.hypot(a.p.x-player.x,a.p.z-player.z);if(pd<(sp.zone==='soar'?60:12)&&a.g.visible)W.seen[sp.n]=1;   // counts as seen in the book
       if(['forest','edge','mountain','grass'].includes(sp.zone))ground(a,dt,pd,sneak);
       else if(sp.zone==='soar'){const R=45+20*Math.sin(a.t*.01+a.phase),an=a.t*.045+a.phase;a.p.set(a.home.x+Math.sin(an)*R,Math.max(heightAt(a.home.x,a.home.z),40)+35+Math.sin(a.t*.07)*6,a.home.z+Math.cos(an)*R);a.yaw=an+Math.PI/2;
         if(a.acts.fly)a.acts.fly.timeScale=Math.sin(a.t*.3+a.phase)>.6?1:0.05;}                                   // mostly soaring, now and then a few wingbeats
