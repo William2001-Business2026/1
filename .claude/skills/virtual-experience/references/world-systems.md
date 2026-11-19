@@ -16,7 +16,8 @@ Each entry says what the system does, how, and why it was done that way. Keep th
 
 ## Water
 - **Sea:** ring mesh, waves, foam and lace on the shore, sky reflection, caustics on the shallows. Seen from below it shows a bright window straight up and fades into the haze.
-- **Fresh water:** a ribbon along the river (5 columns), discs for the pool and spring, and a single flow shader. Foam comes from the steepness of the drop; falling water is whitish, not a mirror. Spray puffs at the foot of the falls. After rain the river swells: higher, faster, whiter and louder.
+- **Fresh water:** a ribbon along the river (5 columns), discs for the pool and spring, and a single flow shader. Foam comes from the steepness of the drop. After rain the river swells: higher, faster, whiter and louder.
+- **Waterfall (the game way, `FALLS`):** not a strip on the slope but layers. A core sheet leaves the lip on a free-fall curve and never passes inside the rock (march out from the lip until the ground is below the water); a looser veil in front with torn edges that widen as it falls; textures move on the water's *travel time* (`(√(v0²+2gh)−v0)/g`), so the flow speeds up and stretches; strands peel off the sides (they follow a table of the sheet's shape, never per-frame terrain queries); spray bursts at the foot; lacy plunge foam and rings spread on the pool; mist rolls downstream with the wind and shows a rainbow 40–42° from the antisolar point; the rock around it is bare, dark and wet (a gorge mask in the terrain material). Additive particles fade by instance colour and are scaled by daylight so nothing glows at night.
 - **Swimming:** the water depth is `freshAt ?? sea` minus the ground. Rivers carry you downstream.
 
 ## Under the sea
@@ -28,13 +29,17 @@ Each entry says what the system does, how, and why it was done that way. Keep th
 - **Under-water look:** fog and background become the haze colour, the sky is hidden, sunlight and sky light are dimmed with depth, caustics cover the reef, slanted light shafts in the grade, muffled sound with bubbles.
 
 ## Trees and forest
-- Ten species built in code: trunk and limbs as tapered tubes with the bark scan; leaves as dense, hand-drawn sprig clusters (hundreds of leaves per card, darker toward the heart, flowers or fruit). Card normals point outward from the crown for soft canopy light. Fronds, strap leaves and pleated fans for the tree fern, pandanus and fan palm.
+- **Real scans first.** Most species are drawn by Poly Haven CC0 tree scans standing in for the local species (tinted per kind; ʻōhiʻa gets red lehua mixed into the upper canopy in the shader). Each scan has a near version (30–45k triangles) and a far one (5–9k), made with `scripts/prep_tree.mjs`, swapped per 64 m chunk at a quality-scaled distance, with the code-built tree kept as a hidden fallback. All sway in the shared wind, weighted by height.
+- **Making a game tree from a film scan** (`prep_tree.mjs`): find each leaf as a connected component, keep a fraction of whole leaves, enlarge each kept leaf about its own centre so the canopy stays full, then simplify; alpha-test (MASK, cutoff .45), double-sided. Thinning by simplifying alone leaves a sparse, dead-looking crown.
+- **Built in code** where no scan fits (banyan, loulu, the hāpuʻu trunk: rough, bulging, with a flared base). Replace a code tree that looks fake with a real species a scan can draw (the shore's hala became milo) rather than keeping it.
 - **Placement:** by habitat (forest mask, mountain height, shore, dry side, near people), with grid-hashed spacing; instanced per kind in 64 m chunks; trunks block the player.
 - **Lesson:** sparse sprigs read as dead trees. Fill the cards.
 
 ## Animals
 - **Ground animals** (wander, graze, flee; Shift to sneak); **perch**; **soar**; **bats at dusk**; **flit** (honeycreepers); **flutter** (butterflies); **climbers** on trunks; and tiny ones on leaves.
 - **Models:** rigged where possible (mixer with idle, graze, walk, run). Static scans are baked to a canonical mesh (y up, feet at 0, facing +z) and their legs swing in the vertex shader about the hip, diagonal pairs or alternate for birds. Rigged ones without walk clips swing their leg bones.
+- **Behaviour that reads as alive:** notice → freeze and watch (turn to you, ~1 s) → bolt; sneaking shrinks every distance. Speed eases up and down; walk, trot and run clips play at the rate their speed calls for; bodies tilt to the slope. A kill eases the body over onto its side in about half a second (a rigged "die" clip may only be a flinch: check it before relying on it).
+- **A rigged model with no textures** can still look right: shade it in TSL from `positionGeometry` (bind-pose space): coat colour, grizzle noise, paler back, snout, hooves. Expect albedo to read brighter than the numbers: Hawaiian feral pigs needed about 0.01–0.05 linear.
 - **Hunting:** spear strike (better if sneaking) → the animal falls → E to butcher → meat item → cook. Protected species (honu) can be swum with but not taken.
 
 ## Player movement
@@ -63,3 +68,9 @@ Each entry says what the system does, how, and why it was done that way. Keep th
 
 ## Chat (optional)
 - Supabase with row-level security, Google sign-in only. A restrictive policy blocks anonymous accounts; room functions check too. The General room plus private rooms by invite code, rate limits, and a word filter. Only the publishable key is in the client.
+
+## Home screen
+- A live title film behind the menu, as games do: a list of shots, each `[from, to]` camera and look-at points built when the shot starts (some follow the world: the waterfall's foot, a fish school, a clear path found among the trunk colliders), eased with a cosine, a slightly longer lens than play, a dip to black between shots, and a caption (Hawaiian name, English name, one line) with progress marks.
+- The menu moves aside (top-left over a soft gradient) so the world shows and other panels (chat) stay clear; on phones it stays centred and the caption goes to the top.
+- Begin cuts straight to the player under a short fade; flying the camera from a far shot to the player crosses the whole island and looks wrong.
+- Place cameras by rule, not by hand-picked coordinates: hand-picked spots ended inside a tree twice. Check clearance against colliders and keep each shot about its own zone.

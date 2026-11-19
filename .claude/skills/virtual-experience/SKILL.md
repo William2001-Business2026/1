@@ -84,4 +84,4 @@ The order of sections in `index.html`, and the contract each one keeps, is in `r
 - `references/realism-and-rendering.md`: the WebGPU/TSL rules and the realism fixes, including every pitfall already hit, with its cause and fix. Read it before writing shaders or loading models.
 - `references/assets-pipeline.md`: where assets come from, licence rules, the download and compression pipeline, and credits.
 - `references/testing-and-shipping.md`: headless WebGPU screenshots, functional tests, performance comparison, and the commit-and-push routine.
-- `scripts/`: `fakegpu.js` (headless WebGPU capture shim), `views.js` (screenshots from chosen spots), `prep_model.mjs` (compress and clean a downloaded GLB).
+- `scripts/`: `fakegpu.js` (headless WebGPU capture shim), `views.js` (screenshots from chosen spots; `VIEW=third|first`), `prep_model.mjs` (compress and clean a downloaded GLB, keep and rename clips), `prep_tree.mjs` (turn a film tree scan into near and far game trees).
