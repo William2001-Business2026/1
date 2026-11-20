@@ -43,15 +43,19 @@ function update(dt){
       if(!player.uw&&!DIVE.black&&deep>1.7&&!player.air&&player.trans>=1&&keys.KeyC){player.uw=true;player.y=wy-2.15;(player.vel||(player.vel=new THREE.Vector3())).set(0,-.8,0);DIVE.start();SFX.splash(.5);}
       if(player.uw)moving=swimUnder(f,s,dt,wy);
       else{
-      if(f||s){const l=Math.hypot(f,s),sy=Math.sin(player.yaw),cy=Math.cos(player.yaw);
-        let dx=(-sy*f+cy*s)/l*sp*dt,dz=(-cy*f-sy*s)/l*sp*dt;
+      // momentum: you speed up over about half a second and come to a stop over a third, and have little control in the air
+      const V=player.mv||(player.mv={x:0,z:0});{const l=Math.hypot(f,s)||1,sy=Math.sin(player.yaw),cy=Math.cos(player.yaw),tx=f||s?(-sy*f+cy*s)/l*sp:0,tz=f||s?(-cy*f-sy*s)/l*sp:0;
+        const k=1-Math.exp(-dt*(player.air?1.1:Math.hypot(tx,tz)>Math.hypot(V.x,V.z)?5.2:8.5));V.x+=(tx-V.x)*k;V.z+=(tz-V.z)*k;if(!(f||s)&&Math.hypot(V.x,V.z)<.05)V.x=V.z=0;}
+      if(V.x||V.z){
+        let dx=V.x*dt,dz=V.z*dt;
         if(deep<.9&&!player.air){const grade=(heightAt(player.x+dx,player.z+dz)-h)/Math.max(1e-4,Math.hypot(dx,dz));
           if(grade>.95){if(STAM.v>0&&f>0){player.climb=true;const k=.42/Math.max(1,grade);dx*=k;dz*=k;STAM.v-=dt*(1+Math.min(1.5,grade-.95));} // too steep to walk: climb, hands and feet, while your strength lasts
             else{dx=0;dz=0;}}
           else{const k=clamp(1-(grade-.4)*1.1,.3,1);dx*=k;dz*=k;}}                                    // steep ground uphill is slow going
         let nx=player.x+dx,nz=player.z+dz;
         for(const cs of[colliders,pieceCols])for(const c of cs){const ox=nx-c.x,oz=nz-c.z,d=Math.hypot(ox,oz),m=c.r+.3;if(d<m&&d>1e-4){nx=c.x+ox/d*m;nz=c.z+oz/d*m;}}
-        moving=Math.hypot(nx-player.x,nz-player.z)/dt;player.x=nx;player.z=nz;}
+        moving=Math.hypot(nx-player.x,nz-player.z)/dt;if(moving<Math.hypot(V.x,V.z)*.4){V.x*=.85;V.z*=.85;} // blocked: stop pushing into it
+        player.x=nx;player.z=nz;}
       if(fw!=null&&deep>.35){const q=riverQ(player.x,player.z);                // the river's current carries you downstream
         if(q&&q.d<q.w+.3){const gr=Math.max(0,RIVER.wl[Math.floor(q.i)]-RIVER.wl[Math.min(RIVER.P.length-1,Math.floor(q.i)+2)])/2;const cs=clamp(.4+gr*30,.4,4)*smooth(.35,1,deep)*dt;player.x+=q.fx*cs;player.z+=q.fz*cs;}}
       if(deep<.5&&!player.air&&!player.climb){const gx=heightAt(player.x+.4,player.z)-heightAt(player.x-.4,player.z),gz=heightAt(player.x,player.z+.4)-heightAt(player.x,player.z-.4),g=Math.hypot(gx,gz)/.8;

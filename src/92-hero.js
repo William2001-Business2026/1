@@ -56,7 +56,7 @@ Promise.all([gltfLoader.loadAsync('assets/models/islander.glb'),gltfLoader.loadA
   model.rotation.y+=Math.PI; // the model faces +Z; the game's "forward" is -Z
   hero.root.add(model);hero.mixer=new THREE.AnimationMixer(model);
   for(const clip of clips){const a=hero.mixer.clipAction(clip);if(/Start|Land|Enter|Exit|Interact|PickUp/.test(clip.name)){a.setLoop(THREE.LoopOnce,1);a.clampWhenFinished=true;}hero.acts[clip.name]=a;}
-  hero.hand=model.getObjectByName(hero.scan?'right_wrist_020':'hand_r');hero.px=player.x;hero.pz=player.z;hero.ready=true;heroPlay('Idle_Loop',0);applyView();
+  hero.model=model;hero.hand=model.getObjectByName(hero.scan?'right_wrist_020':'hand_r');hero.px=player.x;hero.pz=player.z;hero.ready=true;heroPlay('Idle_Loop',0);applyView();
   if(hero.scan)return;                                                   // the scanned islander wears his own clothes and hair
   try{dressMalo(model);}catch(e){console.warn('Malo:',e);}
   // hair and beard come as separate meshes skinned to the same 65-bone rig: bind them to this body's bones
@@ -84,8 +84,39 @@ function dressMalo(model){
   const flap=(z)=>{const piv=new THREE.Group();piv.position.set(0,.0,z);const p=new THREE.Mesh(new THREE.PlaneGeometry(.2,.42,1,4).translate(0,-.21,0),m);p.castShadow=true;piv.add(p);g.add(piv);return piv;};
   hero.malo={front:flap(zmax*1.1+.006),back:flap(zmin*1.1-.006)};
 }
-function heroPlay(name,fade=.22){if(hero.cur===name)return;const a=hero.acts[name];if(!a)return;const p=hero.acts[hero.cur];
-  a.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).play();if(p&&fade>0)a.crossFadeFrom(p,fade,false);else if(p)p.stop();hero.cur=name;}
+const LOCO=['Idle_Loop','Walk_Loop','Jog_Fwd_Loop'];
+function heroPlay(name,fade=.22){if(hero.cur===name)return;const a=hero.acts[name];if(!a)return;
+  if(hero.cur==='LOCO'){for(const n of LOCO){const l=hero.acts[n];if(l&&l!==a)fade>0?l.fadeOut(fade):l.stop();}a.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).play();if(fade>0)a.fadeIn(fade);hero.cur=name;return;}
+  const p=hero.acts[hero.cur];a.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).play();if(p&&fade>0)a.crossFadeFrom(p,fade,false);else if(p)p.stop();hero.cur=name;}
+/* Walking and running, the way open-world games do it: idle, walk and jog are not swapped but blended by how fast you are actually
+   going, and all of them run on one shared step cycle that advances with the ground you cover, so the feet never slide and a speed
+   change never pops. Speed itself has weight (see the frame loop), so the blend rises and falls smoothly. */
+function heroLoco(dt,v){
+  const A=hero.acts,I=A.Idle_Loop,Wk=A.Walk_Loop,J=A.Jog_Fwd_Loop;if(!I||!Wk||!J)return false;
+  if(hero.cur!=='LOCO'){const p=A[hero.cur];if(p)p.fadeOut(.28);for(const a of[I,Wk,J]){a.reset().play();a.setEffectiveTimeScale(0);a.setEffectiveWeight(0);}hero.cur='LOCO';hero.locoIn=0;}
+  hero.locoIn=Math.min(1,(hero.locoIn||0)+dt/.28);
+  const wI=1-smooth(.06,1.1,v),wJ=smooth(1.7,3.1,v),wW=Math.max(0,1-wI-wJ),dW=Wk.getClip().duration,dJ=J.getClip().duration;
+  const stride=lerp(1.45*dW,3.4*dJ,wJ/(wW+wJ+1e-4));                                       // metres per cycle, at each clip's own pace
+  hero.ph=((hero.ph||0)+v*dt/Math.max(.3,stride))%1;Wk.time=hero.ph*dW;J.time=hero.ph*dJ;I.time=(I.time+dt)%I.getClip().duration;
+  I.setEffectiveWeight(wI*hero.locoIn);Wk.setEffectiveWeight(wW*hero.locoIn);J.setEffectiveWeight(wJ*hero.locoIn);hero.idleW=wI;return true;}
+// after the clips: the head follows where you look, the chest breathes, and the body banks into turns and leans with speed changes
+function heroPost(dt,spd,swim){
+  const B=hero.bones||(hero.bones={neck:hero.model.getObjectByName(hero.scan?'neck_011':'neck_01'),head:hero.model.getObjectByName(hero.scan?'head_012':'Head'),
+    chest:hero.model.getObjectByName(hero.scan?'spine3_010':'spine_03')});
+  let d=player.yaw-hero.bodyYaw;d=Math.atan2(Math.sin(d),Math.cos(d));
+  const look=swim||player.air?0:smooth(2.5,1.7,Math.abs(d)),want=clamp(d,-1.15,1.15)*look,pitch=clamp(-player.pitch*.45,-.4,.35)*look;  // never over the shoulder
+  hero.lookY=lerp(hero.lookY||0,want,Math.min(1,dt*5));hero.lookP=lerp(hero.lookP||0,pitch,Math.min(1,dt*5));
+  const up=new THREE.Vector3(0,1,0),q=new THREE.Quaternion(),pq=new THREE.Quaternion(),wq=new THREE.Quaternion(),side=new THREE.Vector3();
+  const turn=(b,yaw,pit)=>{if(!b||!b.parent)return;b.getWorldQuaternion(wq);b.parent.getWorldQuaternion(pq);
+    side.set(Math.cos(hero.bodyYaw+yaw),0,-Math.sin(hero.bodyYaw+yaw));                         // the axis across the face, for nodding
+    q.setFromAxisAngle(up,yaw).premultiply(new THREE.Quaternion().setFromAxisAngle(side,pit));wq.premultiply(q);b.quaternion.copy(pq.invert().multiply(wq));b.updateMatrixWorld(true);};
+  hero.model.updateMatrixWorld(true);turn(B.neck,hero.lookY*.4,hero.lookP*.4);turn(B.head,hero.lookY*.6,hero.lookP*.6);
+  if(B.chest&&hero.idleW>.01){B.chest.rotateX(Math.sin(performance.now()/1000*1.55)*.018*hero.idleW);}   // breathing, while standing
+  // bank into turns and lean with acceleration
+  const yr=(hero.bodyYaw-(hero.prevYaw??hero.bodyYaw)),w=Math.atan2(Math.sin(yr),Math.cos(yr))/Math.max(dt,1e-3);hero.prevYaw=hero.bodyYaw;
+  const acc=(spd-(hero.prevSpd??spd))/Math.max(dt,1e-3);hero.prevSpd=spd;
+  hero.bank=lerp(hero.bank||0,swim||player.air?0:clamp(-w*spd*.05,-.2,.2),Math.min(1,dt*6));hero.lean=lerp(hero.lean||0,swim||player.air?0:clamp(acc*.025,-.08,.1),Math.min(1,dt*4));
+}
 function heroOneShot(name){if(!heroShown()||!hero.acts[name])return;hero.shot=name;hero.shotT=hero.acts[name].getClip().duration*.8;}
 // how each item sits in the right hand: x, y, z (metres, body space), then rotation x, y, z
 const HOLD3={cup:[0,-.04,.03,0,0,0],lantern:[0,-.24,.02,0,0,0],uke:[.02,-.02,.12,0,1.57,1.2],bino:[0,-.03,.05,0,0,0],coco:[0,-.03,.05,0,0,0]};
@@ -110,7 +141,8 @@ function updateHero(dt,moving){
     if(!hero.turn&&Math.abs(d)>1.75)hero.turn=1;
     if(hero.turn){const st=Math.sign(d)*Math.min(Math.abs(d),dt*3.2);hero.bodyYaw+=st;if(Math.abs(d)<.12)hero.turn=0;}}
   else hero.turn=0;
-  hero.root.rotation.order='YXZ';hero.root.rotation.y=hero.bodyYaw;hero.root.rotation.x=player.uw?lerp(hero.root.rotation.x,player.pitch*.85*smooth(.2,1,moving),Math.min(1,dt*3)):0; // dive head-first
+  hero.root.rotation.order='YXZ';hero.root.rotation.y=hero.bodyYaw;hero.root.rotation.x=player.uw?lerp(hero.root.rotation.x,player.pitch*.85*smooth(.2,1,moving),Math.min(1,dt*3)):-(hero.lean||0); // dive head-first; on land, lean with speed changes
+  hero.root.rotation.z=hero.bank||0;
   if(hero.wasAir&&!player.air)hero.landT=.28;hero.wasAir=player.air;hero.landT=Math.max(0,hero.landT-dt);hero.shotT=Math.max(0,hero.shotT-dt);
   let want='Idle_Loop',ts=1;
   if(swim)want=moving>.3?'Swim_Fwd_Loop':'Swim_Idle_Loop';
@@ -121,9 +153,11 @@ function updateHero(dt,moving){
   else if(hero.turn){want='Walk_Loop';ts=.8;}                                                 // small steps round
   else if(hero.shotT>0)want=hero.shot;
   else if(held&&held.kind==='lantern')want='Idle_Torch_Loop';
-  heroPlay(want,player.air||hero.landT>0?.12:.25);
-  if(/Walk_Loop|Jog_Fwd/.test(hero.cur))hero.acts[hero.cur].setEffectiveTimeScale(ts); // feet match the ground speed
+  const loco=/^(Idle_Loop|Walk_Loop|Jog_Fwd_Loop)$/.test(want)&&!hero.turn&&heroLoco(dt,moving);  // on foot: blended by speed
+  if(!loco){heroPlay(want,player.air||hero.landT>0?.12:.25);hero.idleW=want==='Idle_Loop'?1:0;
+    if(/Walk_Loop|Jog_Fwd/.test(hero.cur))hero.acts[hero.cur].setEffectiveTimeScale(ts);}  // feet match the ground speed
   hero.mixer.update(dt);
+  heroPost(dt,moving,swim);
   heroIK(dt,swim);
   if(hero.malo){const sp=Math.min(1,moving/3),sw=Math.sin(performance.now()/1000*7.5)*.25*sp;hero.malo.front.rotation.x=-sw-.15*sp;hero.malo.back.rotation.x=sw+.12*sp;}
   // the hand socket follows the right hand but stays upright, so a full cup or a lantern does not tip
