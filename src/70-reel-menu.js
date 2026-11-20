@@ -93,7 +93,7 @@ bind('s-post','post','check',applyGraphics);bind('s-fps','showFps','check',apply
 bind('s-master','master','num',applyAudio);bind('s-amb','amb','num',applyAudio);bind('s-music','music','num',applyAudio);
 bind('s-sens','sens','num');bind('s-view','view','str',()=>applyView());bind('s-invert','invertY','check');bind('s-bob','bob','check');bind('s-photo','photo','check');
 $('v-time').textContent='· golden hour';
-$('s-time').addEventListener('input',e=>{const v=+e.target.value;evening.running=false;W.clock=v<2?{phase:'day',dayT:v?.5:.04,fast:false}:{phase:v===4?'night':'golden',dayT:1,fast:false};evening.s=[0,0,0,.44,1][v];$('v-time').textContent='· '+TIME_NAMES[v];applyTime(true);});
+$('s-time').addEventListener('input',e=>{const v=+e.target.value;evening.running=false;W.clock.fast=false;W.clock.h=presetHour(v);applyTime(true);syncSlider();});
 addEventListener('resize',applyGraphics);describeGfx();
 function savePhoto(){
   post.render();const a=document.createElement('a');a.download='hale-moku-'+Date.now()+'.png';a.href=canvas.toDataURL('image/png');a.click();toast('Photo saved.',2);

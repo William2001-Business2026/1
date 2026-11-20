@@ -95,6 +95,20 @@ const palms=[];
    for(let i=0;i<n;i++){fronds.getMatrixAt(i,M);aPh[i]=e[12]*.7+e[14]*.5+e[0]*3;aUp.set([e[4],e[5],e[6]],i*3);aSide.set([e[0],e[1],e[2]],i*3);}
    fg.setAttribute('aPh',new THREE.InstancedBufferAttribute(aPh,1));fg.setAttribute('aUp',new THREE.InstancedBufferAttribute(aUp,3));fg.setAttribute('aSide',new THREE.InstancedBufferAttribute(aSide,3));}
   scene.add(fronds);
+  // the crowns: a real coconut palm's (evolveduk, CC BY 4.0) in place of the code-built fronds, which read as flat green blades up close.
+  // Each palm gets the scanned crown at its own top, turned, tipped a little along its lean and sized; it sways with the shared wind.
+  gltfLoader.loadAsync('assets/models/trees/palm_crown.glb').then(gl=>{gl.scene.updateMatrixWorld(true);const parts=[];gl.scene.traverse(o=>{if(o.isMesh)parts.push(o);});if(!parts.length)return;
+    const {vec3,sin,dot,positionLocal,positionGeometry,length,pow}=TSL,Mt=new THREE.Matrix4(),Qt=new THREE.Quaternion(),Et=new THREE.Euler(0,0,0,'YXZ'),St=new THREE.Vector3();
+    const mats=palms.map((p,i)=>{const lx=p.crown.x-p.x,lz=p.crown.z-p.z,ll=Math.hypot(lx,lz)||1,tip=Math.min(.22,ll/p.H*.5);
+      Et.set(lz/ll*tip,R()*6.283,-lx/ll*tip);Qt.setFromEuler(Et);const k=.85+R()*.3;St.set(k,k,k);return Mt.clone().compose(new THREE.Vector3(p.crown.x,p.crown.y-.05,p.crown.z),Qt,St);});
+    for(const src of parts){const geo=floatGeo(src.geometry).applyMatrix4(src.matrixWorld);geo.computeBoundingSphere();const m0=src.material,leaf=m0.alphaTest>0||m0.transparent||/2/.test(m0.name);
+      const nm=new THREE.MeshStandardNodeMaterial({map:m0.map,normalMap:m0.normalMap,roughnessMap:m0.roughnessMap||m0.metalnessMap,roughness:1,metalness:0,alphaTest:leaf?.45:0,side:leaf?THREE.DoubleSide:THREE.FrontSide});
+      const r=length(positionGeometry.xz),kk=pow(r.div(3.4).min(1),1.5),wd=windAt(positionLocal.xz),gust=wd.z.mul(1.4).add(.5);
+      const fl=sin(windU.mul(1.7).add(dot(positionGeometry,vec3(.9,.4,.7))).add(positionLocal.x.mul(.3))).mul(.12).mul(kk).mul(gust); // frond tips lift and drop in the gusts
+      nm.positionNode=positionLocal.add(vec3(wd.x,0,wd.y).mul(kk).mul(.55)).add(vec3(0,fl,0));
+      const im=new THREE.InstancedMesh(geo,leaf?leafy(nm):nm,mats.length);mats.forEach((m,i)=>im.setMatrixAt(i,m));im.castShadow=true;im.receiveShadow=true;im.frustumCulled=false;im.raycast=()=>{};scene.add(im);}
+    fronds.visible=false;
+  }).catch(e=>console.warn('The palm crowns did not load, so the code-built fronds stay:',e));
 }
 /* grass: tufts of curved, tapering blades, streamed in 16 m chunks around you.
    Close chunks draw full tufts, further ones lighter tufts that thin out with distance; past the last ring the ground's own green takes over.
@@ -203,7 +217,7 @@ const GRASS=(()=>{
    const wd=windAt(positionLocal.xz),h=positionGeometry.y.add(.45).max(0),fl=sin(U.uTime.mul(7.3).add(dot(positionGeometry,vec3(9.1,5.3,7.7)))).mul(wd.z.add(.3)).mul(.012);
    sm.positionNode=positionLocal.add(vec3(wd.x,0,wd.y).mul(h).mul(.09)).add(vec3(fl,fl.mul(.6),fl.negate()));}
   const SHRUBS=360,shr=new THREE.InstancedMesh(sg,sm,SHRUBS),d=new THREE.Object3D();let i=0,t=0;
-  while(i<SHRUBS&&t<60000){t++;const x=(R()-.5)*250,z=-170+R()*295,h=heightAt(x,z),mk=masks(x,z);if(h<1.5||mk.lava>.3||mk.d<12||grassMask(x,z,h,mk)<.35||freshAt(x,z)!=null||Math.hypot(x-SPRING.x,z-SPRING.z)<4)continue;
+  while(i<SHRUBS&&t<60000){t++;const x=(R()-.5)*250,z=-170+R()*295,h=heightAt(x,z),mk=masks(x,z);if(h<1.5||mk.lava>.3||mk.d<60||forestW(x,z)<.35||tnorm(x,z).y<.75||freshAt(x,z)!=null||Math.hypot(x-SPRING.x,z-SPRING.z)<4)continue; // ferns and anthuriums are forest-floor plants: under the trees, never on the beach
     if(Math.hypot(x-LANAI.x,z-LANAI.z)<12||Math.hypot(x-START.x,z-START.z)<16)continue; if(h>5&&R()>.3)continue;
     const s=.6+R()*1.1;d.position.set(x,h+.1*s,z);d.rotation.y=R()*6.28;d.scale.set(s*(1+R()*.5),s,s*(1+R()*.5));d.updateMatrix();shr.setMatrixAt(i++,d.matrix);
     if(s>1.1)colliders.push({x,z,r:s*.8});}

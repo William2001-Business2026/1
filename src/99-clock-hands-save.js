@@ -24,10 +24,11 @@ function tick(dt,offline){
   if(drain)recompute();
   for(const p of W.plots){growPlot(p,dt);if(!offline)drawPlot(p);}
 }
-function newDay(){
-  W.day++;W.clock={phase:'day',dayT:0,fast:false};evening.s=0;evening.running=false;W.rainLeft=0;W.rainIn=Math.max(W.rainIn,120);
+function newDay(){ // you slept through the night: wake at sunrise plus a little
+  W.day++;W.clock.fast=false;W.clock.h=SKYCLOCK.hourAt(4,false);evening.running=false;W.rainLeft=0;W.rainIn=Math.max(W.rainIn,120);
   arrivals();for(let i=0;i<5;i++)washUp();applyTime(true);syncSlider();saveNow();
 }
+function dayTurned(){arrivals();for(let i=0;i<3;i++)washUp();saveNow();} // midnight passed while you were awake
 function arrivals(){
   const F=W.flags,d=W.day;
   if(d>=1&&!F.b1){F.b1=1;spawn('onion',...BEACH(4.2,41.2),3);spawn('beans',...BEACH(4.9,41.6),3);spawn('stick',...BEACH(5.4,40.8),2);}
@@ -150,6 +151,7 @@ function saveNow(){const s=serialize();try{localStorage.setItem(SAVE_KEY,s);}cat
 function loadSave(str){
   let d;try{d=JSON.parse(str);}catch(e){return false;}if(!d||(d.v!==1&&d.v!==2&&d.v!==3))return false;
   if(d.v<3)migrateSave(d); // older maps → the real island (10-island.js)
+  if(d.clock&&d.clock.h==null){const c=d.clock;d.clock={h:c.phase==='night'?21.5:c.phase==='golden'?17.1:7+(c.dayT||0)*9.5,fast:false};} // the old phased clock → an hour of the day
   [...W.items].forEach(despawn);[...W.plots].forEach(removePlot);[...W.pieces].forEach(p=>removePiece(p,false));
   for(const k of['seen','day','inv','sel','basket','notes','flags','chick','goat','buff','clock','rainIn','nodes','fires'])if(d[k]!=null)W[k]=d[k];
   if(W.buff.until>nowS()+3600)W.buff.until=0;
@@ -162,9 +164,11 @@ function loadSave(str){
   recompute();
   for(let t=0;t<away;t+=60)tick(Math.min(60,away-t),true);
   W.plots.forEach(drawPlot);W.rainLeft=0;W.clock.fast=false;
-  evening.s=W.clock.phase==='night'?1:0;evening.running=false;handDirty=true;applyTime(true);syncSlider();return true;
+  if(W.clock.h==null)W.clock={h:17.1,fast:false};W.clock.fast=false;evening.running=false;handDirty=true;applyTime(true);syncSlider();return true;
 }
-function syncSlider(){const c=W.clock,v=c.phase==='night'?4:c.phase==='golden'?2:c.dayT<.3?0:1;$('s-time').value=v;$('v-time').textContent='· '+TIME_NAMES[v];}
+function syncSlider(){const c=W.clock,e=SKYCLOCK.st.sunEl,v=e<-6?4:c.h>=12&&e<4?3:c.h>=12&&e<14?2:c.h<10.5?0:1;$('s-time').value=v;$('v-time').textContent='· '+SKYCLOCK.label()+', '+TIME_NAMES[v];}
+// the presets, as real times today: morning, midday, golden hour, sunset, night
+function presetHour(v){return v===0?SKYCLOCK.hourAt(18,false):v===1?12.4:v===2?SKYCLOCK.hourAt(12,true):v===3?SKYCLOCK.hourAt(1.5,true):SKYCLOCK.hourAt(-16,true)+.5;}
 const TIME_NAMES=['morning','midday','golden hour','sunset','night'];
 $('b-export').addEventListener('click',()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([serialize()],{type:'application/json'}));a.download='hale-moku-island.json';a.click();});
 $('b-import').addEventListener('click',()=>$('f-import').click());
@@ -187,10 +191,6 @@ function sysUpdate(dt){
   updateCreatures(dt);updateFires(dt,night);updateWeather(dt);
   for(const p of W.plots)if(p.plant)p.plant.rotation.x=Math.sin(time*1.3+p.x*1.7+p.z)*.03;
   if(state==='play'){const c=W.clock;
-    if(c.phase==='day'){c.dayT+=dt/1200*(c.fast?45:1);clockAcc+=dt;
-      if(c.dayT>=1){c.dayT=1;c.phase='golden';if(c.fast){c.fast=false;evening.running=true;}applyTime(true);syncSlider();}
-      else if(clockAcc>(c.fast?.05:.5)){clockAcc=0;applyTime(false);}}
-    if(c.phase!=='night'&&evening.s>=1&&!evening.running){c.phase='night';saveNow();}
     if(player.mode==='hammock'&&c.phase==='night'&&player.trans>=1){sleepT+=dt;if(sleepT>4)$('fade').classList.add('on');if(sleepT>6.6){sleepT=-3;newDay();}}
     else{if(sleepT<0){sleepT+=dt;if(sleepT>=-1.5){$('fade').classList.remove('on');}if(sleepT>=0)sleepT=0;}else{sleepT=0;$('fade').classList.remove('on');}}
     saveT+=dt;if(saveT>20){saveT=0;saveNow();}

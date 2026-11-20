@@ -2,7 +2,7 @@
 const SAVE_KEY='halemoku-island-1';
 const W={seen:{},day:0,inv:[],sel:-1,basket:false,items:[],plots:[],pieces:[],fires:{},notes:{},flags:{},
   chick:{fed:.45,egg:0,man:0,bold:false},goat:{fed:.4,trust:0,milk:0},buff:{until:0,speed:1,carry:0},
-  clock:{phase:'golden',dayT:1,fast:false},stamp:Date.now(),rainIn:500,rainLeft:0,nodes:{wash:0,stone:0,frond:0,nut:0,flower:0}};
+  clock:{h:17.1,fast:false,phase:'golden'},stamp:Date.now(),rainIn:500,rainLeft:0,nodes:{wash:0,stone:0,frond:0,nut:0,flower:0}};
 const SEEP=enlarge(-22,6),GROVE=enlarge(-8,-22),OLDPLOT=enlarge(17,13),CHICKHOME=enlarge(21,9),CHILIPLOT=enlarge(12,2);
 const season=()=>Math.floor(W.day/4)%2;            // 0 dry, 1 wet
 const nowS=()=>Date.now()/1000;

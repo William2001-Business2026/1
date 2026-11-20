@@ -101,6 +101,7 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
 
 ## Realism
 
+- **A real day:** time runs as in the big open-world games, a 48-minute day. The sun and moon are where they really are over Waipiʻo on the game's date: the sun rises in the east-southeast, stands about 50° high in the south at noon in November and sets in the west-southwest, and the moon rises, sets and waxes and wanes through its real phases. Shadows grow long and soft at sunrise and sunset and short at noon; by night the moon casts its own soft, cool shadows, and a moonless night is darker. Sitting makes time pass quickly. The time setting jumps to morning, midday, golden hour, sunset or night, as real times for that day.
 - **Sky and light:** after dusk, cool moonlight keeps the night dark but readable. Five photographed HDRI skies (day, golden hour, sunset, afterglow, dusk) cross-fade as the sun moves. Each is turned to match the sun and lights the island (image-based lighting); the computed starry sky takes over at night.
 - **Materials:** physically based (albedo, normal, roughness) scans for sand, wet sand, grassy ground, lava rock, deck boards and palm bark.
 - **Island:** the whole of Hawaiʻi Island (the Big Island) at its real size, about 10,430 km², and real heights from US Geological Survey elevation data: Mauna Kea rises to 4,207 m and Mauna Loa to 4,169 m, and both stand on the horizon from the coast. The ground streams in around you: full detail close by, coarser farther away, out to the sea horizon.
@@ -180,6 +181,7 @@ Elevation: USGS 3DEP via AWS Terrain Tiles (public domain for the United States;
 
 More trees from Sketchfab under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), standing in for Hawaiian species:
 [Acacia tree](https://sketchfab.com/3d-models/acacia-tree-bb14c2bb679b4d0bb1c578a27e2ddabf) by evolveduk (koa),
+[Coconut Palm](https://sketchfab.com/3d-models/coconut-palm-26e787f2ff2e4c0fb004c3b0210805a3) by evolveduk (the coconut palms' crowns),
 [Chinese Banyan (Ficus Microcarpa)](https://sketchfab.com/3d-models/chinese-banyan-ficus-microcarpa-2a0dbcdf8f5d48f5ad79987c7a8170ce) by Valery.Li (banyan),
 [Livistona Chinensis - Fan Palm](https://sketchfab.com/3d-models/free-livistona-chinensis-fan-palm-f59bab2a81244b869e1ca5aefd4ad94a) by AllQuad (loulu crown) and
 [Realistic HD Bottlebrush laevis](https://sketchfab.com/3d-models/realistic-hd-bottlebrush-laevis-120-17859f7b38784420bdefe734533b0263) by PlantCatalog (young ʻōhiʻa, for its red brush flowers).

@@ -1,3 +1,4 @@
+let clockLight=0;
 /* ───────────────────────── frame loop ───────────────────────── */
 const ray=new THREE.Raycaster();ray.far=3.3;
 let lastFrameAt=performance.now(),time=0,lastLabel='',lastHint='';
@@ -5,14 +6,8 @@ function update(dt){
   time+=dt;U.uTime.value=time;windU.value=time;postU.uTime.value=time;
   water.position.y=Math.sin(time*.55)*.045+Math.sin(time*.23)*.02;
 
-  // the evening
-  if(evening.running){
-    const before=evening.s;evening.s=Math.min(1,evening.s+dt/60*(U.uFlash.value>.04?.28:1));applyTime(false);
-    if(AU.ctx&&before<.08)AU.radioDuck.gain.setTargetAtTime(0,AU.ctx.currentTime,1.3);
-    if(before<.08&&evening.s>=.08)radio.mode=0;
-    if(before<.9&&evening.s>=.9)toast('The surf is glowing.',6);
-    if(evening.s>=1){evening.running=false;$('s-time').value=4;$('v-time').textContent='· night';}
-  }
+  // the clock: the sun and moon move every frame; the sky's palette and lighting follow a few times a second
+  SKYCLOCK.tick(dt);clockLight+=dt;if(clockLight>(W.clock.fast?.05:.25)){clockLight=0;applyTime(false);syncSlider();}
 
   // lantern
   const fl=lantern.lit?1:0,flick=.82+.18*fbm(time*7,1.7,2)+.05*Math.sin(time*23);
@@ -157,9 +152,9 @@ function update(dt){
   WIND.player.value.set(player.x,player.y,player.z);WIND.strength.value=.5+U.uCover.value*.8; // rain squalls blow harder
   leafU.uSunView.value.copy(U.uSunDir.value).transformDirection(camera.matrixWorldInverse);leafU.uSunTr.value.copy(sun.color).multiplyScalar(sun.intensity*.11);
   const tx=Math.round(camera.position.x/2)*2,tz=Math.round(camera.position.z/2)*2;
-  sun.target.position.set(tx,0,tz);sun.position.set(tx,0,tz).addScaledVector(U.uSunDir.value.clone().setY(Math.max(U.uSunDir.value.y,.12)).normalize(),200);
+  sun.target.position.set(tx,0,tz);sun.position.set(tx,0,tz).addScaledVector(SKYCLOCK.st.light.clone().setY(Math.max(SKYCLOCK.st.light.y,.035)).normalize(),200); // low enough for the long shadows of sunrise and sunset
   {const cell=tx+','+tz;if(cell!==perf.shotCell||++perf.shadowTick>=activeGfx().shadowEvery){perf.shotCell=cell;perf.shadowTick=0;sun.shadow.needsUpdate=true;}}
-  if(csmOn&&csm)for(const l of csm.lights)l.shadow.autoUpdate=true; // the cascades copied the sun's 'manual update' flag
+  if(csmOn&&csm)csm.lights.forEach((l,i)=>{l.shadow.autoUpdate=true;l.shadow.radius=[3,2,1.4][i]||1.2;}); // the cascades copied the sun's 'manual update' flag; nearer cascades have finer texels, so a wider kernel keeps one soft edge
   lanternLight.shadow.autoUpdate=lanternLight.intensity>.01; // no point redrawing the lantern's six shadow views while it is dark
   sysUpdate(dt);updateAnimalModels(dt);physStep(dt);
   scheduleAudio(dt,time);

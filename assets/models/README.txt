@@ -29,6 +29,7 @@ props/  (Poly Haven, CC0 1.0, https://polyhaven.com)
   wooden_crate_01, planter_pot_clay, wicker_basket_02. 1K WebP textures, meshopt geometry.
 
 trees/ (Sketchfab, Creative Commons Attribution 4.0, https://creativecommons.org/licenses/by/4.0/)
+  palm_crown.glb                        "Coconut Palm" by evolveduk  https://sketchfab.com/3d-models/coconut-palm-26e787f2ff2e4c0fb004c3b0210805a3  (one crown of the pair, without trunk or nuts, on every coconut palm)
   koa.glb, koa_far.glb                  "Acacia tree" by evolveduk  https://sketchfab.com/3d-models/acacia-tree-bb14c2bb679b4d0bb1c578a27e2ddabf  (used as koa)
   banyan.glb, banyan_far.glb            "Chinese Banyan (Ficus Microcarpa)" by Valery.Li  https://sketchfab.com/3d-models/chinese-banyan-ficus-microcarpa-2a0dbcdf8f5d48f5ad79987c7a8170ce
   loulu_crown.glb, loulu_crown_far.glb  "[FREE] Livistona Chinensis - Fan Palm" by AllQuad  https://sketchfab.com/3d-models/free-livistona-chinensis-fan-palm-f59bab2a81244b869e1ca5aefd4ad94a  (the loulu's crown)

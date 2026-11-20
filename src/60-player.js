@@ -93,11 +93,11 @@ function useHeld(){
 }
 function sit(){
   player.mode='sit';applyView();player.from.copy(camera.position);player.trans=0;player.baseYaw=sunYaw;player.yaw=sunYaw;player.pitch=.04;SFX.cloth();
-  if(W.clock.phase==='day'){W.clock.fast=true;toast('Stay a while.',5);}else if(evening.s<.999&&!evening.running){evening.running=true;toast('Stay a while.',5);}
+  W.clock.fast=true;toast('Stay a while. Time passes quickly while you sit.',5);
 }
 function lie(){player.mode='hammock';applyView();player.from.copy(camera.position);player.trans=0;player.baseYaw=hamYaw();player.yaw=player.baseYaw;player.pitch=1.12;SFX.cloth();}
 const hamYaw=()=>{const d=_v.set(1,0,0).applyQuaternion(hamG.quaternion);return Math.atan2(-d.x,-d.z);};
-function standUp(){
+function standUp(){W.clock.fast=false;
   const was=player.mode;player.mode='walk';applyView();player.from.copy(camera.position);player.trans=0;
   if(was==='sit'){player.x=CHAIR.x+SUN_AZ.x*.8;player.z=CHAIR.z+SUN_AZ.y*.8;}
   else{player.x=hamG.position.x-1.05;player.z=hamG.position.z;player.pitch=0;}
@@ -112,7 +112,7 @@ function interactE(){
   else if(it.pickable)pickUp(it);
 }
 function restartEvening(){
-  evening.s=0;evening.running=false;W.clock={phase:'golden',dayT:1,fast:false};applyTime(true);$('s-time').value=2;$('v-time').textContent='· golden hour';
+  evening.running=false;W.clock.fast=false;W.clock.h=presetHour(2);applyTime(true);syncSlider();
   if(held){scene.add(held.group);held=null;}
   player.mode='walk';player.x=START.x;player.z=START.z;player.yaw=START.yaw;player.pitch=0;player.trans=1;player.vy=0;player.air=false;player.y=groundAt(player.x,player.z);
   for(const s of slots)s.item=null;

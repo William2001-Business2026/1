@@ -5,7 +5,7 @@ const WK=6,WW=.7;
 const {U,uRipplesNode,sstep,hash21,vn,fbmN,grey,skyBase,skyRad,wavePh,waveAmp,skyMat,envSkyMat,SKYU}=(()=>{
 const {Fn,If,Loop,uniform,uniformArray,texture,float,vec2,vec3,dot,fract,floor,mix,clamp,max,pow,exp,sin,sqrt,length,normalize,step,atan,acos,dFdx,dFdy,positionLocal}=TSL;
 const U={ // shared uniforms (same names and .value API as before)
-  uTime:uniform(0),uSunDir:uniform(new THREE.Vector3(0,1,0)),uZenith:uniform(new THREE.Color()),uHorizon:uniform(new THREE.Color()),
+  uTime:uniform(0),uSunDir:uniform(new THREE.Vector3(0,1,0)),uMoonDir:uniform(new THREE.Vector3(0,-1,0)),uMoonL:uniform(0),uZenith:uniform(new THREE.Color()),uHorizon:uniform(new THREE.Color()),
   uGlow:uniform(new THREE.Color()),uSunDisc:uniform(new THREE.Color()),uCloud:uniform(new THREE.Color()),uStars:uniform(0),
   uFlash:uniform(0),uCover:uniform(0),uFlashDir:uniform(new THREE.Vector3()),uBio:uniform(0),uDay:uniform(1),uHeight:{value:null},
   uRipples:{value:Array.from({length:8},()=>new THREE.Vector3(0,0,-100))}
@@ -77,6 +77,13 @@ const skyColor=(withSun)=>Fn(()=>{
   if(withSun){
     // sun disc
     c.addAssign(U.uSunDisc.mul(sstep(Math.cos(.0165),Math.cos(.0145),sd)).mul(sstep(-.004,.004,d.y)));
+    // the moon: a disc lit from the real sun's direction, so its phase is always right, with a soft halo in the haze
+    { const M=U.uMoonDir,md=dot(d,M),R=.0095,o=d.sub(M.mul(md)),q=length(o).div(R);
+      const disc=sstep(1.02,.96,q).mul(sstep(0,.001,md)),n=M.negate().mul(sqrt(max(float(1).sub(q.mul(q)),0))).add(o.div(R));
+      const lit=sstep(-.06,.06,dot(n,U.uSunDir)),mare=fbmN(o.div(R).mul(2.2).add(3)).mul(.35).add(.75);
+      const night=float(1).sub(U.uDay.mul(.85));
+      c.addAssign(vec3(.92,.94,1).mul(disc.mul(lit).mul(mare).mul(1.6).add(disc.mul(.012))).mul(U.uMoonL).mul(night).mul(sstep(-.01,.02,d.y)).mul(float(1).sub(U.uCover.mul(.8))));
+      c.addAssign(vec3(.5,.56,.7).mul(pow(max(md,0),400).mul(.05).add(pow(max(md,0),2400).mul(.12))).mul(U.uMoonL).mul(night).mul(float(1).sub(U.uCover.mul(.5)))); }
     // green flash
     const fd=dot(d,U.uFlashDir),fc=sstep(Math.cos(.036),Math.cos(.012),fd);
     c.assign(mix(c,vec3(.05,1.7,.42),U.uFlash.mul(fc).mul(.95)).add(vec3(.01,.5,.13).mul(U.uFlash).mul(sstep(Math.cos(.17),Math.cos(.03),fd))));
@@ -101,7 +108,7 @@ scene.environmentIntensity=.55;
 /* ───────────────────────── lights ───────────────────────── */
 const sun=new THREE.DirectionalLight(0xffffff,1); sun.castShadow=true;
 sun.shadow.camera.left=-46;sun.shadow.camera.right=46;sun.shadow.camera.top=46;sun.shadow.camera.bottom=-46;
-sun.shadow.camera.near=1;sun.shadow.camera.far=420;sun.shadow.bias=-.0005;sun.shadow.normalBias=.06;sun.shadow.autoUpdate=false;sun.shadow.needsUpdate=true;
+sun.shadow.camera.near=1;sun.shadow.camera.far=420;sun.shadow.bias=-.0005;sun.shadow.normalBias=.06;sun.shadow.radius=2.6;sun.shadow.autoUpdate=false; // radius: a soft penumbra, as the sun is a disc, not a pointsun.shadow.needsUpdate=true;
 scene.add(sun,sun.target);
 const hemi=new THREE.HemisphereLight(0xffffff,0xffffff,1); scene.add(hemi);
 const moon=new THREE.DirectionalLight(0x8ea4e6,0);moon.position.set(0,90,-60);scene.add(moon,moon.target);
