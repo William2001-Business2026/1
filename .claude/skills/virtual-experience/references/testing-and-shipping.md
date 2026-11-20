@@ -25,6 +25,9 @@ VIEWS='[["warm",0,88,0,-0.05],["start",0,88,0,-0.05],["pool",34,-62,0.5,0.25]]' 
   like slabs, holes and floating objects, and half-faded trees look like ghosts: those are test artefacts, not the build. Check the
   geometry numerically too (tile vertices against `heightAt`), and never test from a spot inside a river channel or against a wall
   (cast a few rays from the eye first).
+- **Fast logic tests:** disable the page's own frame loop (`window.requestAnimationFrame=()=>0`) and step the game yourself with
+  `__hm.update(1/60)`, pausing every ten steps (`await new Promise(r=>setTimeout(r,30))`) so worker results (terrain, physics
+  ground) can arrive. Render a frame for a picture with `__hm.render()` and grab it.
 - Add a `seek` hook to anything timed (the home-screen reel has `REEL.seek(shot, t)`), so a test can jump to the moment it needs.
 - Skip the slow arrival transition by setting `player.trans=1` after clicking Begin.
 - For animals, read positions from `__hm.FAUNA.list` or `__hm.SEA.schools`, stand 2–3 m away, and set `sp.flee=0` so they do not run.

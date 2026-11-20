@@ -74,3 +74,21 @@ Each entry says what the system does, how, and why it was done that way. Keep th
 - The menu moves aside (top-left over a soft gradient) so the world shows and other panels (chat) stay clear; on phones it stays centred and the caption goes to the top.
 - Begin cuts straight to the player under a short fade; flying the camera from a far shot to the player crosses the whole island and looks wrong.
 - Place cameras by rule, not by hand-picked coordinates: hand-picked spots ended inside a tree twice. Check clearance against colliders and keep each shot about its own zone.
+
+## The sky clock (sun, moon, shadows)
+- One real clock (`SKYCLOCK`, a 48-minute day): NOAA solar equations and a low-precision lunar theory for the site's latitude and
+  longitude on the game's date; the moon's phase from the angle between them. Every old phase flag (day, golden, night, the evening's
+  events) is derived from the sun's height, so other systems keep working. Presets are real times found by the sun's height.
+- The shadow-casting lamp is the sun by day and the moon by night (moonlight casts soft, cool shadows). Let the lamp go down to about
+  2° for long sunrise and sunset shadows; at golden hour the sun must be strong against a dimmer sky or the shadows vanish.
+- The moon disc is lit from the real sun direction in the sky shader, so its phase is always right.
+
+## Character motion and physics
+- Momentum on the player's velocity; idle, walk and jog blended by real speed on one shared step cycle (advance the cycle by
+  ground covered, set each clip's time from it); bank into turns, lean with acceleration; head look toward the camera (never over
+  the shoulder); breathing while still.
+- Ragdoll: capsules sized from the skeleton's own joints, spherical joints, a collision group that ignores itself and the player
+  capsule; bones follow bodies parents-first; start only over ground the physics already has; get up by easing from the saved
+  lying pose into an animation. Killed animals: a rigid body with a roll impulse, left where it rests.
+- Fern fronds cannot be thinned like tree canopies (they lose their leaflets and look like confetti); they need cards or a full
+  model, which is too heavy for hundreds of instances.
