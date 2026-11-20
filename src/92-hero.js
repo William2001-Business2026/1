@@ -103,7 +103,13 @@ function updateHero(dt,moving){
   const hfw=freshAt(player.x,player.z),deep=Math.max(0,(hfw!=null?hfw:0)-heightAt(player.x,player.z)),swim=player.uw||deep>1.05&&!player.air;
   hero.root.position.set(player.x,player.uw?player.y+.1:swim?(hfw!=null?hfw:water.position.y)-1.15:player.y,player.z);
   const k=1/Math.max(dt,1e-3),vx=(player.x-hero.px)*k,vz=(player.z-hero.pz)*k;hero.px=player.x;hero.pz=player.z;
-  if(Math.hypot(vx,vz)>.15){const want=Math.atan2(-vx,-vz);let d=want-hero.bodyYaw;d=Math.atan2(Math.sin(d),Math.cos(d));hero.bodyYaw+=d*Math.min(1,dt*10);}
+  const spd=hero.spd=Math.hypot(vx,vz);
+  if(spd>.15){hero.turn=0;const want=Math.atan2(-vx,-vz);let d=want-hero.bodyYaw;d=Math.atan2(Math.sin(d),Math.cos(d));hero.bodyYaw+=d*Math.min(1,dt*10);}
+  else if(!swim&&!player.air&&thirdView()){ // standing still: when the camera swings far round, turn on the spot to face the way you look, stepping as you go
+    let d=player.yaw-hero.bodyYaw;d=Math.atan2(Math.sin(d),Math.cos(d));
+    if(!hero.turn&&Math.abs(d)>1.75)hero.turn=1;
+    if(hero.turn){const st=Math.sign(d)*Math.min(Math.abs(d),dt*3.2);hero.bodyYaw+=st;if(Math.abs(d)<.12)hero.turn=0;}}
+  else hero.turn=0;
   hero.root.rotation.order='YXZ';hero.root.rotation.y=hero.bodyYaw;hero.root.rotation.x=player.uw?lerp(hero.root.rotation.x,player.pitch*.85*smooth(.2,1,moving),Math.min(1,dt*3)):0; // dive head-first
   if(hero.wasAir&&!player.air)hero.landT=.28;hero.wasAir=player.air;hero.landT=Math.max(0,hero.landT-dt);hero.shotT=Math.max(0,hero.shotT-dt);
   let want='Idle_Loop',ts=1;
@@ -112,11 +118,13 @@ function updateHero(dt,moving){
   else if(hero.landT>0)want='Jump_Land';
   else if(moving>2.3){want='Jog_Fwd_Loop';ts=clamp(moving/3.4,.7,1.3);}
   else if(moving>.2){want='Walk_Loop';ts=clamp(moving/1.45,.6,1.5);}
+  else if(hero.turn){want='Walk_Loop';ts=.8;}                                                 // small steps round
   else if(hero.shotT>0)want=hero.shot;
   else if(held&&held.kind==='lantern')want='Idle_Torch_Loop';
   heroPlay(want,player.air||hero.landT>0?.12:.25);
   if(/Walk_Loop|Jog_Fwd/.test(hero.cur))hero.acts[hero.cur].setEffectiveTimeScale(ts); // feet match the ground speed
   hero.mixer.update(dt);
+  heroIK(dt,swim);
   if(hero.malo){const sp=Math.min(1,moving/3),sw=Math.sin(performance.now()/1000*7.5)*.25*sp;hero.malo.front.rotation.x=-sw-.15*sp;hero.malo.back.rotation.x=sw+.12*sp;}
   // the hand socket follows the right hand but stays upright, so a full cup or a lantern does not tip
   hero.root.updateMatrixWorld(true);hero.hand.getWorldPosition(hero.socket.position);hero.socket.rotation.set(0,hero.bodyYaw,0);
@@ -131,3 +139,40 @@ function sysDrop(){const k=selKind();if(!k)return;const fx=player.x-Math.sin(pla
     physDrop(it.g,{vel:{x:-Math.sin(player.yaw)*.7,y:.4,z:-Math.cos(player.yaw)*.7},float:FLOATS.has(k),onRest:g=>{it.x=g.position.x;it.z=g.position.z;
       const top=g.position.y-groundAt(it.x,it.z);it.y=top>.06?g.position.y:null;}});}}
 
+
+/* ───────── feet on the ground ─────────
+   After the animation has posed the body, each leg is bent so its foot meets the ground under it (two-bone IK: the knee bends by the
+   law of cosines, then the hip turns the leg to the target), the pelvis drops to the lower foot so the higher one can bend, and each
+   foot tilts to the slope it stands on. While standing still the upper body also turns a little toward where the camera looks.
+   Ground comes from groundAt (the terrain's heightAt, or the deck). Faded out in the air, swimming and when not walking. */
+const IK={w:0,drop:0,legs:null,footH:null,look:0};
+const _ik={a:new THREE.Vector3(),b:new THREE.Vector3(),c:new THREE.Vector3(),t:new THREE.Vector3(),u:new THREE.Vector3(),v:new THREE.Vector3(),ax:new THREE.Vector3(),
+  q:new THREE.Quaternion(),q2:new THREE.Quaternion(),q3:new THREE.Quaternion(),up:new THREE.Vector3(0,1,0)};
+function boneTurnWorld(bone,dq){const pq=bone.parent.getWorldQuaternion(_ik.q2),wq=bone.getWorldQuaternion(_ik.q3);wq.premultiply(dq);bone.quaternion.copy(pq.invert().multiply(wq));bone.updateMatrixWorld(true);}
+function heroIK(dt,swim){
+  if(!IK.legs){const m=hero.root,names=hero.scan?[['left_hip_02','left_knee_03','left_ankle_04'],['right_hip_05','right_knee_06','right_ankle_07']]:[['thigh_l','calf_l','foot_l'],['thigh_r','calf_r','foot_r']];
+    IK.legs=names.map(([a,b,c])=>({a:m.getObjectByName(a),b:m.getObjectByName(b),c:m.getObjectByName(c)})).filter(l=>l.a&&l.b&&l.c);
+    IK.spine=['spine2_09','spine3_010','spine_02','spine_03'].map(n=>m.getObjectByName(n)).filter(Boolean).slice(0,2);if(!IK.legs.length)return;}
+  if(!IK.legs.length)return;
+  const want=player.mode==='walk'&&!player.air&&!swim&&!player.uw&&!player.climb?1:0;IK.w=lerp(IK.w,want,1-Math.exp(-dt*10));
+  hero.root.updateMatrixWorld(true);
+  if(IK.footH==null){if(hero.cur!=='Idle_Loop')return;IK.footH=Math.min(...IK.legs.map(l=>l.c.getWorldPosition(_ik.c).y-hero.root.position.y));} // ankle height above the sole, measured standing
+  if(IK.w<.01){IK.drop=0;return;}
+  const base=hero.root.position.y,offs=IK.legs.map(l=>{l.c.getWorldPosition(_ik.c);const g=groundAt(_ik.c.x,_ik.c.z);l.g=g;l.n=tnorm(_ik.c.x,_ik.c.z);return clamp(g-base,-.6,.5);});
+  const drop=Math.min(0,...offs);IK.drop=lerp(IK.drop,drop*IK.w,1-Math.exp(-dt*14));
+  hero.root.position.y=base+IK.drop;hero.root.updateMatrixWorld(true);
+  IK.legs.forEach((l,i)=>{const H=l.a.getWorldPosition(_ik.a),K=l.b.getWorldPosition(_ik.b),A=l.c.getWorldPosition(_ik.c);
+    const footQ=l.c.getWorldQuaternion(new THREE.Quaternion());
+    const lift=Math.max(0,A.y-(base+IK.drop)-IK.footH),T=_ik.t.set(A.x,l.g+IK.footH+lift,A.z);                 // keep the stride's own lift above the local ground
+    T.y=lerp(A.y,T.y,IK.w);
+    const l1=H.distanceTo(K),l2=K.distanceTo(A),dT=clamp(H.distanceTo(T),Math.abs(l1-l2)+1e-3,(l1+l2)*.999);
+    const u=_ik.u.subVectors(H,K),v=_ik.v.subVectors(A,K),cur=u.angleTo(v),des=Math.acos(clamp((l1*l1+l2*l2-dT*dT)/(2*l1*l2),-1,1));
+    const ax=_ik.ax.crossVectors(u,v);if(ax.lengthSq()<1e-8)ax.set(1,0,0).applyQuaternion(hero.root.quaternion);ax.normalize();
+    boneTurnWorld(l.b,_ik.q.setFromAxisAngle(ax,des-cur));                                                 // bend the knee
+    l.c.getWorldPosition(A);boneTurnWorld(l.a,_ik.q.setFromUnitVectors(_ik.u.subVectors(A,H).normalize(),_ik.v.subVectors(T,H).normalize())); // swing the leg to the target
+    const tilt=_ik.q.setFromUnitVectors(_ik.up,l.n);tilt.slerp(_ik.q3.identity(),1-IK.w*.8*(1-Math.min(1,lift*8)));   // the foot lies on the slope while it is down
+    const pq=l.c.parent.getWorldQuaternion(_ik.q2);l.c.quaternion.copy(pq.invert().multiply(tilt.multiply(footQ)));l.c.updateMatrixWorld(true);});
+  // stood still, the chest turns toward where you look (up to about 45°)
+  let d=player.yaw-hero.bodyYaw;d=Math.atan2(Math.sin(d),Math.cos(d));const look=player.mode==='walk'&&thirdView()&&(hero.spd||0)<.15?clamp(d,-.8,.8):0;
+  IK.look=lerp(IK.look,look,1-Math.exp(-dt*4));if(Math.abs(IK.look)>.01)for(const b of IK.spine)boneTurnWorld(b,_ik.q.setFromAxisAngle(_ik.up,IK.look/IK.spine.length));
+}

@@ -124,16 +124,17 @@ window.__tF0=performance.now();const FLORA=(()=>{
      past that an impostor: a card that always faces you, painted from eight views of the far scan rendered once at load. Neighbouring versions
      cross-fade over a few metres with a screen-door dither (each pixel is drawn by one version or the other, never both, never neither), so a
      tree never pops; new chunks fade in over a moment, and the edge of the forest's reach dissolves into the haze. */
-  const done={};const RK=Object.keys(SPECIES).concat(['ohia2']),KIND_OF=k=>k==='ohia2'?'ohia':k; // render kinds: ʻōhiʻa grows as a tree, and as a low shrub on young lava
+  const DBG=(new URLSearchParams(location.search).get('treedbg')||'');const done={};const RK=Object.keys(SPECIES).concat(['ohia2']),KIND_OF=k=>k==='ohia2'?'ohia':k; // render kinds: ʻōhiʻa grows as a tree, and as a low shrub on young lava
   const TU={r0:TSL.uniform(25),b0:TSL.uniform(3),r1:TSL.uniform(75),b1:TSL.uniform(7),r2:TSL.uniform(450)};let Q={r0:25,b0:3,r1:75,b1:7,r2:450};
   const quality=g=>{const k=g.grass;Q={r0:10+22*k,b0:3,r1:40+50*k,b1:7,r2:220+340*k};for(const n in Q)TU[n].value=Q[n];};quality(activeGfx());
-  const tierMask=mode=>{const {attribute,length,min,clamp}=TSL;const r=attribute('aRoot','vec4'),d=length(r.xz.sub(STREAM.uEye.xz)),ign=DITHER.ign;
-    const fNear=sstep(TU.r0.add(TU.b0),TU.r0.sub(TU.b0),d),fMid=sstep(TU.r1.add(TU.b1),TU.r1.sub(TU.b1),d);
-    const pres=min(clamp(STREAM.uNow.sub(r.w).div(.7),0,1),sstep(TU.r2,TU.r2.mul(.86),d));     // a new chunk fades in; the forest's far edge fades out
+  // the per-tree fades are worked out per vertex (they are the same over a whole tree) and only compared with the dither per pixel
+  const tierMask=mode=>{const {attribute,length,min,clamp,varying,vec3}=TSL;const r=attribute('aRoot','vec4'),d=length(r.xz.sub(STREAM.uEye.xz)),ign=DITHER.ign;
+    const F=varying(vec3(sstep(TU.r0.add(TU.b0),TU.r0.sub(TU.b0),d),sstep(TU.r1.add(TU.b1),TU.r1.sub(TU.b1),d),min(clamp(STREAM.uNow.sub(r.w).div(.7),0,1),sstep(TU.r2,TU.r2.mul(.86),d))));
+    const fNear=F.x,fMid=F.y,pres=F.z;                                                         // a new chunk fades in; the forest's far edge fades out
     if(mode==='near')return ign.lessThan(min(fNear,pres));
     if(mode==='mid')return ign.greaterThanEqual(fNear).and(ign.lessThan(min(fMid,pres)));
     return ign.lessThan(min(fMid,pres));};                                                     // 'all': one version drawn near and mid
-  const tierMats=new Map(),tierMat=(base,mode)=>{const key=base.uuid+mode;let m=tierMats.get(key);if(!m){m=base.clone();m.maskNode=tierMask(mode);tierMats.set(key,m);}return m;};
+  const tierMats=new Map(),tierMat=(base,mode)=>{const key=base.uuid+mode;let m=tierMats.get(key);if(!m){m=base.clone();if(!DBG.includes('nomask'))m.maskNode=tierMask(mode);tierMats.set(key,m);}return m;};
   // what each render kind is drawn with: {near:[parts], mid:[parts], k:[xz,y] scale, ver}; parts are {geo, mat}. Code-built trees stand in until the scans load.
   const SRC={};let srcVer=0;
   for(const k of Object.keys(SPECIES)){const T=TEMPL[k],parts=[{geo:T.bark,mat:barkMats[k]},{geo:T.leaf,mat:leafMats[T.leafKind],leaf:true}];SRC[k]={near:[],mid:parts,mode:'all',k:[1,1],ver:++srcVer,H:T.H};}
@@ -179,8 +180,8 @@ window.__tF0=performance.now();const FLORA=(()=>{
     const L=pool.get(key);while(L&&L.length){const e=L.pop();if(e.ver===src.ver)return e;for(const im of e.meshes)scene.remove(im);}
     const M=new THREE.InstancedBufferAttribute(new Float32Array(cap*16),16),Rt=new THREE.InstancedBufferAttribute(new Float32Array(cap*4),4);M.setUsage(THREE.DynamicDrawUsage);Rt.setUsage(THREE.DynamicDrawUsage);
     const meshes=parts.map(p=>{const geo=new THREE.BufferGeometry();for(const a in p.geo.attributes)geo.setAttribute(a,p.geo.attributes[a]);geo.setIndex(p.geo.index);geo.setAttribute('aRoot',Rt);
-      const im=new THREE.InstancedMesh(geo,tierMat(p.mat,tier==='near'?'near':src.mode==='all'?'all':'mid'),cap);im.instanceMatrix=M;im.count=0;im.castShadow=true;im.receiveShadow=true;
-      if(p.leaf||(tier==='mid'&&src.mode!=='all')||p!==parts.find(q=>!q.leaf))im.raycast=()=>{};else{im.userData.item=ITEM[KIND_OF(rk)];im.userData.look=true;}   // the trunk is what you look at
+      const im=new THREE.InstancedMesh(geo,tierMat(p.mat,tier==='near'?'near':src.mode==='all'?'all':'mid'),cap);im.instanceMatrix=M;im.count=0;im.castShadow=!DBG.includes('noshadow');im.receiveShadow=true;
+      if(p.leaf||(tier==='mid'&&src.mode!=='all')||p!==parts.find(q=>!q.leaf))im.raycast=()=>{};else if(!DBG.includes('nolook')){im.userData.item=ITEM[KIND_OF(rk)];im.userData.look=true;}else im.raycast=()=>{};   // the trunk is what you look at
       im.boundingSphere=new THREE.Sphere();im.visible=false;scene.add(im);return im;});
     return{rk,tier,cap,key,ver:src.ver,M,Rt,meshes};}
   function putSet(e){for(const im of e.meshes){im.visible=false;im.count=0;if(im.userData.look){const i=interact.indexOf(im);if(i>=0)interact.splice(i,1);}}const L=pool.get(e.key)||pool.set(e.key,[]).get(e.key);if(L.length<24)L.push(e);}
@@ -215,8 +216,8 @@ window.__tF0=performance.now();const FLORA=(()=>{
     const vUv=varying(vec2(col.add(pg.x.add(.5)).div(4),row.add(pg.y).div(2)));
     const tx=texture(atlas,vUv);m.colorNode=vec4(tx.rgb.mul(mix(.62,1.04,clamp(pg.y.mul(1.3),0,1))),tx.a);                // the lower crown sits in its own shade
     m.normalNode=normalize(cameraViewMatrix.mul(vec4(normalize(vec3(dir.x.mul(.55),1,dir.y.mul(.55))),0)).xyz);
-    const ign=DITHER.ign,fMid=sstep(TU.r1.add(TU.b1),TU.r1.sub(TU.b1),dE),pres=min(clamp(STREAM.uNow.sub(b.y).div(.7),0,1),sstep(TU.r2,TU.r2.mul(.86),dE));
-    m.maskNode=ign.greaterThanEqual(fMid).and(ign.lessThan(pres));return m;}
+    const ign=DITHER.ign,F=varying(vec2(sstep(TU.r1.add(TU.b1),TU.r1.sub(TU.b1),dE),min(clamp(STREAM.uNow.sub(b.y).div(.7),0,1),sstep(TU.r2,TU.r2.mul(.86),dE))));
+    m.maskNode=ign.greaterThanEqual(F.x).and(ign.lessThan(F.y));return m;}
   // eight views of a tree, rendered once into a 4×2 atlas (flat colour: the game lights the card)
   function bake(rk,parts,H,Wd){const T=Math.max(H,Wd)*1.06,sc=new THREE.Scene(),bm=new Map();
     const bmat=m=>{let b=bm.get(m);if(!b){b=new THREE.MeshBasicNodeMaterial({map:m.map||null,color:(m.color||new THREE.Color(1,1,1)).clone(),alphaTest:Math.max(.3,m.alphaTest||0),side:THREE.DoubleSide});
