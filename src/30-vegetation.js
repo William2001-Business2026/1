@@ -96,10 +96,12 @@ const palms=[];
    fg.setAttribute('aPh',new THREE.InstancedBufferAttribute(aPh,1));fg.setAttribute('aUp',new THREE.InstancedBufferAttribute(aUp,3));fg.setAttribute('aSide',new THREE.InstancedBufferAttribute(aSide,3));}
   scene.add(fronds);
 }
-/* grass: 120,000 tufts of curved, tapering blades in 16 m chunks.
+/* grass: tufts of curved, tapering blades, streamed in 16 m chunks around you.
    Close chunks draw full tufts, further ones lighter tufts that thin out with distance; past the last ring the ground's own green takes over.
    To sit in the ground rather than on it, the blades are lit as the ground is (facing up, whichever side you see), start from the ground's colour
-   at the root and follow the same dry and lush patches as the soil under them. */
+   at the root and follow the same dry and lush patches as the soil under them. Where grass grows is asked of the ground truth (grassMask, with
+   less on slopes, river banks and under trees); a chunk samples the ground on a 1 m grid and places up to ~1,100 tufts on it. New chunks grow
+   in from the ground over half a second, so nothing pops. Chunk meshes are pooled and reused, so walking about allocates nothing. */
 const GRASS=(()=>{
   const tuft=(BL,SEG,wk)=>{const P=[],N=[],C=[],UVs=[],I=[],cBase=new THREE.Color(.038,.056,.017),cTip=new THREE.Color(.16,.24,.058),cDry=new THREE.Color(.3,.26,.11),c=new THREE.Color();
     for(let b=0;b<BL;b++){const a=R()*6.283,r=Math.sqrt(R())*.15,bx=Math.cos(a)*r,bz=Math.sin(a)*r,H=.45+R()*.6,w=(.02+R()*.02)*wk;
@@ -114,11 +116,11 @@ const GRASS=(()=>{
   const LOD=[tuft(11,3,1),tuft(5,2,1.5)]; // full tufts close by; fewer, wider blades further out
   const GU={near:TSL.uniform(30),far:TSL.uniform(85),dens:TSL.uniform(1)};
   const m=leafy(new THREE.MeshStandardNodeMaterial({vertexColors:true,side:THREE.DoubleSide,roughness:.82}));
-  {const {Fn,vec3,vec4,float,length,normalize,dot,clamp,mix,attribute,positionLocal,positionGeometry,cameraPosition,cameraViewMatrix,varyingProperty,normalLocal,faceDirection}=TSL;
-   const info=attribute('aInfo','vec4'),vBend=varyingProperty('float','vBend'); // root position, and the tuft's place in its chunk's thinning order
-   m.positionNode=Fn(()=>{const root=info.xyz,dist=length(root.xz.sub(cameraPosition.xz));
+  {const {Fn,vec3,vec4,float,length,normalize,dot,clamp,mix,attribute,positionLocal,positionGeometry,cameraViewMatrix,varyingProperty,normalLocal,faceDirection}=TSL;
+   const info=attribute('aInfo','vec4'),born=attribute('aBorn','float'),vBend=varyingProperty('float','vBend'); // root position, the tuft's place in its chunk's thinning order, and when its chunk was made
+   m.positionNode=Fn(()=>{const root=info.xyz,dist=length(root.xz.sub(STREAM.uEye.xz));
      const keep=mix(1,.3,sstep(GU.near,GU.far.mul(.85),dist)).mul(sstep(GU.far,GU.far.mul(.85),dist)).mul(GU.dens);
-     const grow=clamp(keep.sub(info.w).div(.06),0,1);                                       // tufts sink away one by one in the distance instead of popping
+     const grow=clamp(keep.sub(info.w).div(.06),0,1).mul(clamp(STREAM.uNow.sub(born).div(.6),0,1)); // tufts sink away one by one in the distance, and new chunks grow in
      const h=positionGeometry.y,k=h.mul(h),wd=windAt(positionLocal.xz);
      const d=positionLocal.xz.sub(WIND.player.xz),near=float(1).sub(sstep(.15,.95,length(d))).mul(sstep(1.6,.4,positionLocal.y.sub(WIND.player.y).abs()));
      const push=normalize(d.add(1e-4)).mul(near).mul(.8);                                    // blades lean away from your legs
@@ -130,41 +132,61 @@ const GRASS=(()=>{
    m.normalNode=Fn(()=>{const side=normalize(normalLocal).mul(faceDirection);return normalize(cameraViewMatrix.mul(vec4(normalize(vec3(0,1,0).add(side.mul(.55))),0)).xyz);})();
    m.colorNode=vec4(vec3(float(1).add(vBend.mul(.28))),1);                                   // gusts flatten blades and show their paler sides
   }
-  // where the tufts go: sampled from the terrain's own grid, exactly on its triangles
-  const n1=SEG+1,st=SIZE/SEG;
-  const onGrid=(arr,x,z)=>{const gx=(x+SIZE/2)/st,gz=(z+SIZE/2)/st,i=Math.floor(gx),j=Math.floor(gz),u=gx-i,v=gz-j,o=j*n1+i;
-    const ha=arr[o],hb=arr[o+n1],hc=arr[o+n1+1],hd=arr[o+1];
-    return u+v<=1?ha+(hd-ha)*u+(hb-ha)*v:hc+(hb-hc)*(1-u)+(hd-hc)*(1-v);};
-  const TOTAL=150000,CH=16,chunks=new Map(),up=new THREE.Vector3(0,1,0),nv=new THREE.Vector3(),qa=new THREE.Quaternion(),qb=new THREE.Quaternion(),d=new THREE.Object3D(),c=new THREE.Color();
+  const CH=16,CAP=1400,G1=CH+1,up=new THREE.Vector3(0,1,0),nv=new THREE.Vector3(),qa=new THREE.Quaternion(),qb=new THREE.Quaternion(),M4=new THREE.Matrix4(),P3=new THREE.Vector3(),S3=new THREE.Vector3(),c=new THREE.Color();
   const lush=new THREE.Color(.92,1.04,.9),dryC=new THREE.Color(1.3,1.0,1.02);
-  let placed=0,tries=0;
-  while(placed<TOTAL&&tries<2200000){tries++;const x=(R()-.5)*280,z=-178+R()*316,h=onGrid(TERR,x,z);if(h<1.2)continue;
-    const gm=onGrid(TGRASS,x,z);if(gm<.12||R()>gm||freshAt(x,z)!=null)continue;if(Math.hypot(x-LANAI.x,z-LANAI.z)<4.6)continue;
-    const key=Math.floor(x/CH)+','+Math.floor(z/CH);let ch=chunks.get(key);if(!ch){ch={x0:Math.floor(x/CH)*CH,z0:Math.floor(z/CH)*CH,t:[]};chunks.set(key,ch);}
-    nv.set(onGrid(TERR,x-.4,z)-onGrid(TERR,x+.4,z),.8,onGrid(TERR,x,z-.4)-onGrid(TERR,x,z+.4)).normalize();
-    const s=(.35+R()*.55)*(.55+.45*smooth(.2,.8,gm)),f=smooth(.45,.68,fbm(x*.15,z*.15,3));   // shorter, sparser grass where it thins out at its edges
-    c.copy(lush).lerp(dryC,f).multiplyScalar(.85+R()*.3);
-    ch.t.push([x,h-.03,z,nv.x,nv.y,nv.z,R()*6.28,s,c.r,c.g,c.b]);placed++;}
-  const list=[];
-  for(const ch of chunks.values()){const t=ch.t,n=t.length;
-    for(let i=n-1;i>0;i--){const j=Math.floor(R()*(i+1));[t[i],t[j]]=[t[j],t[i]];}             // random order, so any first part of the list is an even thinning
-    const mats=new THREE.InstancedBufferAttribute(new Float32Array(n*16),16),cols=new THREE.InstancedBufferAttribute(new Float32Array(n*3),3),info=new THREE.InstancedBufferAttribute(new Float32Array(n*4),4);
-    let y0=1e9,y1=-1e9;
-    t.forEach(([x,y,z,a,b,e,yaw,sc,r,g,bl],i)=>{d.position.set(x,y,z);qa.setFromUnitVectors(up,nv.set(a,b,e));qb.setFromAxisAngle(up,yaw);d.quaternion.copy(qa).multiply(qb);
-      d.scale.set(sc*1.3,sc,sc*1.3);d.updateMatrix();d.matrix.toArray(mats.array,i*16);cols.array.set([r,g,bl],i*3);info.array.set([x,y,z,i/n],i*4);y0=Math.min(y0,y);y1=Math.max(y1,y);});
-    const meshes=LOD.map(base=>{const geo=new THREE.BufferGeometry();for(const k in base.attributes)geo.setAttribute(k,base.attributes[k]);geo.setIndex(base.index);geo.setAttribute('aInfo',info);
-      const im=new THREE.InstancedMesh(geo,m,n);im.instanceMatrix=mats;im.instanceColor=cols;im.receiveShadow=true;im.raycast=()=>{};
-      im.boundingSphere=new THREE.Sphere(new THREE.Vector3(ch.x0+CH/2,(y0+y1)/2+.4,ch.z0+CH/2),Math.hypot(CH/2,CH/2,(y1-y0)/2+.8)+1);
-      im.visible=false;scene.add(im);return im;});
-    list.push({...ch,n,meshes});ch.t=null;}
+  // a pool of chunk meshes: each slot holds both detail levels over the same instance data
+  const pool=[];let made=0;
+  function slot(){if(pool.length)return pool.pop();made++;
+    const mats=new THREE.InstancedBufferAttribute(new Float32Array(CAP*16),16),cols=new THREE.InstancedBufferAttribute(new Float32Array(CAP*3),3),
+      info=new THREE.InstancedBufferAttribute(new Float32Array(CAP*4),4),born=new THREE.InstancedBufferAttribute(new Float32Array(CAP),1);
+    for(const a of[mats,cols,info,born])a.setUsage(THREE.DynamicDrawUsage);
+    const meshes=LOD.map(base=>{const geo=new THREE.BufferGeometry();for(const k in base.attributes)geo.setAttribute(k,base.attributes[k]);geo.setIndex(base.index);geo.setAttribute('aInfo',info);geo.setAttribute('aBorn',born);
+      const im=new THREE.InstancedMesh(geo,m,CAP);im.instanceMatrix=mats;im.instanceColor=cols;im.receiveShadow=true;im.raycast=()=>{};im.boundingSphere=new THREE.Sphere();im.visible=false;im.count=0;scene.add(im);return im;});
+    return{mats,cols,info,born,meshes};}
+  const live=[];let total=0;
   let q={near:30,far:85,dens:1};
-  return{count:placed,chunks:list,
-    quality(g){q={near:8+16*g.grass,far:30+55*g.grass,dens:Math.min(1,g.grass*1.1)};GU.near.value=q.near;GU.far.value=q.far;GU.dens.value=q.dens;},
-    update(cx,cz){ // pick each chunk's detail and how many of its tufts to send, from its nearest point to the camera
-      for(const ch of list){const dx=Math.max(ch.x0-cx,0,cx-ch.x0-CH),dz=Math.max(ch.z0-cz,0,cz-ch.z0-CH),dd=Math.hypot(dx,dz);
-        const [a,b]=ch.meshes;if(dd>=q.far){a.visible=b.visible=false;continue;}
+  // the ground under a chunk, on a 1 m grid: height, and how much grass it takes
+  function* build(ch){const x0=ch.x0,z0=ch.z0,H=new Float32Array(G1*G1),Gm=new Float32Array(G1*G1);let any=false;
+    for(let j=0;j<G1;j++){for(let i=0;i<G1;i++)H[j*G1+i]=heightAt(x0+i,z0+j);if(j%4===3)yield;}
+    for(let j=0;j<G1;j+=2){for(let i=0;i<G1;i+=2){const x=x0+i,z=z0+j,h=H[j*G1+i];let g=0;
+        if(h>=1.2&&!nearHome(x,z,4.6)&&freshAt(x,z)==null){const mk=masks(x,z);g=grassMask(x,z,h,mk);
+          if(g>0){const hx=H[j*G1+Math.min(i+1,CH)]-H[j*G1+Math.max(i-1,0)],hz=H[Math.min(j+1,CH)*G1+i]-H[Math.max(j-1,0)*G1+i],ny=2/Math.hypot(hx,2,hz);
+            const rock=smooth(.56,.3,ny)*smooth(3,8,h),q2=riverQ(x,z),wet=q2?smooth(q2.w+4,q2.w,q2.d):0;g*=(1-rock)*(1-wet*.85)*(1-.7*forestW(x,z));}}
+        Gm[j*G1+i]=g;if(g>.12)any=true;}
+      yield;}
+    // the odd grid points take their neighbours' average
+    for(let j=0;j<G1;j++)for(let i=0;i<G1;i++){if(!(i%2)&&!(j%2))continue;const i0=i-(i%2),j0=j-(j%2),i1=Math.min(CH,i0+(i%2?2:0)),j1=Math.min(CH,j0+(j%2?2:0));
+      Gm[j*G1+i]=(Gm[j0*G1+i0]+Gm[j0*G1+i1]+Gm[j1*G1+i0]+Gm[j1*G1+i1])*.25;}
+    ch.n=0;if(!any)return;
+    const S=ch.slot=slot(),R2=ch.R,bil=(A,u,v)=>{const i=Math.min(CH-1,Math.floor(u)),j=Math.min(CH-1,Math.floor(v)),fu=u-i,fv=v-j,o=j*G1+i;
+      return (A[o]*(1-fu)+A[o+1]*fu)*(1-fv)+(A[o+G1]*(1-fu)+A[o+G1+1]*fu)*fv;};
+    let n=0,y0=1e9,y1=-1e9;
+    for(let t=0;t<CAP*1.6&&n<CAP;t++){const u=R2()*CH,v=R2()*CH,g=bil(Gm,u,v);if(g<.12||R2()>g)continue;
+      const x=x0+u,z=z0+v,h=bil(H,u,v),hx=bil(H,Math.min(CH,u+.4),v)-bil(H,Math.max(0,u-.4),v),hz=bil(H,u,Math.min(CH,v+.4))-bil(H,u,Math.max(0,v-.4));
+      nv.set(-hx,.8,-hz).normalize();const yaw=R2()*6.28,sc=(.35+R2()*.55)*(.55+.45*smooth(.2,.8,g)),f=smooth(.45,.68,fbm(x*.15,z*.15,3)); // shorter, sparser grass where it thins out at its edges
+      c.copy(lush).lerp(dryC,f).multiplyScalar(.85+R2()*.3);
+      qa.setFromUnitVectors(up,nv);qb.setFromAxisAngle(up,yaw);qa.multiply(qb);P3.set(x,h-.03,z);S3.set(sc*1.3,sc,sc*1.3);M4.compose(P3,qa,S3);M4.toArray(S.mats.array,n*16);
+      S.cols.array[n*3]=c.r;S.cols.array[n*3+1]=c.g;S.cols.array[n*3+2]=c.b;S.info.array[n*4]=x;S.info.array[n*4+1]=h-.03;S.info.array[n*4+2]=z;
+      y0=Math.min(y0,h);y1=Math.max(y1,h);n++;if(n%300===0)yield;}
+    // a tuft's rank (its place in the thinning order) is its place in the list: tufts were placed in random order, so any first part is an even thinning
+    for(let i=0;i<n;i++){S.info.array[i*4+3]=i/n;}
+    ch.n=n;ch.y0=y0;ch.y1=y1;
+    if(!n){pool.push(S);ch.slot=null;}}
+  const L=STREAM.layer({name:'grass',size:CH,seed:16,prio:0,radius:()=>q.far+2,build,
+    ready(ch){const S=ch.slot;if(!S)return;S.born.array.fill(ch.born,0,ch.n);for(const a of[S.mats,S.cols,S.info,S.born])a.needsUpdate=true;
+      for(const im of S.meshes){im.boundingSphere.set(P3.set(ch.x0+CH/2,(ch.y0+ch.y1)/2+.4,ch.z0+CH/2),Math.hypot(CH/2,CH/2,(ch.y1-ch.y0)/2+.8)+1);}
+      ch.meshes=S.meshes;live.push(ch);total+=ch.n;},
+    dispose(ch){const S=ch.slot;if(!S)return;for(const im of S.meshes){im.visible=false;im.count=0;}const i=live.indexOf(ch);if(i>=0)live.splice(i,1);total-=ch.n;
+      if(pool.length<48)pool.push(S);else for(const im of S.meshes){scene.remove(im);im.geometry.dispose();im.dispose();made--;}ch.slot=null;},
+    abort(ch){if(ch.slot){pool.push(ch.slot);ch.slot=null;}},
+    frame(cx,cz){ // pick each chunk's detail and how many of its tufts to send, from its nearest point to the camera
+      for(const ch of live){const dx=Math.max(ch.x0-cx,0,cx-ch.x0-CH),dz=Math.max(ch.z0-cz,0,cz-ch.z0-CH),dd=Math.hypot(dx,dz);const [a,b]=ch.meshes;if(dd>=q.far){a.visible=b.visible=false;continue;}
         const keep=q.dens*lerp(1,.3,smooth(q.near,q.far*.85,dd))+.07,cnt=Math.min(ch.n,Math.ceil(ch.n*keep));
-        const close=dd<q.near;a.visible=close;b.visible=!close;(close?a:b).count=cnt;}}};
+        const close=dd<q.near;a.visible=close;b.visible=!close;(close?a:b).count=cnt;}}});
+  return{get count(){return total;},get chunks(){return live;},get pooled(){return made;},layer:L,
+    quality(g){q={near:8+16*g.grass,far:30+55*g.grass,dens:Math.min(1,g.grass*1.1)};GU.near.value=q.near;GU.far.value=q.far;GU.dens.value=q.dens;},
+    // called once a frame by the frame loop: it drives all streaming (grass, trees, plants, reef, animals' homes)
+    update(cx,cz){STREAM.update(cx,cz);}};
 })();
 { // naupaka shrubs and lava rocks
   const sp=[],sn=[],su=[],sc=[],c=new THREE.Color(),core=new THREE.IcosahedronGeometry(.74,2).toNonIndexed().attributes.position;
