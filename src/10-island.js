@@ -88,19 +88,22 @@ function makeGround(D){
   const R=D.river,C=R.C;
   const lipC=C[R.iLip],footC=C[R.iFoot];
   const dd=(()=>{const dx=footC[0]-lipC[0],dz=footC[1]-lipC[1],l=Math.hypot(dx,dz);return{x:dx/l,z:dz/l};})(); // the way the water falls
-  const POOL={x:lipC[0]+dd.x*17,z:lipC[1]+dd.z*17,r:13};
-  const SPRING={x:C[0][0],z:C[0][1]};
   const LIP={x:lipC[0],z:lipC[1],h:dataH(lipC[0],lipC[1])};
-  const poolL=Math.min(dataH(footC[0],footC[1]),dataH(POOL.x,POOL.z))-1.2;
+  const footL=dataH(footC[0],footC[1]),WALL=.07; // the wall falls about 86°: 0.07 m out for every metre down, so a 450 m face is ~32 m deep, not one 5 m step
+  const POOL=(()=>{const o=Math.max(17,(LIP.h-footL)*WALL+11);return{x:lipC[0]+dd.x*o,z:lipC[1]+dd.z*o,r:13};})(); // the pool lies at the foot of the wall
+  const SPRING={x:C[0][0],z:C[0][1]};
+  const poolL=Math.min(footL,dataH(POOL.x,POOL.z))-1.2;
   // the amphitheatre Hiʻilawe has cut: a sheer back wall under the lip, steep sides, and a gentle way out downstream
   function fallsCarve(x,z,h){
     const px=x-LIP.x,pz=z-LIP.z,s=px*dd.x+pz*dd.z,t=-px*dd.z+pz*dd.x;
     if(s<-30||s>260||Math.abs(t)>260)return h;
-    const face=1.2+t*t/110+(fbm(x*.08,z*.08,2)-.5)*2.5;                   // the wall curves back on both sides, and is ragged
+    const face=1.2+t*t/110+(fbm(x*.08,z*.08,2)-.5)*2.5                    // the wall curves back on both sides, and is ragged:
+      +(fbm(t*.06+11,h*.004,3)-.5)*14;                                       // buttresses and gullies running down it
     const r=Math.hypot(x-POOL.x,z-POOL.z),dn=((x-POOL.x)*dd.x+(z-POOL.z)*dd.z)/Math.max(r,.01);
     const k=lerp(4.2,.16,smooth(.35,.85,dn));                              // steep sides and back, a gentle way out
     let bowl=r<POOL.r?poolL-4*Math.sqrt(1-Math.pow(r/POOL.r,2))-.05:poolL+.35+(r-POOL.r)*k+(fbm(x*.15,z*.15,2)-.5)*2*smooth(0,12,r-POOL.r);
-    const front=smooth(face-1.4,face+1.4,s);
+    const drop=Math.max(0,h-poolL),W=Math.max(2.8,drop*WALL);               // how far out the foot is, from how high the face stands
+    const front=smooth(face,face+W,s);
     return lerp(h,Math.min(h,bowl),front);
   }
   const P=[];{const iL=R.iLip; // control points → a smooth path every metre or so (no curve across the fall itself)

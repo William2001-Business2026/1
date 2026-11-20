@@ -44,7 +44,8 @@ const saveSettings=()=>{try{localStorage.setItem('halemoku',JSON.stringify(setti
 // Add ?renderer=webgl to the address to force the fallback.
 const canvas=document.getElementById('c'),fpsEl=document.getElementById('fps');
 const FORCE_GL=/[?&]renderer=webgl\b/.test(location.search);
-const renderer=new THREE.WebGPURenderer({canvas,antialias:false,powerPreference:'high-performance',forceWebGL:FORCE_GL,reversedDepthBuffer:true}); // reversed depth: the island is seen from 5 cm to 200 km
+const DEPTH_MODE=new URLSearchParams(location.search).get('depth')||'reversed';
+const renderer=new THREE.WebGPURenderer({canvas,antialias:false,powerPreference:'high-performance',forceWebGL:FORCE_GL,reversedDepthBuffer:DEPTH_MODE==='reversed',logarithmicDepthBuffer:DEPTH_MODE==='log'}); // reversed depth: the island is seen from 5 cm to 200 km
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFShadowMap;
 await renderer.init();

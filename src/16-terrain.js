@@ -121,17 +121,28 @@ const TERRAIN=(()=>{
   const farF=vForest.mul(sstep(500,1500,vDist));
   const spray=(()=>{const f=FRESH_SPOT;return sstep(26,8,length(wp.xz.sub(vec2(f.x,f.z))).add(vn(wp.xz.mul(.7)).mul(4))).mul(sstep(f.y+45,f.y-2,wy));})(); // the rock the spray keeps wet
   const puddle=sstep(.6,.7,vn(wp.xz.mul(.16).add(7)).add(vn(wp.xz.mul(.5)).mul(.15))).mul(sstep(.975,.995,normalWorldGeometry.y)).mul(sstep(.3,.9,U.uWet)).mul(float(1).sub(lavaM)).mul(sstep(.5,1.2,wy)).mul(near);
-  mat.colorNode=vec4(mix(vCol.mul(detail).mul(macro),canopy,farF).mul(mix(1,.82,wetM)).mul(mix(1,.68,U.uWet.mul(sstep(-.2,.4,wy)))).mul(mix(1,.45,puddle))
+  // cliffs: rock projected from the side (a texture laid from above stretches into flat slabs on a 450 m wall), mostly hidden
+  // under moss, ferns and shrubs as on the real valley walls, bare only where it is steepest, with dark streaks where water runs
+  const N0=normalWorldGeometry,cl=sstep(.74,.4,N0.y);
+  const rockT=LAYERS[3].t,cliff=Fn(()=>{const c=vec3(0).toVar();If(cl.greaterThan(.003),()=>{
+      const ax=abs(N0.x),az=abs(N0.z),wsum=ax.add(az).add(.001);
+      const tri=texture(rockT.a,wp.zy.div(5.5)).rgb.mul(ax).add(texture(rockT.a,wp.xy.div(5.5)).rgb.mul(az)).div(wsum).div(.011);
+      const big=vn(vec2(wp.x.add(wp.z).mul(.035),wp.y.mul(.05))),fine=vn(wp.xz.mul(.6).add(wp.y.mul(.4)));
+      const rock=vec3(.05,.047,.043).mul(mix(vec3(1),tri,.8)).mul(mix(.55,1,vn(vec2(wp.x.add(wp.z).mul(.9),wp.y.mul(.04))))); // water stains run down
+      const veg=sstep(.5,.72,N0.y.add(big.sub(.5).mul(.55)).add(.55)).mul(sstep(-2,40,wy)),                                  // green wherever plants can hold on
+        green=vec3(.022,.05,.016).mul(mix(.6,1.35,fine)).mul(mix(.8,1.1,big));
+      c.assign(mix(rock,green,veg));});return c;})();
+  mat.colorNode=vec4(mix(mix(vCol.mul(detail).mul(macro),cliff,cl),canopy,farF).mul(mix(1,.82,wetM)).mul(mix(1,.68,U.uWet.mul(sstep(-.2,.4,wy)))).mul(mix(1,.45,puddle))
     .mul(mix(1,.78,sstep(.5,1,vMat).mul(float(1).sub(lavaM)).mul(near))).mul(mix(1,.5,spray)),1);
   const nr=blend((L,q)=>texture(L.t.n,q).rgb,vec3(0));
   const ph0=U.uTime.mul(.7).add(vn(wp.xz.mul(.045)).mul(7));
   const gloss=clamp(sstep(.25,.07,wy).mul(sin(ph0.sub(1.3)).mul(.5).add(.5)),0,1);
-  mat.roughnessNode=mix(mix(.95,nr.z,near),.12,gloss.mul(sandM).mul(.9)).mul(mix(1,.7,wetM)).mul(mix(1,.55,U.uWet)).mul(mix(1,.06,puddle)).mul(mix(1,.22,spray));
+  mat.roughnessNode=mix(mix(mix(.95,nr.z,near),.8,cl),.12,gloss.mul(sandM).mul(.9)).mul(mix(1,.7,wetM)).mul(mix(1,.55,U.uWet)).mul(mix(1,.06,puddle)).mul(mix(1,.22,spray));
   mat.normalNode=Fn(()=>{ // tangent space follows the ground: X along world X, Y along world Z
     const N=normalWorldGeometry,T=normalize(vec3(1,0,0).sub(N.mul(N.x))),B=cross(T,N);
     const t=nr.xy.mul(2).sub(1).mul(near),tz=sqrt(max(float(1).sub(dot(t,t)),0));
     const n=normalize(T.mul(t.x).add(B.mul(t.y)).add(N.mul(tz)));
-    return normalize(cameraViewMatrix.mul(vec4(mix(n,N,puddle),0)).xyz);
+    return normalize(cameraViewMatrix.mul(vec4(mix(mix(n,N,cl),N,puddle),0)).xyz);
   })();
   mat.emissiveNode=Fn(()=>{
     const e=vec3(0).toVar(),dist=vDist;
@@ -188,21 +199,26 @@ const TERRAIN=(()=>{
   function canDraw(t,c,depth){if(skipSea(t,c))return true;if(wantSplit(t,c)&&depth<14){if(kids(t).every(k=>canDraw(k,c,depth+1)))return true;}return t.state===2;}
   function pickTiles(t,c,out,depth){t.used=frameT;
     if(skipSea(t,c))return;
-    if(wantSplit(t,c)){const ks=kids(t);for(const k of ks){k.used=frameT;if(k.state===0&&!skipSea(k,c))request(k,k.lvl*100000+nodeDist(c.x,c.y,c.z,k.x,k.z,k.s)[0]/k.s);}
+    if(wantSplit(t,c)){const ks=kids(t);for(const k of ks){k.used=frameT;if(k.state===0&&!skipSea(k,c))request(k,nodeDist(c.x,c.y,c.z,k.x,k.z,k.s)[0]/k.s);} // nearest, most needed first: the ground under you before the far coast
       if(ks.every(k=>canDraw(k,c,depth+1))){for(const k of ks)pickTiles(k,c,out,depth+1);return;}}
-    if(t.state===2)out.push(t);else if(t.state===0)request(t,t.lvl*100000);
+    if(t.state===2)out.push(t);else if(t.state===0)request(t,-1); // a node with nothing to draw yet comes before everything
   }
+  // every tile under and around a point, from the root down to the finest, requested together (nearest and finest first)
+  function prefetch(c){let lvl=0;for(let sz=ROOT.s;sz>=MIN;sz/=2,lvl++){const r=sz<=1280?1:0;
+    for(let j=-r;j<=r;j++)for(let i=-r;i<=r;i++){const x=ROOT.x+(Math.floor((c.x-ROOT.x)/sz)+i)*sz,z=ROOT.z+(Math.floor((c.z-ROOT.z)/sz)+j)*sz,t=tileFor(x,z,sz,lvl);
+      if(t.state===0&&!skipSea(t,c))request(t,-2+(Math.abs(i)+Math.abs(j))*.1);}}}
   function apply(){const c=conf();if(c.N!==N||c.min!==MIN){N=c.N;MIN=c.min;gen++;for(const t of tiles.values())drop(t);tiles.clear();}K=c.K;uK.value=K;}
   apply();
   function update(){
     const o=window.__terrain&&window.__terrain.camOverride;if(o){camera.position.set(...o.pos);camera.lookAt(...o.look);camera.updateMatrixWorld();sky.position.copy(camera.position);}
     frameT++;apply();const c=camera.position;
+    if(c.distanceTo(lastCam)>150)prefetch(c);lastCam.copy(c);                // a teleport or a cut: ask for the whole column down to full detail at once
     const root=tileFor(ROOT.x,ROOT.z,ROOT.s,0),out=[];pickTiles(root,c,out,0);
     for(const t of shown)if(t.mesh)t.mesh.visible=false;for(const t of out)t.mesh.visible=true;shown=out;
     if(frameT%60===0){let n=0;for(const t of tiles.values())if(frameT-t.used>600&&t.s<ROOT.s){drop(t);tiles.delete(t.key);n++;}}
     pump();
   }
-  return{update,job,mat,group,get shown(){return shown;},stats(){let tris=0;for(const t of shown)tris+=t.mesh.geometry.index.count/3;return{tiles:shown.length,tris,queued:queue.length,busy:workers.reduce((a,w)=>a+w.busy,0),cached:tiles.size,nw:workers.length,pend:pend.size,jid,wb:workers.map(w=>w.busy)};},
+  return{update,job,mat,group,get tiles(){return tiles;},get gen(){return gen;},get shown(){return shown;},stats(){let tris=0;for(const t of shown)tris+=t.mesh.geometry.index.count/3;return{tiles:shown.length,tris,queued:queue.length,busy:workers.reduce((a,w)=>a+w.busy,0),cached:tiles.size,nw:workers.length,pend:pend.size,jid,wb:workers.map(w=>w.busy)};},
     idle(){return queue.length===0&&workers.every(w=>w.busy===0);},flush(){gen++;for(const t of tiles.values())drop(t);tiles.clear();}};
 })();
 // test hooks: terrain streaming state, a free camera, and the numeric checks of the real-island phase
