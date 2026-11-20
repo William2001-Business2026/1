@@ -3,7 +3,7 @@
    built in code from the scanned bark. All share the island's wind. They grow where they would: koa, ʻōhiʻa and hāpuʻu in the forest and up the mountain, loulu on its
    ridges, milo by the shore, wiliwili on the dry lava side, ʻulu, kukui and ʻōhiʻa ʻai near water and people, and a banyan or
    two. Trees are instanced per kind in 64 m chunks. */
-function forestW(x,z){const e=Math.hypot((x-FOREST.x)/36,(z-FOREST.z)/52),m=masks(x,z);return smooth(1,.72,e+(fbm(x*.04+3,z*.04,2)-.5)*.35)*smooth(18,30,m.d)*(1-m.lava);}
+// forestW(x,z) is defined with the ground truth in 10-island.js
 window.__tF0=performance.now();const FLORA=(()=>{
   const R3=rng(9191),V3=THREE.Vector3,up=new V3(0,1,0),C=(h)=>new THREE.Color(h);
   // ── leaf textures: sprigs drawn on a canvas, with alpha ──

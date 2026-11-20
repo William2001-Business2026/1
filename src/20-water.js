@@ -1,16 +1,35 @@
 /* ───────────────────────── ocean ───────────────────────── */
+// the sea floor as the sea shader sees it: the whole island's grid, plus a finer window kept up to date around the camera
+const SEA_TEX=(()=>{
+  const G=TERRAIN_DATA.grids.island,n=G.nx*G.nz,d=new Uint16Array(n),toH=THREE.DataUtils.toHalfFloat;
+  for(let k=0;k<n;k++)d[k]=toH(G.h.a[k]*G.h.sc+G.h.of);
+  const farTex=new THREE.DataTexture(d,G.nx,G.nz,THREE.RedFormat,THREE.HalfFloatType);farTex.magFilter=farTex.minFilter=THREE.LinearFilter;farTex.needsUpdate=true;
+  const NN=512,S=2048,nd=new Uint16Array(NN*NN).fill(toH(-600));
+  const nearTex=new THREE.DataTexture(nd,NN,NN,THREE.RedFormat,THREE.HalfFloatType);nearTex.magFilter=nearTex.minFilter=THREE.LinearFilter;nearTex.needsUpdate=true;
+  const uNearO=TSL.uniform(new THREE.Vector2(-1e7,-1e7)),uNearS=TSL.uniform(S),uNearOn=TSL.uniform(0);
+  let busy=false,cx=1e9,cz=1e9;
+  function update(){const c=camera.position;if(busy||(Math.hypot(c.x-cx,c.z-cz)<320&&uNearOn.value))return;
+    busy=true;const x0=Math.round(c.x/64)*64-S/2,z0=Math.round(c.z/64)*64-S/2;
+    TERRAIN.job({job:'seaTex',x:x0,z:z0,s:S,N:NN},-1).then(m=>{nd.set(m.H);nearTex.needsUpdate=true;uNearO.value.set(x0,z0);uNearOn.value=1;cx=x0+S/2;cz=z0+S/2;busy=false;});}
+  return{far:{x0:G.x0,z0:G.z0,step:G.step,nx:G.nx,nz:G.nz},farTex,nearTex,uNearO,uNearS,uNearOn,update,get ready(){return uNearOn.value>0&&!busy;}};
+})();
 const waterMat=new THREE.MeshBasicNodeMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,fog:false});
 {
   const {min,Fn,If,Loop,texture,float,vec2,vec3,vec4,dot,mix,clamp,max,pow,exp,sin,cos,normalize,length,distance,reflect,abs,select,positionGeometry,cameraPosition,modelWorldMatrix,varyingProperty}=TSL;
-  const hTex=U.uHeight.value,vW=varyingProperty('vec3','vW');
-  const groundH=(p,vertex)=>{const q=p.div(SIZE).add(.5),t=texture(hTex,q);
-    return select(q.x.lessThan(0).or(q.x.greaterThan(1)).or(q.y.lessThan(0)).or(q.y.greaterThan(1)),float(-10),(vertex?t.level(0):t).r);};
+  const vW=varyingProperty('vec3','vW');
+  // the sea floor under the waves: the whole island's grid (100 m), and a fine window (4 m) streamed around the camera by the terrain workers
+  const groundH=(p,vertex)=>{const qn=p.sub(SEA_TEX.uNearO).div(SEA_TEX.uNearS),qf=p.sub(vec2(SEA_TEX.far.x0,SEA_TEX.far.z0)).div(SEA_TEX.far.step).add(.5).div(vec2(SEA_TEX.far.nx,SEA_TEX.far.nz));
+    const tn=texture(SEA_TEX.nearTex,qn),tf=texture(SEA_TEX.farTex,qf),hn=(vertex?tn.level(0):tn).r,hf=(vertex?tf.level(0):tf).r;
+    const inN=min(min(qn.x,float(1).sub(qn.x)),min(qn.y,float(1).sub(qn.y))).mul(SEA_TEX.uNearS),wN=sstep(16,64,inN).mul(SEA_TEX.uNearOn);
+    const outF=qf.x.lessThan(0).or(qf.x.greaterThan(1)).or(qf.y.lessThan(0)).or(qf.y.greaterThan(1));
+    return mix(select(outF,float(-600),hf),hn,wN);};
   waterMat.positionNode=Fn(()=>{ // the sea mesh only ever moves up and down, so local and world differ by a translation
     const w=modelWorldMatrix.mul(vec4(positionGeometry,1)).xyz;const d0=max(groundH(w.xz,true).negate(),0);
     const sh=pow(sin(wavePh(w.xz,d0)).mul(.5).add(.5),3);
     const dy=waveAmp(d0).mul(sh).add(sin(dot(w.xz,vec2(.045,.03)).add(U.uTime.mul(.5))).mul(.07).mul(sstep(3,14,d0)));
     vW.assign(w.add(vec3(0,dy,0)));
-    return positionGeometry.add(vec3(0,dy,0));
+    const cd=w.xz.sub(cameraPosition.xz),drop=dot(cd,cd).div(2*6371000);                 // the Earth curves away: the sea horizon is a real horizon
+    return positionGeometry.add(vec3(0,dy.sub(drop),0));
   })();
   const wh=Fn(([p,d])=>{const t=U.uTime;
     return vn(p.mul(.33).add(vec2(t.mul(.22),t.mul(.16)))).mul(float(1).sub(sstep(400,1500,d)))
@@ -48,8 +67,7 @@ const waterMat=new THREE.MeshBasicNodeMaterial({transparent:true,depthWrite:fals
         If(age.greaterThan(0).and(age.lessThan(5)),()=>{const r=distance(p,rp.xy),k=r.sub(age.mul(.9)).div(.12);
           col.addAssign(bio.mul(U.uBio).mul(exp(k.mul(k).negate()).add(exp(r.mul(r).mul(-3)).mul(.6))).mul(exp(age.mul(-1.1))).mul(4));});});
     });
-    const hz=skyRad(normalize(vec3(V.x.negate(),.015,V.z.negate())));
-    col.assign(mix(col,hz,sstep(500,4300,dist).mul(.92)));
+    col.assign(airHaze(col,vW.y,dist));
     const under=cameraPosition.y.lessThan(vW.y),cv=abs(dot(N,V));
     const uc=mix(U.uFogCol.div(U.uDay.add(.08).max(.05)).mul(.8),grey(skyBase(normalize(vec3(V.x.negate(),abs(V.y),V.z.negate())))).mul(.9).add(vec3(.02,.1,.1)),sstep(.55,.8,cv)).mul(U.uDay.add(.08));
     const nearTop=sstep(3,.4,cameraPosition.y.sub(vW.y)).mul(sstep(28,6,dist));      // swimming at the surface you can see down to the reef
@@ -57,9 +75,9 @@ const waterMat=new THREE.MeshBasicNodeMaterial({transparent:true,depthWrite:fals
     return select(under,vec4(ucF,.97),vec4(col,mix(alpha,max(min(alpha,.5),F),nearTop)));
   })();
 }
-function seaGeometry(){
-  const rad=[];for(let i=0;i<=240;i++)rad.push(56+i*.5);let r=176;while(r<4600){r*=1.085;rad.push(Math.min(r,4600));}
-  const SEC=400,pos=[],idx=[];
+function seaGeometry(){ // rings around the camera: half a metre apart close by, then wider and wider out to 160 km
+  const rad=[0];let r=.5;while(r<30){rad.push(r);r+=.5;}while(r<150){rad.push(r);r+=1;}while(r<160000){rad.push(r);r*=1.06;}rad.push(160000);
+  const SEC=320,pos=[],idx=[];
   for(const q of rad)for(let j=0;j<=SEC;j++){const a=j/SEC*Math.PI*2;pos.push(Math.cos(a)*q,0,Math.sin(a)*q);}
   for(let i=0;i<rad.length-1;i++)for(let j=0;j<SEC;j++){const a=i*(SEC+1)+j,b=a+SEC+1;idx.push(a,b,a+1,a+1,b,b+1);}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);return g;
@@ -204,15 +222,27 @@ const FALLS=(()=>{
     for(const o of[spray,strands,mist,rings]){o.instanceMatrix.needsUpdate=true;o.instanceColor.needsUpdate=true;}
     core.position.y=veil.position.y=0;}};
 })();
-// a cap of cloud drifting around the summit: soft puffs, facing the camera
-const SUMMIT=(()=>{const tex=canvasTex(128,128,(c,w,h)=>{const g=c.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);g.addColorStop(0,'rgba(255,255,255,.75)');g.addColorStop(.6,'rgba(255,255,255,.3)');g.addColorStop(1,'rgba(255,255,255,0)');c.fillStyle=g;c.fillRect(0,0,w,h);});
-  const m=new THREE.MeshBasicNodeMaterial({map:tex,transparent:true,depthWrite:false,fog:false,opacity:.3}),N=40,im=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1),m,N);im.frustumCulled=false;scene.add(im);
-  const P=Array.from({length:N},(_,i)=>({a:i/N*6.28,r:8+Math.random()*34,y:PEAK_H-12+Math.random()*22,s:16+Math.random()*20,sp:.008+Math.random()*.018}));const M=new THREE.Matrix4(),S=new THREE.Vector3(),V=new THREE.Vector3();
-  return{update(dt,dl){m.color.setRGB(.95*dl+.05,.95*dl+.05,.97*dl+.05);m.opacity=.22+.3*U.uCover.value;P.forEach((p,i)=>{p.a+=p.sp*dt;V.set(PEAK.x+Math.sin(p.a)*p.r,p.y+Math.sin(p.a*3+i)*2,PEAK.z+Math.cos(p.a)*p.r);
-    S.set(p.s*2.2,p.s*.55,1);M.compose(V,camera.quaternion,S);im.setMatrixAt(i,M);});im.instanceMatrix.needsUpdate=true;}};})();
+// trade-wind cloud: a belt of it on Mauna Kea's windward flanks below the inversion (about 1,600–2,600 m), and a few wisps near the summit
+const SUMMIT=(()=>{const tex=canvasTex(128,128,(c,w,h)=>{const g=c.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);g.addColorStop(0,'rgba(255,255,255,.8)');g.addColorStop(.55,'rgba(255,255,255,.32)');g.addColorStop(1,'rgba(255,255,255,0)');c.fillStyle=g;c.fillRect(0,0,w,h);});
+  const {texture,uv,vec4,vec3,float,positionWorld,cameraPosition,length}=TSL,uC=TSL.uniform(new THREE.Color(1,1,1)),uO=TSL.uniform(.3);
+  const m=new THREE.MeshBasicNodeMaterial({transparent:true,depthWrite:false,fog:false});
+  m.colorNode=(()=>{const t=texture(tex,uv());return vec4(airHaze(uC,positionWorld.y,length(positionWorld.sub(cameraPosition))),t.a.mul(uO));})();
+  const N=64,im=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1),m,N);im.frustumCulled=false;im.renderOrder=6;scene.add(im);
+  const rr=rng(31);
+  const P=Array.from({length:N},(_,i)=>{const belt=i<50,a=belt?(rr()-.5)*2.6+Math.atan2(1,-.45):rr()*6.28,r=belt?7000+rr()*9000:400+rr()*1600;
+    return{belt,a,r,y:belt?1600+rr()*900:PEAK_H+40+rr()*260,s:belt?900+rr()*1500:160+rr()*260,sp:(.004+rr()*.01)*(belt?.05:1),ph:rr()*6};});
+  const M=new THREE.Matrix4(),S=new THREE.Vector3(),V=new THREE.Vector3();
+  return{update(dt,dl){uC.value.setRGB(.95*dl+.04,.95*dl+.04,.97*dl+.05);uO.value=.38+.3*U.uCover.value;
+    P.forEach((p,i)=>{p.a+=p.sp*dt;const x=PEAK.x+Math.sin(p.a)*p.r,z=PEAK.z+Math.cos(p.a)*p.r;if(p.gy==null||i===(frameNo%N))p.gy=p.belt?Math.max(p.y,heightAt(x,z)+60):p.y;
+      V.set(x,p.gy+Math.sin(time*.05+p.ph)*30,z);S.set(p.s*2.4,p.s*.5,1);M.compose(V,camera.quaternion,S);im.setMatrixAt(i,M);});im.instanceMatrix.needsUpdate=true;
+    // mist: in the forest after rain, and inside the cloud belt (this replaces the old island's mist above its 74 m summit, set just before in the frame loop)
+    if(!U.uUnder.value){const c=camera.position,belt=smooth(1300,1800,c.y)*smooth(2900,2400,c.y)*smooth(.35,.7,GROUND.wetAt(c.x,c.z));
+      scene.fog.density=Math.max(U.uWet.value*forestW(c.x,c.z)*.022,belt*.012,U.uCover.value*.004);}}};})();
 function updateFresh(dt){
   {const sw=U.uSwell.value*.22;for(const m of FRESH.meshes)m.position.y=m.userData.y0+sw;}          // the river rises a little in heavy rain
   FALLS.update(dt);
+  water.position.x=Math.round(camera.position.x/4)*4;water.position.z=Math.round(camera.position.z/4)*4; // the sea's rings stay centred on you
+  TERRAIN.update();SEA_TEX.update();
 }
 
 /* far island: flat silhouette on the northern horizon */
@@ -223,10 +253,4 @@ const farMat=new THREE.MeshBasicNodeMaterial({fog:false});
   const haze=pow(float(1).sub(positionLocal.y.div(430).clamp(0,1)),2.2).mul(.55).add(.12);
   farMat.colorNode=vec4(mix(materialColor.rgb.mul(shade),grey(U.uHorizon),haze),1);
 }
-{
-  const s=new THREE.Shape(); s.moveTo(-1700,-5);
-  for(let i=0;i<=120;i++){const u=i/120,x=-1700+u*3400;const y=Math.pow(Math.sin(Math.PI*u),1.6)*430*(.82+.18*Math.sin(u*5+.6))+fbm(u*14,2,3)*38*Math.sin(Math.PI*u);s.lineTo(x,y);}
-  s.lineTo(1700,-5);
-  const m=new THREE.Mesh(new THREE.ShapeGeometry(s),farMat); m.position.set(350,0,-4350); scene.add(m);
-}
-
+// (the old far-island cut-out is gone: it stood in the open sea here)
