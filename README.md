@@ -164,7 +164,7 @@ Rain squalls blow through now and then, more often in the wet season.
   - ʻulu (breadfruit) near the lanai;
   - kukui and ʻōhiʻa ʻai (mountain apple) through the forest;
   - two great banyans with hanging aerial roots (these, the loulu and the hāpuʻu trunks are still built in code).
-- **Forest floor:** dark leaf litter, ferns and anthuriums, with little grass.
+- **Forest floor:** dark leaf litter, ferns and anthuriums, with fallen trunks, old stumps, mossy rocks and roots scattered under the trees. From the valley rim the forest shows as a canopy of crowns and shadowed gaps, in stands of dark ʻōhiʻa, brighter koa and pale kukui.
 - **Animals:** 15 kinds.
   - **Hunted for food with the bamboo spear:** puaʻa (wild pigs), kia (axis deer), kao (feral goats) on the mountain, moa (jungle fowl) and nēnē. They graze and wander. When they notice you they freeze, heads up, and watch; come closer and they bolt, gathering speed as they go. Bodies follow the slope, feet keep pace with the ground, and a clean strike drops the animal onto its side. Holding Shift lets you creep nearer and strike more surely. Butcher what you take (E) for pork, venison, goat meat or fowl, then roast it at the fire. Pork with taro or sweet potato in the pot makes kālua puaʻa.
   - **To watch:**
@@ -192,6 +192,8 @@ More trees from Sketchfab under [CC BY 4.0](https://creativecommons.org/licenses
 [Livistona Chinensis - Fan Palm](https://sketchfab.com/3d-models/free-livistona-chinensis-fan-palm-f59bab2a81244b869e1ca5aefd4ad94a) by AllQuad (loulu crown) and
 [Realistic HD Bottlebrush laevis](https://sketchfab.com/3d-models/realistic-hd-bottlebrush-laevis-120-17859f7b38784420bdefe734533b0263) by PlantCatalog (young ʻōhiʻa, for its red brush flowers).
 Each has a near and a far version, simplified and compressed.
+
+The forest floor's fallen trunk, stump, mossy rocks and roots are Poly Haven's dead_tree_trunk, tree_stump_01, rock_moss_set_01 and root_cluster_01 (CC0).
 
 The other scanned trees are Poly Haven's island_tree_01, island_tree_02, island_tree_03 and tree_small_02 (CC0), standing in for the Hawaiian species named in the game; the tree-fern crowns are fern_02. Leaves were thinned and simplified so a forest of them runs in a browser.
 

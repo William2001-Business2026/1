@@ -58,3 +58,7 @@ fauna/  (Creative Commons Attribution 4.0, https://creativecommons.org/licenses/
   hummer.glb       "Animated Hovering Flying Hummingbird Loop" by LasquetiSpice  https://sketchfab.com/3d-models/animated-hovering-flying-hummingbird-loop-102884713a2742ce829e368d2a790c45  (used as the ʻiʻiwi and ʻapapane, recoloured)
   Changes: textures resized to 512-1024 px WebP, geometry meshopt-compressed and some simplified, unused animations removed,
   display bases cut away; recoloured or tinted in the game, and legs swung in code where the model has no rig.
+
+clutter/  (Poly Haven, CC0 1.0, https://polyhaven.com)
+  dead_tree_trunk.glb, tree_stump_01.glb, rock_moss_set_01.glb, root_cluster_01.glb: the forest floor.
+  Simplified to 2,500-3,500 triangles each (the rock set's rocks are separate variants), 1K WebP textures, meshopt geometry.
