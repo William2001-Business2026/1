@@ -13,6 +13,9 @@ const SEA_TEX=(()=>{
     TERRAIN.job({job:'seaTex',x:x0,z:z0,s:S,N:NN},-1).then(m=>{nd.set(m.H);nearTex.needsUpdate=true;uNearO.value.set(x0,z0);uNearOn.value=1;cx=x0+S/2;cz=z0+S/2;busy=false;});}
   return{far:{x0:G.x0,z0:G.z0,step:G.step,nx:G.nx,nz:G.nz},farTex,nearTex,uNearO,uNearS,uNearOn,update,get ready(){return uNearOn.value>0&&!busy;}};
 })();
+// the river's mouth, for the sea shader: where the fresh water reaches the sea, which way it is going, and how far its plume carries
+const MOUTH=(()=>{const P=RIVER.P,n=P.length;let e=n-1;for(let i=RIVER.iPool;i<n;i++)if(RIVER.wl[i]<.05){e=i;break;}const a=P[Math.max(0,e-8)],b=P[e],l=Math.hypot(b[0]-a[0],b[1]-a[1])||1;
+  return{x:b[0],z:b[1],dx:(b[0]-a[0])/l,dz:(b[1]-a[1])/l,L:110};})();
 const waterMat=new THREE.MeshBasicNodeMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,fog:false});
 {
   const {min,Fn,If,Loop,texture,float,vec2,vec3,vec4,dot,mix,clamp,max,pow,exp,sin,cos,normalize,length,distance,reflect,abs,select,positionGeometry,cameraPosition,modelWorldMatrix,varyingProperty}=TSL;
@@ -47,7 +50,11 @@ const waterMat=new THREE.MeshBasicNodeMaterial({transparent:true,depthWrite:fals
     const N=normalize(vec3(h0.sub(wh(p.add(vec2(e,0)),dist)).mul(S).div(e).sub(ws.mul(np.x)),1,h0.sub(wh(p.add(vec2(0,e)),dist)).mul(S).div(e).sub(ws.mul(np.y))));
     const Rf0=reflect(V.negate(),N),Rf=vec3(Rf0.x,abs(Rf0.y),Rf0.z);
     const F=float(.02).add(pow(float(1).sub(max(dot(N,V),0)),5).mul(.98));
-    const body=mix(vec3(.07,.50,.47),vec3(.006,.07,.17),float(1).sub(exp(max(depth,0).mul(-.3)))).mul(U.uDay);
+    const body0=mix(vec3(.07,.50,.47),vec3(.006,.07,.17),float(1).sub(exp(max(depth,0).mul(-.3)))).mul(U.uDay);
+    // where the river meets the sea, its fresh, silty water fans out over the surf: a plume that drifts and frays at its edge
+    const mq=p.sub(vec2(MOUTH.x,MOUTH.z)),ma=dot(mq,vec2(MOUTH.dx,MOUTH.dz)),ml=dot(mq,vec2(-MOUTH.dz,MOUTH.dx)),mw=float(9).add(max(ma,0).mul(.55));
+    const mn=vn(p.mul(.06).add(vec2(U.uTime.mul(.02),0))).mul(.6).add(vn(p.mul(.21)).mul(.4)),plume=exp(ml.div(mw).pow(2).negate()).mul(exp(max(ma,0).div(MOUTH.L).negate())).mul(sstep(-12,4,ma)).mul(mn.mul(.7).add(.55)).mul(U.uSwell.mul(.5).add(.8)).min(1);
+    const body=mix(body0,vec3(.11,.11,.07).mul(U.uDay),plume.mul(.72));
     const refl=skyRad(Rf),sr=max(dot(Rf,U.uSunDir),0),far=sstep(50,600,dist);
     const col=mix(body,refl,F).add(U.uSunDisc.mul(pow(sr,420).mul(.2).add(pow(sr,mix(36,90,far)).mul(mix(.012,.05,far))))).toVar();
     const alpha=max(clamp(float(1).sub(exp(max(depth,0).mul(-1.5))),0,1),F).toVar();
@@ -105,13 +112,18 @@ const freshMat=new THREE.MeshBasicNodeMaterial({transparent:true,depthWrite:fals
     col.assign(mix(col,vec3(.5,.56,.58).mul(U.uDay.add(.08)),aFoam.mul(.45)));            // falling, churning water is white, not a mirror
     const streak=vn(vec2(q.x.mul(14),q.y.mul(.3).sub(t.mul(aFlow).mul(.9)))).mul(.6).add(vn(vec2(q.x.mul(31),q.y.mul(.8).sub(t.mul(aFlow).mul(1.6)))).mul(.4)); // long streaks down the flow
     const fine=vn(vec2(q.x.mul(41),q.y.mul(5).sub(t.mul(aFlow).mul(4.2))));
-    const foam=clamp(aFoam.mul(sstep(.38,.72,streak.mul(.75).add(fine.mul(.35)))),0,1);
+    const foam=clamp(aFoam.mul(sstep(.38,.72,streak.mul(.75).add(fine.mul(.35)))).add(pow(aFoam,3).mul(sstep(.3,.62,streak)).mul(.9)),0,1); // strong broken water (round rocks) stays white, in streaks
     col.assign(mix(col,vec3(.9,.93,.95).mul(U.uDay.add(.1)),foam.mul(.9)));
     return vec4(col,max(mix(mix(.5,.32,aFoam),.96,foam),F.mul(1.2)));})();                        // clear enough to see the stream bed, opaque where it froths
 }
 const FRESH={pool:null,fallAt:new THREE.Vector3(),mist:null,meshes:[]};
 {
-  const Rv=RIVER,P=Rv.P,n=P.length,COLS=5,pos=[],uvs=[],flow=[],foam=[],idx=[];let v=0;const keep=[];
+  const Rv=RIVER,P=Rv.P,n=P.length,COLS=11,pos=[],uvs=[],flow=[],foam=[],idx=[];let v=0;const keep=[];
+  // rocks in the stream: the current piles up in a pillow in front of each and trails a white wake behind it
+  const ROCKS=[];{const R=rng(911);for(let i=8;i<n-10;){i+=6+Math.floor(R()*11);if(i>=n-10)break;if(i>Rv.iTop-12&&i<Rv.iPool+14)continue;
+      if(Rv.wl[i]<.3||Math.hypot(P[i][0]-POOL.x,P[i][1]-POOL.z)<POOL.r+6)continue;const o=(R()*1.6-.8)*Rv.w[i],s=Rv.w[i]*(.18+R()*.28);ROCKS.push({i,o,r:s});
+      if(R()<.35){const o2=clamp(o+(R()<.5?-1:1)*s*2.2,-Rv.w[i],Rv.w[i]);ROCKS.push({i:i+1,o:o2,r:s*.7});}}}
+  FRESH.rocks=ROCKS;
   const inPool=(x,z)=>Math.hypot(x-POOL.x,z-POOL.z)<POOL.r-.6,inSpring=(x,z)=>Math.hypot(x-SPRING.x,z-SPRING.z)<2.2;
   let end=n-1;for(let i=Rv.iPool;i<n;i++)if(Rv.wl[i]<.05){end=i;break;} // the river's own surface ends where it meets the sea
   for(let i=0;i<=end;i++){
@@ -119,8 +131,13 @@ const FRESH={pool:null,fallAt:new THREE.Vector3(),mist:null,meshes:[]};
     const drop=(Rv.wl[Math.max(0,i-1)]-Rv.wl[Math.min(n-1,i+1)])/l;                                 // how steeply the water falls here
     if(i>0){const p0=P[i-1];v+=Math.hypot(P[i][0]-p0[0],P[i][1]-p0[1],Rv.wl[i]-Rv.wl[i-1]);}
     const hw=Rv.w[i]+.45,fo=i>=Rv.iTop-1?.12:smooth(.15,.9,drop)*.85*smooth(Rv.iTop-1,Rv.iTop-9,i); // the river runs smooth and glassy into the lip
-    for(let k=0;k<COLS;k++){const o=(k/(COLS-1)*2-1)*hw;pos.push(P[i][0]+nx*o,Rv.wl[i]+.03,P[i][1]+nz*o);uvs.push(k/(COLS-1)*hw/2.5,v);
-      flow.push(clamp(.35+drop*28,.35,4.5));foam.push(fo);}
+    const near=ROCKS.filter(r=>r.i>i-14&&r.i<i+4);
+    for(let k=0;k<COLS;k++){const o=(k/(COLS-1)*2-1)*hw;let f=fo,lift=0;
+      for(const r of near){const da=(i-r.i)*1.2,dl=o-r.o;                                         // metres downstream of the rock, and to its side
+        const sq=x=>x*x,pillow=Math.exp(-sq(dl/r.r))*Math.exp(-sq((da+r.r*.6)/(r.r*.9))),wake=da>0?Math.exp(-sq(dl/(r.r*(1+da*.18))))*Math.exp(-da/(r.r*4)):0;
+        f=Math.max(f,pillow*.95,wake*.8);lift+=pillow*.06;}
+      pos.push(P[i][0]+nx*o,Rv.wl[i]+.03+lift,P[i][1]+nz*o);uvs.push(k/(COLS-1)*hw/2.5,v);
+      flow.push(clamp(.35+drop*28,.35,4.5)*(1+f*.7));foam.push(f);}
     keep.push(!inPool(P[i][0],P[i][1])&&!inSpring(P[i][0],P[i][1])&&!(i>Rv.iTop&&i<Rv.iIn)); // the fall itself is FALLS' sheet
   }
   for(let i=0;i<end;i++){if(!keep[i]||!keep[i+1])continue;for(let k=0;k<COLS-1;k++){const a=i*COLS+k,b=a+COLS;idx.push(a,a+1,b,a+1,b+1,b);}}
@@ -133,6 +150,15 @@ const FRESH={pool:null,fallAt:new THREE.Vector3(),mist:null,meshes:[]};
     for(let i=0;i<ps.count;i++){const x=ps.getX(i)+cx,z=ps.getZ(i)+cz;uv.setXY(i,x/2.5,z/2.5);const f=smooth(foamR,0,Math.hypot(x-foamAt.x,z-foamAt.z));fl.push(.12+f*1.6);fm.push(f);}
     d.setAttribute('aFlow',new THREE.Float32BufferAttribute(fl,1));d.setAttribute('aFoam',new THREE.Float32BufferAttribute(fm,1));
     const m=new THREE.Mesh(d,freshMat);m.position.set(cx,y+.03,cz);m.renderOrder=1;scene.add(m);m.userData.y0=m.position.y;FRESH.meshes.push(m);return m;};
+  // the stream's rocks: the scanned boulder, wet and dark, half out of the water; you bump into the big ones
+  gltfLoader.loadAsync('assets/models/boulder.glb').then(gl=>{let src=null;gl.scene.updateMatrixWorld(true);gl.scene.traverse(o=>{if(o.isMesh&&!src)src=o;});if(!src||!ROCKS.length)return;
+    const geo=floatGeo(src.geometry).applyMatrix4(src.matrixWorld);geo.center();geo.computeBoundingSphere();const k=1/geo.boundingSphere.radius;geo.scale(k,k*.7,k);geo.computeBoundingSphere();
+    const m=src.material.clone();m.color.setRGB(.17,.17,.17);m.roughness=.38;                           // wet basalt
+    const im=new THREE.InstancedMesh(geo,m,ROCKS.length),M=new THREE.Matrix4(),Q=new THREE.Quaternion(),E=new THREE.Euler(),S=new THREE.Vector3(),T=new THREE.Vector3(),R=rng(77);
+    ROCKS.forEach((r,j)=>{const i=Math.min(n-2,r.i),a=P[Math.max(0,i-1)],b=P[i+1],tx=b[0]-a[0],tz=b[1]-a[1],l=Math.hypot(tx,tz)||1,x=P[i][0]-tz/l*r.o,z=P[i][1]+tx/l*r.o;
+      r.x=x;r.z=z;E.set(R()*.4,R()*6.28,R()*.4);Q.setFromEuler(E);S.set(r.r*(1+R()*.4),r.r*(.9+R()*.5),r.r*(1+R()*.3));T.set(x,Rv.wl[i]-r.r*.35,z);M.compose(T,Q,S);im.setMatrixAt(j,M);
+      if(r.r>.35)colliders.push({x,z,r:r.r*.85});});
+    im.castShadow=im.receiveShadow=true;im.raycast=()=>{};scene.add(im);}).catch(e=>console.warn('River rocks:',e));
   FRESH.pool=disc(POOL.x,POOL.z,POOL.r+.9,Rv.poolL,{x:FRESH.fallAt.x,z:FRESH.fallAt.z},4.5);
   disc(SPRING.x,SPRING.z,2.9,Rv.springL,{x:SPRING.x,z:SPRING.z},1.4);
 }

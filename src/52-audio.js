@@ -31,6 +31,10 @@ function initAudio(){
   AU.fallP=ctx.createPanner();AU.fallP.panningModel='equalpower';AU.fallP.distanceModel='inverse';AU.fallP.refDistance=7;AU.fallP.rolloffFactor=1.15;AU.fallP.connect(AU.amb);
   {const fp=FRESH.fallAt;if(AU.fallP.positionX){AU.fallP.positionX.value=fp.x;AU.fallP.positionY.value=fp.y+5;AU.fallP.positionZ.value=fp.z;}else AU.fallP.setPosition(fp.x,fp.y+5,fp.z);}
   AU.fallG=G(.6,AU.fallP);loop(AU.brown,filt('lowpass',620,.4,AU.fallG));loop(AU.pink,filt('bandpass',2400,.6,G(.35,AU.fallG)));
+  // close to the plunge: the crash of water hitting water, sharp and bright, which only the last few tens of metres let you hear
+  AU.splashP=ctx.createPanner();AU.splashP.panningModel='equalpower';AU.splashP.distanceModel='exponential';AU.splashP.refDistance=6;AU.splashP.rolloffFactor=1.6;AU.splashP.connect(AU.amb);
+  {const fp=FRESH.fallAt;if(AU.splashP.positionX){AU.splashP.positionX.value=fp.x;AU.splashP.positionY.value=fp.y+.5;AU.splashP.positionZ.value=fp.z;}else AU.splashP.setPosition(fp.x,fp.y+.5,fp.z);}
+  AU.splashG=G(.55,AU.splashP);loop(AU.white,filt('highpass',1800,.4,filt('peaking',4200,.8,AU.splashG)));loop(AU.pink,filt('bandpass',900,.9,G(.4,AU.splashG)));
   // the river's babble, and the wind's howl over the summit
   AU.riverG=G(0,AU.amb);AU.riverF=filt('bandpass',1500,1.1,AU.riverG);loop(AU.pink,AU.riverF);
   AU.howlG=G(0,AU.amb);AU.howlF=filt('bandpass',760,6,AU.howlG);loop(AU.pink,AU.howlF);
