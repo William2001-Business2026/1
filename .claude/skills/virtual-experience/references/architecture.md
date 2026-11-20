@@ -1,6 +1,8 @@
 # Architecture of the reference build (Hale Moku)
 
-`index.html` is one module script, about 3,600 lines, in labelled sections (`/* ───── name ───── */`). Keep that shape: one file, readable top to bottom, with no bundler. Comments explain *why*, in plain words.
+The game's code is in `src/`, one file per system, in labelled sections (`/* ───── name ───── */`). `index.html` holds the styles, the HUD markup and a small loader that fetches the parts **in a fixed order** and runs them as **one module**, so every part shares one scope, exactly as when it was a single script. No bundler and no imports between parts: a part simply uses what an earlier part defined. `window.__where(n)` turns a line number from an error into `file:line`. Ownership of each file, for team work, is in `src/README.md`. Comments explain *why*, in plain words.
+
+Adding a file: put it in `src/`, add it to `PARTS` in `index.html` at the point in the order where what it needs is already defined, and add it to `src/README.md`.
 
 ## Section order and what each one owns
 

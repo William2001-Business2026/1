@@ -1,6 +1,6 @@
 ---
 name: virtual-experience
-description: How to plan, build and extend a realistic browser 3D "virtual experience" held to the standard of Red Dead Redemption 2 and Ghost of Tsushima (an explorable world game like Hale Moku, the Hawaiian island) with the same thinking logic and core structure every time. One self-contained index.html on Three.js WebGPU with a WebGL 2 fallback; zones; terrain, water, weather, flora and fauna systems; survival, crafting and food loops; adaptive quality for 1080p and 60 FPS; headless visual testing; shipping phase by phase. Use this skill whenever the user wants to create, extend, fix, reshape or review a virtual experience, a 3D world, an island or zone, a realistic browser game, or any part of Hale Moku (terrain, grass, trees, animals, sea, diving, rain, sound, chat, performance, assets). Use it even if they only say "add X to the island", "make it more realistic", "make it feel like RDR2 or Ghost of Tsushima" or "it feels like a sticker".
+description: How to plan, build and extend a realistic browser 3D "virtual experience" held to the standard of GTA VI (the main benchmark), Red Dead Redemption 2 and Ghost of Tsushima (an explorable world game like Hale Moku, the Hawaiian island) with the same thinking logic and core structure every time. One self-contained index.html on Three.js WebGPU with a WebGL 2 fallback; zones; terrain, water, weather, flora and fauna systems; survival, crafting and food loops; adaptive quality for 1080p and 60 FPS; headless visual testing; shipping phase by phase. Use this skill whenever the user wants to create, extend, fix, reshape or review a virtual experience, a 3D world, an island or zone, a realistic browser game, or any part of Hale Moku (terrain, grass, trees, animals, sea, diving, rain, sound, chat, performance, assets). Use it even if they only say "add X to the island", "make it more realistic", "make it feel like GTA VI, RDR2 or Ghost of Tsushima" or "it feels like a sticker". It also covers running the work as an agent team (a lead, two builders and QA).
 ---
 
 # Virtual experience
@@ -9,7 +9,9 @@ A virtual experience is an explorable, realistic 3D world that runs in the brows
 
 The aim is consistency: the same way of thinking, the same structure, and the same standard of finish, whether the task is a new world or one more feature in an existing one.
 
-The project's reference games are **Red Dead Redemption 2** (a living, physical world) and **Ghost of Tsushima** (wind, beauty and composition). They set how the experience should feel. Borrow their qualities, never their content. `references/game-references.md` lists the qualities to aim for.
+The project's **main reference is GTA VI** (a realistic, dense open world: water, light, vegetation, wildlife and people that hold up close). **Red Dead Redemption 2** (a living, physical world) and **Ghost of Tsushima** (wind, beauty and composition) are the supporting references. They set how the experience should feel. Borrow their qualities, never their content. `references/game-references.md` lists the qualities to aim for.
+
+Large requests are run as an **agent team**: the lead plans, writes each phase's brief and merges; a *living-world* builder and an *environment* builder work in parallel on their own files; QA tests once both are done. `references/team.md` says how.
 
 ## The thinking logic
 
@@ -39,7 +41,7 @@ After each part, render screenshots headlessly from the places a player will sta
 
 - Does anything look **pasted on**: flat lighting, hard edges, wrong colour against the ground, floating, sitting on bare sand where it would not grow?
 - Is anything a smooth blob, a uniform colour, a straight line where nature is ragged, or a bright glow where it should be dim?
-- Would it hold up next to Red Dead Redemption 2 or Ghost of Tsushima? Name the biggest gap (too sparse, too smooth, too evenly lit, too quiet) and close it first.
+- Would it hold up next to GTA VI (first), Red Dead Redemption 2 or Ghost of Tsushima? Name the biggest gap (too sparse, too smooth, too evenly lit, too quiet) and close it first.
 
 Fix the weakest things before moving on. If it still is not good enough, say what remains weak.
 
@@ -53,7 +55,7 @@ Update the README (player-facing, plain words) and the asset credits, commit wit
 |---|---|
 | Rendering | Three.js WebGPU build (TSL shaders) with an automatic WebGL 2 fallback, and `?renderer=webgl` to force it. Vendored locally; no build step. |
 | Targets | 1920×1080 cap, 16:9 letterboxed, 60 FPS cap, never below 30. An Auto quality ladder steps down within about 2 s of slow frames and back up after about 8 s of smooth ones. |
-| Look | PBR materials from 2K scans, photographed HDRI skies blended through the day, dynamic shadows (cascaded on High), bloom and AO on High, a filmic grade. The benchmark is Red Dead Redemption 2 and Ghost of Tsushima: their qualities, never their content. |
+| Look | PBR materials from 2K scans, a sky and light that follow a real sun and moon, dynamic soft shadows, bloom and AO on High, a filmic grade. The benchmark is GTA VI first, then Red Dead Redemption 2 and Ghost of Tsushima: their qualities, never their content. |
 | Life | One shared wind moves grass, plants and trees. Animals have behaviour (wander, graze, flee, perch, soar). Sound changes by zone and by what is near. |
 | Ground truth | Every placement queries the same height and water functions, so nothing floats, sinks or grows in a river. |
 | Scale | Dense things (grass, coral, trees) are instanced in chunks, with distance detail and culling, and their count scales with quality. |
@@ -63,7 +65,8 @@ Update the README (player-facing, plain words) and the asset credits, commit wit
 ## Core structure
 
 ```
-index.html             the whole game: styles, HUD, and one module script in labelled sections
+index.html             styles, HUD markup, and a loader that runs src/ parts in order as one module
+src/                   the game's code, one file per system; src/README.md says who owns each file and the shared contracts
 chat.js, chat.css      optional multiplayer chat panel (Supabase, Google sign-in only)
 chat-config.js         public URL and publishable key only
 supabase/migrations/   database schema and row-level security
@@ -78,7 +81,8 @@ The order of sections in `index.html`, and the contract each one keeps, is in `r
 
 ## Where to look next
 
-- `references/game-references.md`: what to take from Red Dead Redemption 2 and Ghost of Tsushima, and how to use them when planning and judging.
+- `references/game-references.md`: what to take from GTA VI (main), Red Dead Redemption 2 and Ghost of Tsushima, and how to use them when planning and judging.
+- `references/team.md`: running a phase with a lead, two builders and QA: roles, briefs, worktrees, the shared browser lock, merging.
 - `references/architecture.md`: section-by-section map of the reference build, the shared functions, and the module pattern.
 - `references/world-systems.md`: how each system works and the design decisions behind it (terrain and zones, water, grass, trees, reef, animals, diving, climbing, weather, sound, items and food, saves, chat).
 - `references/realism-and-rendering.md`: the WebGPU/TSL rules and the realism fixes, including every pitfall already hit, with its cause and fix. Read it before writing shaders or loading models.

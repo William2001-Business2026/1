@@ -1,8 +1,22 @@
-# Reference games: Red Dead Redemption 2 and Ghost of Tsushima
+# Reference games: GTA VI (main), Red Dead Redemption 2 and Ghost of Tsushima
 
-These two games set the bar for how a virtual experience should **feel**. Use them as the yardstick when planning a feature and when judging screenshots: "would this hold up next to RDR2 or Ghost of Tsushima?"
+**GTA VI is the main benchmark**; RDR2 and Ghost of Tsushima support it. Use them as the yardstick when planning a feature and when judging screenshots: "would this hold up next to GTA VI?" first, then RDR2 and Ghost of Tsushima.
+
+Judge GTA VI only by what Rockstar has shown publicly (trailers, screenshots, the released game where available), and say so.
 
 Take their *qualities*, never their *content*. Do not reproduce their names, characters, story, maps, art, music, UI or assets, even renamed. Everything built is original and fits the experience's own setting (for Hale Moku, Hawaiʻi).
+
+## GTA VI: a realistic world that holds up close (main reference)
+
+| Quality | What it means for a build |
+|---|---|
+| Water that behaves | A sea with real swell, breaking surf, foam and wet sand; refraction and depth colour; reflections of sky and shore; wakes and splashes; rivers that bend around rocks and blend into the sea at their mouth. |
+| Light as the look | A real sun and moon on a 24-hour clock; long soft shadows at sunrise and sunset, short at noon; light that bounces (ambient occlusion and probes in a browser, since ray tracing is not available); eye adaptation; haze and light shafts; wet surfaces that shine. |
+| Dense, varied vegetation | The right species, many of them, close together, with ground clutter; no popping between levels of detail; lit and shadowed like the ground they stand on. |
+| Wildlife with lives | Species-correct animals with routines (feeding, drinking, resting), reactions to the player and to each other, feet that meet the ground, and their own sounds. |
+| People with detail | A realistic body, skin and clothes, feet placed on slopes, hands on what they hold, natural turns and transitions. |
+| Scale with density | A large streamed world where the area you are in is dense and the far land is still there, at real heights. |
+| Physical traces | Footprints and wet prints, things that fall and settle, structures that stand only if supported. |
 
 ## Red Dead Redemption 2: a living, physical world
 

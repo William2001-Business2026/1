@@ -10,10 +10,7 @@ Hale Moku is a 3D island you explore in the browser, in third person (or first p
 
 ## Running it
 
-The whole game is one page, `index.html`.
-
-- **Quick look:** double-click `index.html`. Opened this way it loads Three.js from the jsDelivr CDN, so it needs an internet connection.
-- **As it will be hosted:** serve the folder with any static web server, then open the address it prints. Served this way it uses the bundled copy of Three.js in `vendor/` and needs no internet.
+The game is one page, `index.html`, with its code in `src/` (one file per system, read in order and run as one script). Serve the folder with any static web server, then open the address it prints. It uses the bundled copy of Three.js in `vendor/` and needs no internet. Opening `index.html` straight from disk no longer works, because a browser will not let a page read its own files that way.
 
 ```bash
 python3 -m http.server 8000
