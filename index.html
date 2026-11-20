@@ -198,7 +198,7 @@
 /* The game's code lives in src/, one file per system (see src/README.md). They are read in this order and run as ONE module,
    exactly as if they were still one script: every part shares the same scope. No build step; the page must be served over
    http(s), as for the models. window.__where(line) turns a line number in an error into "file:line". */
-const PARTS=['00-core.js','10-island.js','12-materials.js','14-sky-lights.js','16-terrain.js','20-water.js','28-stream.js','30-vegetation.js','40-lanai-props.js','50-time-skies.js','52-audio.js','60-player.js','70-reel-menu.js','80-frame.js','90-world-state.js','92-hero.js','94-making-building.js','96-creatures.js','97-fixtures.js','98-weather.js','99-clock-hands-save.js','A0-sea-life.js','A2-forest.js','A4-fauna.js','A6-physics.js'];
+const PARTS=['00-core.js','10-island.js','12-materials.js','14-sky-lights.js','16-terrain.js','20-water.js','28-stream.js','30-vegetation.js','40-lanai-props.js','50-time-skies.js','52-audio.js','60-player.js','70-reel-menu.js','80-frame.js','90-world-state.js','92-hero.js','94-making-building.js','96-creatures.js','97-fixtures.js','98-weather.js','99-clock-hands-save.js','A0-sea-life.js','A2-forest.js','A4-fauna.js','A6-physics.js','A7-ragdoll.js'];
 try{
   const texts=await Promise.all(PARTS.map(p=>fetch('src/'+p,{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error(p+': '+r.status);return r.text();})));
   const map=[];let line=1,code='';

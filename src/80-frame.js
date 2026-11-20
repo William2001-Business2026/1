@@ -35,7 +35,8 @@ function update(dt){
     const playing=state==='play';
     // movement
     let moving=0;
-    if(player.mode==='walk'&&playing){
+    RAG.update(dt);
+    if(player.mode==='walk'&&playing&&!RAG.on){
       const f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0),s=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
       const h=heightAt(player.x,player.z),fw=freshAt(player.x,player.z),deep=Math.max(0,(fw!=null?fw:0)-h);
       let sp=(keys.ShiftLeft||keys.ShiftRight?1.35:3)*speedMul()*clamp(1-(deep-.5)/.9,.18,1);
@@ -77,7 +78,7 @@ function update(dt){
     else if(player.mode==='walk'){
       const fwy=freshAt(player.x,player.z);let gy=Math.max(groundAt(player.x,player.z),(fwy!=null?fwy:0)-1.12);const fy=floorY(player.x,player.z,player.y);if(fy!=null&&fy>gy)gy=fy;
       if(player.air){ // ballistic jump under gravity; land on ground, the deck or built floors
-        player.vy-=9.81*dt;player.y+=player.vy*dt;
+        player.vy-=9.81*dt;player.y+=player.vy*dt;if(player.vy<-10.8&&!RAG.on)RAG.start(); // falling fast: the body goes limp
         if(player.y<=gy&&player.vy<=0){const hit=-player.vy;player.y=gy;player.vy=0;player.air=false;player.land=Math.min(1,hit/5);
           const sf=fy!=null&&fy>=gy-.01?'wood':surfaceAt(player.x,player.z);if(sf==='water')SFX.splash(.4+.4*player.land);else SFX.step(sf,.6+.5*player.land);}
       }else if(gy<player.y-.35){player.air=true;player.vy=0;} // stepped off an edge: fall instead of gliding down

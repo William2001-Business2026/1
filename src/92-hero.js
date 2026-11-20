@@ -130,7 +130,8 @@ function applyView(){
 }
 function updateHero(dt,moving){
   if(!hero.ready)return;
-  const show=heroShown()&&player.zoom<.4;hero.root.visible=hero.socket.visible=show;if(!show)return;
+  const show=(heroShown()||RAG.on)&&player.zoom<.4;hero.root.visible=hero.socket.visible=show;if(!show)return;
+  if(RAG.on){hero.root.position.set(player.x,player.y,player.z);return;}                    // the physics has him
   const hfw=freshAt(player.x,player.z),deep=Math.max(0,(hfw!=null?hfw:0)-heightAt(player.x,player.z)),swim=player.uw||deep>1.05&&!player.air;
   hero.root.position.set(player.x,player.uw?player.y+.1:swim?(hfw!=null?hfw:water.position.y)-1.15:player.y,player.z);
   const k=1/Math.max(dt,1e-3),vx=(player.x-hero.px)*k,vz=(player.z-hero.pz)*k;hero.px=player.x;hero.pz=player.z;
@@ -158,6 +159,7 @@ function updateHero(dt,moving){
     if(/Walk_Loop|Jog_Fwd/.test(hero.cur))hero.acts[hero.cur].setEffectiveTimeScale(ts);}  // feet match the ground speed
   hero.mixer.update(dt);
   heroPost(dt,moving,swim);
+  RAG.blendPose();
   heroIK(dt,swim);
   if(hero.malo){const sp=Math.min(1,moving/3),sw=Math.sin(performance.now()/1000*7.5)*.25*sp;hero.malo.front.rotation.x=-sw-.15*sp;hero.malo.back.rotation.x=sw+.12*sp;}
   // the hand socket follows the right hand but stays upright, so a full cup or a lantern does not tip

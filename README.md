@@ -125,6 +125,12 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
 - **Physics:** [Rapier](https://rapier.rs) rigid bodies. Things you drop or throw (resources, the coconut, binoculars, ukulele) fall, bounce, tumble and roll on the terrain, deck, rocks, palm trunks and your buildings; coconuts and wood float, stones sink; walking into loose items pushes them. Bodies are removed once things come to rest. The cup and lantern are still set down upright, and buildings keep their own support rules.
 - **Shadows:** dynamic sun shadows. High uses cascaded shadow maps (three 2048 px maps out to 140 m): sharp up close and still present in the distance, plus lantern shadows. Medium and Low use one map that follows you.
 
+## Physics
+
+- **Falling:** fall hard (from about 6 m) and your body goes limp: arms, legs, head and torso tumble as real linked bodies, down whatever is below you, and come to rest. Then you get up, through a kneel. Fall a long way (over 25 m) and you are knocked out, and wake on the beach.
+- **Hunting:** a struck animal topples over and rolls down the slope as a real body, and lies where it stops.
+- **Things you drop or throw** fall, bounce, roll downhill, float or sink, and your body pushes them as you walk.
+
 ## Rain
 
 Rain squalls blow through now and then, more often in the wet season.

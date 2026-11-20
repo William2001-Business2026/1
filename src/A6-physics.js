@@ -50,7 +50,7 @@ function physGround(dt){
 }
 function physStep(dt){
   physGround(dt);
-  if(!PHYS.ready||!PHYS.bodies.size)return;const sea=water.position.y;
+  if(!PHYS.ready||(!PHYS.bodies.size&&!RAG.on))return;const sea=water.position.y;
   PHYS.me.setNextKinematicTranslation({x:player.x,y:player.y+.85,z:player.z});
   PHYS.acc=Math.min(PHYS.acc+dt,.1);
   while(PHYS.acc>=1/60){PHYS.acc-=1/60;
@@ -58,6 +58,7 @@ function physStep(dt){
       if(depth>-.05){const m=b.body.mass();if(b.float)b.body.addForce({x:0,y:m*9.81*1.5*clamp((depth+.05)/.15,0,1),z:0},true); // buoyancy
         b.body.setLinearDamping(b.float?2.2:3.5);b.body.setAngularDamping(2);}else{b.body.setLinearDamping(.15);b.body.setAngularDamping(b.ball?3:.5);}} // on land: rolling resistance in sand
     PHYS.world.step();}
+  if(RAG.on)RAG.pose();
   for(const [g,b] of PHYS.bodies){const t=b.body.translation(),r=b.body.rotation(),v=b.body.linvel();g.position.set(t.x,t.y,t.z);g.quaternion.set(r.x,r.y,r.z,r.w);
     if(b.vy<-1.6&&v.y>-.4&&t.y>sea){const sf=surfaceAt(t.x,t.z);sf==='wood'?SFX.knock():SFX.step(sf,clamp(-b.vy/6,.25,.8));} // it hit something
     if(!b.wet&&t.y<sea){b.wet=true;SFX.splash(clamp(-v.y/6,.25,.8));if(U.uBio.value>.1)U.uRipples.value[rippleI++%8].set(t.x,t.z,time);}
