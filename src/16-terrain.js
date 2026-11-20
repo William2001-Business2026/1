@@ -1,3 +1,4 @@
+const TUBE_HOLE={};
 /* ───────────────────────── terrain: the whole island, streamed in tiles around the camera ─────────────────────────
    A quadtree of square tiles over the island (the root is 327.68 km across, the smallest tiles 80 m). Near the camera tiles are
    small and fine (about 1.25 m between points at High), far away they are large and coarse, out to the far coast and both
@@ -96,6 +97,8 @@ const TERRAIN=(()=>{
 
   /* ── the material: four scanned materials as detail over the macro colour, morphing, curvature and haze ── */
   const mat=new THREE.MeshStandardNodeMaterial({roughness:1,metalness:0});
+  // where a lava tube's mouth goes through the cliff, there is no ground (set by 22-lavatube.js)
+  TUBE_HOLE.c=TSL.uniform(new THREE.Vector3(0,-1e5,0));TUBE_HOLE.a=TSL.uniform(new THREE.Vector3(0,0,1));TUBE_HOLE.r=TSL.uniform(0);
   const vY=varyingProperty('float','vTY'),vDist=varyingProperty('float','vTD');
   const aMat4=attribute('aMat','vec4'),vMat=aMat4.x,vForest=aMat4.y,vCol=attribute('color','vec3');
   mat.positionNode=Fn(()=>{
@@ -139,6 +142,8 @@ const TERRAIN=(()=>{
         moss=texture(LAYERS[2].t.a,wp.zy.div(2.6)).rgb.mul(abs(N0.x)).add(texture(LAYERS[2].t.a,wp.xy.div(2.6)).rgb.mul(abs(N0.z))).div(abs(N0.x).add(abs(N0.z)).add(.001)).div(.17),
         green=vec3(.024,.052,.017).mul(mix(vec3(1),moss,.7)).mul(mix(.55,1.3,clump)).mul(mix(.8,1.1,big));
       c.assign(mix(rock,green,veg));});return c;})();
+  {const {dot,length}=TSL,rel=wp.sub(TUBE_HOLE.c),al=dot(rel,TUBE_HOLE.a),rad=length(rel.sub(TUBE_HOLE.a.mul(al)));
+   mat.maskNode=rad.greaterThan(TUBE_HOLE.r).or(al.lessThan(-1.5)).or(al.greaterThan(9));}                // false (no ground) inside the mouth
   mat.colorNode=vec4(mix(mix(vCol.mul(detail).mul(macro),cliff,cl),canopy,farF).mul(mix(1,.82,wetM)).mul(mix(1,.68,U.uWet.mul(sstep(-.2,.4,wy)))).mul(mix(1,.45,puddle))
     .mul(mix(1,.78,sstep(.5,1,vMat).mul(float(1).sub(lavaM)).mul(near))).mul(mix(1,.5,spray)),1);
   const nr=blend((L,q)=>texture(L.t.n,q).rgb,vec3(0));

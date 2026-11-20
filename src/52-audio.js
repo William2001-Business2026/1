@@ -9,6 +9,9 @@ function initAudio(){
   AU.master=G(settings.master,ctx.destination);
   const comp=ctx.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=3;AU.uwF=ctx.createBiquadFilter();AU.uwF.type='lowpass';AU.uwF.frequency.value=20000;comp.connect(AU.uwF);AU.uwF.connect(AU.master);
   AU.amb=G(settings.amb,comp);AU.mus=G(settings.music,comp);AU.sfx=G(.9,comp);AU.musDuck=G(1,AU.mus);
+  // the lava tube's echo: a long, dark reverb, sent from the world's sounds and your own while you are inside
+  {const n=Math.floor(ctx.sampleRate*2.6),ir=ctx.createBuffer(2,n,ctx.sampleRate);for(let c=0;c<2;c++){const d=ir.getChannelData(c);for(let i=0;i<n;i++){const t=i/ctx.sampleRate;d[i]=(Math.random()*2-1)*Math.exp(-t*2.4)*(t<.012?t/.012:1)*(1-.6*Math.exp(-t*30));}}
+   AU.caveRev=ctx.createConvolver();AU.caveRev.buffer=ir;AU.caveSend=G(0,AU.caveRev);AU.caveRev.connect(comp);AU.amb.connect(AU.caveSend);AU.sfx.connect(AU.caveSend);}
   // reverb impulse
   const ir=ctx.createBuffer(2,sr*3.2,sr);for(let c=0;c<2;c++){const d=ir.getChannelData(c);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2.6);}
   AU.rev=ctx.createConvolver();AU.rev.buffer=ir;AU.revOut=G(.9,AU.musDuck);AU.rev.connect(AU.revOut);
@@ -75,6 +78,7 @@ function tone(f0,f1,gain,dec,type='sine',dest){
   const g=AU.G(0,dest||AU.sfx);o.connect(g);g.gain.setValueAtTime(gain,t);g.gain.exponentialRampToValueAtTime(.0001,t+dec);o.start(t);o.stop(t+dec+.05);
 }
 const SFX={
+  drip(v=1){if(!AU.ctx)return;tone(2300+Math.random()*1100,1500,.07*v,.06);},                    // a drop into a puddle, in the tube
   step(surf,vol){ if(!AU.ctx)return; const v=vol*(.8+Math.random()*.4);
     if(surf==='sand'){noiseBurst(AU.pink,'lowpass',700+Math.random()*300,.5,.22*v,.012,.16);noiseBurst(AU.white,'bandpass',2600,.8,.03*v,.03,.1);}
     else if(surf==='grass'){noiseBurst(AU.white,'bandpass',3200+Math.random()*800,.6,.05*v,.02,.14);noiseBurst(AU.pink,'lowpass',500,.5,.12*v,.01,.1);}
@@ -120,7 +124,7 @@ function scheduleAudio(dt,time){
   AU.windG.gain.setTargetAtTime((.03+.07*gust)*(1+4.5*alt),now,.6);AU.rustG.gain.setTargetAtTime((.006+.03*smooth(.4,.75,gust))*(1-.4*night)*(1-.75*alt),now,.5);
   AU.howlG.gain.setTargetAtTime(alt*alt*(.015+.1*smooth(.4,.85,gust)),now,.5);AU.howlF.frequency.setTargetAtTime(560+620*gust,now,.8);
   {const q=riverQ(player.x,player.z);let rv=0;if(q){const i=Math.floor(q.i),gr=Math.max(0,RIVER.wl[i]-RIVER.wl[Math.min(RIVER.P.length-1,i+2)])/2;rv=smooth(q.w+28,q.w,q.d)*clamp(.35+gr*25,.35,1.4);}
-   AU.riverG.gain.setTargetAtTime(.1*rv,now,.4);AU.riverF.frequency.setTargetAtTime(1150+700*vnoise(time*2.3,7),now,.08);
+   AU.riverG.gain.setTargetAtTime(.1*rv,now,.4);if(AU.caveSend){const c=TUBE.st.s>=0?.3+.7*TUBE.st.cave:0;AU.caveSend.gain.setTargetAtTime(c*.85,now,.3);AU.fallG.gain.setTargetAtTime(.6*(1-.8*TUBE.st.cave),now,.4);AU.splashG&&AU.splashG.gain.setTargetAtTime(.55*(1-.9*TUBE.st.cave),now,.4);}AU.riverF.frequency.setTargetAtTime(1150+700*vnoise(time*2.3,7),now,.08);
    if(rv>.05&&now>(T.burble||0)){T.burble=now+.05+Math.random()*.25;const o=c.createOscillator(),g=AU.G(0,AU.amb),t=now+.01,f=420+Math.random()*900; // water plopping over stones
      o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(f*1.9,t+.06);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.012*rv,t+.008);g.gain.exponentialRampToValueAtTime(.0005,t+.08);o.connect(g);o.start(t);o.stop(t+.1);}}
   {const ds=Math.hypot(player.x-SPRING.x,player.z-SPRING.z);if(ds<16&&now>(T.bub||0)){T.bub=now+.15+Math.random()*.6;const o=c.createOscillator(),g=AU.G(0,AU.amb),t=now+.01,f=300+Math.random()*400; // the spring welling up

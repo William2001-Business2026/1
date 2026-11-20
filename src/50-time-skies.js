@@ -59,7 +59,7 @@ function elevAt(s){
   if(s<.8)return lerp(-1.3,-12,(s-.53)/.27);
   return lerp(-12,-18,(s-.8)/.2);
 }
-let envElev=99;
+let envElev=99;const EXPO={base:1};
 /* ───────── photographed skies: loading, choosing and blending ─────────
    assets/sky/skies.json lists each sky with the range of sun elevations it covers (degrees), where its sun is
    (sunU, across the panorama), and how bright its sky is (Esky), so it can be scaled to the light of the moment. */
@@ -120,7 +120,7 @@ function applyTime(force){
   hemi.intensity=hemiBase=hI*(1-hw); scene.environmentIntensity=envBase=.55+.45*hw;
   {const nt=smooth(-3,-11,e),mf=.35+.65*S.illum*smooth(-2,10,S.moonEl);moon.intensity=.12*nt*mf;moon.color.setRGB(.55,.64,.9);moon.position.copy(S.moonDir).multiplyScalar(90); // the night sky's own glow; darker on a moonless night
    if(nt>0){hemi.intensity=hemiBase=Math.max(hemiBase,.14*nt*mf);hemi.color.lerp(new THREE.Color(.45,.55,.85),nt*.6);}}
-  renderer.toneMappingExposure=expo;
+  renderer.toneMappingExposure=EXPO.base=expo;
   farMat.color.setRGB(...hor).lerp(new THREE.Color(...zen),.45).multiplyScalar(.8);
   if(force)sun.shadow.needsUpdate=true;
   if(force||Math.abs(e-envElev)>.6){envElev=e;const n=pmrem.fromScene(envScene,0,1,300);if(envRT)envRT.dispose();envRT=n;scene.environment=n.texture;}

@@ -206,7 +206,7 @@ function heroIK(dt,swim){
   hero.root.updateMatrixWorld(true);
   if(IK.footH==null){if(!(hero.cur==='Idle_Loop'||hero.cur==='LOCO'&&(hero.idleW||0)>.95))return;IK.footH=Math.min(...IK.legs.map(l=>l.c.getWorldPosition(_ik.c).y-hero.root.position.y));} // ankle height above the sole, measured standing
   if(IK.w<.01){IK.drop=0;return;}
-  const base=hero.root.position.y,offs=IK.legs.map(l=>{l.c.getWorldPosition(_ik.c);const g=groundAt(_ik.c.x,_ik.c.z);l.g=g;l.n=tnorm(_ik.c.x,_ik.c.z);return clamp(g-base,-.6,.5);});
+  const base=hero.root.position.y,offs=IK.legs.map(l=>{l.c.getWorldPosition(_ik.c);const g=TUBE.floorAt(_ik.c.x,_ik.c.z,base)??groundAt(_ik.c.x,_ik.c.z);l.g=g;l.n=tnorm(_ik.c.x,_ik.c.z);return clamp(g-base,-.6,.5);});
   const drop=Math.min(0,...offs);IK.drop=lerp(IK.drop,drop*IK.w,1-Math.exp(-dt*14));
   hero.root.position.y=base+IK.drop;hero.root.updateMatrixWorld(true);
   IK.legs.forEach((l,i)=>{const H=l.a.getWorldPosition(_ik.a),K=l.b.getWorldPosition(_ik.b),A=l.c.getWorldPosition(_ik.c);

@@ -106,6 +106,7 @@ const NOTES={
   wana:'Wana, careful of the spines. The roe inside is rich.',opihi:'ʻOpihi, pried off the wet black rock where the waves break. A delicacy.',
   hee:'Heʻe hides in holes in the reef and changes colour to match it. Slow hands catch it.',ula:'Ula sit under ledges with their long feelers out.',
   aama:'ʻAʻama crabs run across the wet lava. Quick ones.',honu:'A honu glided past and let me swim beside it. They are protected; I would not take one.',
+  tube:'Behind the falls a lava tube runs into the mountain: round walls of glazed black rock, the floor where the last lava drained away, roots hanging from the roof and water dripping. It goes dark a long way in.',
   spring:'High on the mountain, behind fallen boulders, cold water wells up out of the rock. This is where the river begins.',
   flake:'Stone struck on the black rock splits. One edge comes away sharp.',
   digstick:'A stick ground on the rock takes a point. It opens the soil.',
