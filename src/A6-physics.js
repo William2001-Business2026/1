@@ -5,11 +5,9 @@
    Physics loads in the background; until it is ready, things are placed the old way. */
 import(new URL('vendor/rapier/rapier.mjs',document.baseURI).href).then(async mod=>{
   const R=mod.default||mod;await R.init();PHYS.R=R;const w=PHYS.world=new R.World({x:0,y:-9.81,z:0});
-  // the island's surface as a triangle mesh out to 170 m, on the terrain's own 1.25 m grid
-  const st=SIZE/SEG,c0=Math.round(SEG/2-170/st),N=Math.round(340/st),v=new Float32Array((N+1)*(N+1)*3),ix=new Uint32Array(N*N*6);let p=0,q=0;
-  for(let j=0;j<=N;j++)for(let i=0;i<=N;i++){const I=c0+i,J=c0+j;v[p++]=I*st-SIZE/2;v[p++]=TERR[J*(SEG+1)+I];v[p++]=J*st-SIZE/2;}
-  for(let j=0;j<N;j++)for(let i=0;i<N;i++){const a=j*(N+1)+i,b=a+N+1;ix[q++]=a;ix[q++]=b;ix[q++]=a+1;ix[q++]=a+1;ix[q++]=b;ix[q++]=b+1;}
-  w.createCollider(R.ColliderDesc.trimesh(v,ix).setFriction(.8));
+  // the island's surface: triangle-mesh tiles (64 m, a point every metre) built around you as you go, anywhere on the island,
+  // from the same heights as everything else (the terrain workers compute them; see physGround below)
+  PHYS.ground=new Map();
   w.createCollider(R.ColliderDesc.cuboid(LANAI.w/2,.03,LANAI.d/2).setTranslation(LANAI.x,DECK_Y-.03,LANAI.z).setFriction(.6)); // deck
   w.createCollider(R.ColliderDesc.cylinder(.02,.36).setTranslation(TABLE.x,TABLE.y+TABLE_TOP-.02,TABLE.z));                      // table top
   for(const pm of palms){const lx=pm.crown.x-pm.x,lz=pm.crown.z-pm.z;                                                          // leaning trunks
@@ -37,7 +35,21 @@ function physDrop(g,{vel,ball=0,float=false,onRest}={}){
   w.createCollider(d,body);PHYS.bodies.set(g,{body,float,onRest,ball:!!ball,t:0,still:0,vy:0,wet:false});return true;
 }
 function physForget(g){const b=PHYS.bodies.get(g);if(b){PHYS.world.removeRigidBody(b.body);PHYS.bodies.delete(g);}}
+// keeps ground tiles under you and under anything moving; tiles far from both are let go
+const PG={S:64,N:64,idx:null,want:new Set(),t:0};
+function physGround(dt){
+  if(!PHYS.ready)return;PG.t-=dt;if(PG.t>0)return;PG.t=.25;const R=PHYS.R,w=PHYS.world,S=PG.S,N=PG.N;
+  if(!PG.idx){const I=new Uint32Array(N*N*6);let q=0;for(let j=0;j<N;j++)for(let i=0;i<N;i++){const a=j*(N+1)+i,b=a+N+1;I[q++]=a;I[q++]=b;I[q++]=a+1;I[q++]=a+1;I[q++]=b;I[q++]=b+1;}PG.idx=I;}
+  const want=new Set(),add=(x,z,r)=>{for(let j=Math.floor((z-r)/S);j<=Math.floor((z+r)/S);j++)for(let i=Math.floor((x-r)/S);i<=Math.floor((x+r)/S);i++)want.add(i+','+j);};
+  add(player.x,player.z,72);for(const b of PHYS.bodies.values()){const t=b.body.translation();add(t.x,t.z,8);}
+  for(const k of want)if(!PHYS.ground.has(k)){const [i,j]=k.split(',').map(Number),g={col:null};PHYS.ground.set(k,g);
+    TERRAIN.job({job:'heights',x:i*S,z:j*S,s:S,N},1).then(m=>{if(PHYS.ground.get(k)!==g)return;const v=new Float32Array((N+1)*(N+1)*3);let p=0;
+      for(let b=0;b<=N;b++)for(let a=0;a<=N;a++){v[p++]=i*S+a*S/N;v[p++]=m.H[b*(N+1)+a];v[p++]=j*S+b*S/N;}
+      g.col=w.createCollider(R.ColliderDesc.trimesh(v,PG.idx).setFriction(.8));});}
+  for(const [k,g] of PHYS.ground)if(!want.has(k)){const [i,j]=k.split(',').map(Number);if(Math.hypot((i+.5)*S-player.x,(j+.5)*S-player.z)<260)continue;if(g.col)w.removeCollider(g.col,false);PHYS.ground.delete(k);}
+}
 function physStep(dt){
+  physGround(dt);
   if(!PHYS.ready||!PHYS.bodies.size)return;const sea=water.position.y;
   PHYS.me.setNextKinematicTranslation({x:player.x,y:player.y+.85,z:player.z});
   PHYS.acc=Math.min(PHYS.acc+dt,.1);

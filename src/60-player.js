@@ -1,5 +1,5 @@
 /* ───────────────────────── player ───────────────────────── */
-const player={x:START.x,z:START.z,y:0,yaw:Math.PI,pitch:0,mode:'walk',baseYaw:0,stride:0,bobT:0,trans:1,from:new THREE.Vector3(),zoom:0,vy:0,air:false,land:0};
+const player={x:START.x,z:START.z,y:0,yaw:START.yaw,pitch:0,mode:'walk',baseYaw:0,stride:0,bobT:0,trans:1,from:new THREE.Vector3(),zoom:0,vy:0,air:false,land:0};
 player.y=groundAt(player.x,player.z);
 let held=null,looked=null,state='title',locked=false,mouseDown=false,useAnim=0,rippleI=0;
 const keys={};
@@ -19,7 +19,7 @@ const DIVE={on:false,air:60,log:{},black:0,warned:false,moved:false,toldReef:fal
     else if(!player.uw)this.air=Math.min(max,this.air+dt*14);
     if(this.black>0){const b0=this.black;this.black=Math.max(0,this.black-dt);
       if(b0>2&&this.black<=2){for(const k in this.log)takeFrom(k,Math.min(have(k),this.log[k]));handDirty=true;
-        player.uw=false;player.x=START.x;player.z=START.z;player.y=groundAt(START.x,START.z);player.yaw=Math.PI;player.pitch=0;if(player.vel)player.vel.set(0,0,0);
+        player.uw=false;player.x=START.x;player.z=START.z;player.y=groundAt(START.x,START.z);player.yaw=START.yaw;player.pitch=0;if(player.vel)player.vel.set(0,0,0);
         this.end();this.air=max;note('blackout');zoneState.cur='beach';zoneState.next='beach';toast('You black out, and wake on the beach. What you gathered on that dive is gone.',6);}
       fadeEl.style.opacity=this.black>2?(4-this.black)/2:this.black/2;}else fadeEl.style.opacity=0;
     const show=player.uw||this.air<max-.5;airEl.classList.toggle('on',show&&state==='play');airFill.style.width=(100*clamp(this.air/max,0,1))+'%';airEl.classList.toggle('low',this.air<15);}
@@ -114,7 +114,7 @@ function interactE(){
 function restartEvening(){
   evening.s=0;evening.running=false;W.clock={phase:'golden',dayT:1,fast:false};applyTime(true);$('s-time').value=2;$('v-time').textContent='· golden hour';
   if(held){scene.add(held.group);held=null;}
-  player.mode='walk';player.x=START.x;player.z=START.z;player.yaw=Math.PI;player.pitch=0;player.trans=1;player.vy=0;player.air=false;player.y=groundAt(player.x,player.z);
+  player.mode='walk';player.x=START.x;player.z=START.z;player.yaw=START.yaw;player.pitch=0;player.trans=1;player.vy=0;player.air=false;player.y=groundAt(player.x,player.z);
   for(const s of slots)s.item=null;
   cup.sips=3;cup.rinsed=false;cup.water=false;coffee.visible=true;coffee.position.y=.078;cupG.position.copy(slots[0].pos);cupG.rotation.set(0,1,0);slots[0].item=cup;
   lantern.lit=true;lantern.hung=true;lanternG.position.set(HOOK.x,HOOK.y-.33,HOOK.z);lanternG.rotation.set(0,0,0);

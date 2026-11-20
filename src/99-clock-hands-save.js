@@ -1,8 +1,8 @@
 /* ───────── the slow clock: growth, hunger, tides, things that arrive ───────── */
-function shorePt(){for(let i=0;i<12;i++){const th=-.3+Math.random()*2.9,r=coastAt(th,MAP)-1-Math.random()*1.8,x=Math.sin(th)*r,z=Math.cos(th)*r,h=heightAt(x,z);if(h>.15&&h<1.2&&masks(x,z).lava<.2)return[x,z];}return null;}
+function shorePt(){return shoreSpot();} // a spot on the home beach at the waterline (10-island.js)
 function washUp(){const p=shorePt();if(!p)return;const q=Math.random(),k=q<.36?'stick':q<.64?'log':q<.82?'shell':'seaweed';if(countWorld(k)<(k==='stick'?6:4))spawn(k,p[0],p[1],1);}
 function underPalm(){const p=palms[Math.floor(Math.random()*palms.length)],a=Math.random()*6.28,q=1.2+Math.random()*1.8,x=p.x+Math.cos(a)*q,z=p.z+Math.sin(a)*q;return heightAt(x,z)>.5&&!onDeck(x,z)?[x,z]:null;}
-function lavaPt(){for(let i=0;i<20;i++){const x=-56-Math.random()*56,z=(Math.random()-.5)*112;if(masks(x,z).lava>.6&&heightAt(x,z)>.5)return[x,z];}return null;}
+function lavaPt(){return lavaSpot();}  // a spot on the rocky shore near home (10-island.js)
 function tick(dt,offline){
   const N=W.nodes;
   if((N.wash-=dt)<=0){N.wash=90;washUp();}
@@ -140,7 +140,7 @@ function fromSmallIsland(d){
 
 /* ───────── saving: browser storage twice over, plus a file you can keep ───────── */
 let fileHandle=null,saveT=0;
-function serialize(){return JSON.stringify({v:2,seen:W.seen,day:W.day,inv:W.inv,sel:W.sel,basket:W.basket,notes:W.notes,flags:W.flags,chick:W.chick,goat:W.goat,buff:W.buff,clock:W.clock,rainIn:W.rainIn,nodes:W.nodes,fires:W.fires,stamp:Date.now(),
+function serialize(){return JSON.stringify({v:3,seen:W.seen,day:W.day,inv:W.inv,sel:W.sel,basket:W.basket,notes:W.notes,flags:W.flags,chick:W.chick,goat:W.goat,buff:W.buff,clock:W.clock,rainIn:W.rainIn,nodes:W.nodes,fires:W.fires,stamp:Date.now(),
   items:W.items.map(o=>({kind:o.kind,n:o.n,x:+o.x.toFixed(2),z:+o.z.toFixed(2),...(o.y!=null?{y:+o.y.toFixed(2)}:{})})),
   plots:W.plots.map(p=>({x:p.x,z:p.z,soil:p.soil,moist:p.moist,crop:p.crop,g:p.g,over:p.over,health:p.health,last:p.last,dry:p.dry,wild:p.wild})),
   pieces:W.pieces.map(p=>({f:p.f,x:p.x,y:p.y,z:p.z,r:p.r,t:p.t,d:p.d}))});}
@@ -148,8 +148,8 @@ function idb(fn){try{const rq=indexedDB.open('halemoku',1);rq.onupgradeneeded=()
 function saveNow(){const s=serialize();try{localStorage.setItem(SAVE_KEY,s);}catch(e){}idb(st=>st.put(s,SAVE_KEY));
   if(fileHandle)fileHandle.createWritable().then(w=>w.write(s).then(()=>w.close())).catch(()=>{});}
 function loadSave(str){
-  let d;try{d=JSON.parse(str);}catch(e){return false;}if(!d||(d.v!==1&&d.v!==2))return false;
-  if(d.v===1)fromSmallIsland(d);
+  let d;try{d=JSON.parse(str);}catch(e){return false;}if(!d||(d.v!==1&&d.v!==2&&d.v!==3))return false;
+  if(d.v<3)migrateSave(d); // older maps → the real island (10-island.js)
   [...W.items].forEach(despawn);[...W.plots].forEach(removePlot);[...W.pieces].forEach(p=>removePiece(p,false));
   for(const k of['seen','day','inv','sel','basket','notes','flags','chick','goat','buff','clock','rainIn','nodes','fires'])if(d[k]!=null)W[k]=d[k];
   if(W.buff.until>nowS()+3600)W.buff.until=0;
