@@ -57,7 +57,7 @@ const TERRAIN=(()=>{
   const uK=uniform(1.7),uMorph=uniform(1);
   const conf=()=>{const g=activeGfx(),t=g.terrain||{high:{N:64,K:2.1,min:80},medium:{N:48,K:1.8,min:80},low:{N:32,K:1.5,min:160}}[g.name.toLowerCase().startsWith('high')?'high':g.name.toLowerCase().startsWith('low')?'low':'medium'];return t;};
   /* ── workers ── */
-  const wsrc=[`const clamp=${clamp};const lerp=${lerp};const smooth=${smooth};`,h2.toString(),vnoise.toString(),fbm.toString(),makeGround.toString(),terrainLook.toString(),
+  const wsrc=[`const clamp=(v,a,b)=>Math.min(b,Math.max(a,v)),lerp=(a,b,t)=>a+(b-a)*t,smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};`,h2.toString(),vnoise.toString(),fbm.toString(),makeGround.toString(),terrainLook.toString(),
   `function half(v){const f=new Float32Array(1),u=new Uint32Array(f.buffer);f[0]=v;const x=u[0],s=(x>>>16)&0x8000;let e=((x>>>23)&0xff)-127+15,m=x&0x7fffff;
     if(e<=0)return s;if(e>=31)return s|0x7c00;return s|(e<<10)|(m>>>13);}
   let G=null;
@@ -85,8 +85,8 @@ const TERRAIN=(()=>{
       self.postMessage({id:m.id,H},[H.buffer]);return;}
   };`].join('\n');
   const url=URL.createObjectURL(new Blob([wsrc],{type:'text/javascript'}));
-  const NW=clamp((navigator.hardwareConcurrency||4)-1,1,3),workers=[],pend=new Map();let jid=0;
-  for(let i=0;i<NW;i++){const w=new Worker(url);w.busy=0;w.onmessage=e=>{const m=e.data;if(m.ready)return;w.busy--;const cb=pend.get(m.id);pend.delete(m.id);if(cb)cb(m);};
+  const NW=Math.min(3,Math.max(1,(navigator.hardwareConcurrency||4)-1)),workers=[],pend=new Map();let jid=0;
+  for(let i=0;i<NW;i++){const w=new Worker(url);w.busy=0;w.onmessage=e=>{const m=e.data;if(m.ready)return;w.busy--;const cb=pend.get(m.id);pend.delete(m.id);if(cb)cb(m);pump();};
     w.onerror=e=>console.warn('Terrain worker error:',e.message);w.postMessage({init:TERRAIN_DATA});workers.push(w);}
   const queue=[];  // {pri, msg, cb}
   function run(msg,cb,pri=0){queue.push({pri,msg,cb});}
@@ -202,11 +202,11 @@ const TERRAIN=(()=>{
     if(frameT%60===0){let n=0;for(const t of tiles.values())if(frameT-t.used>600&&t.s<ROOT.s){drop(t);tiles.delete(t.key);n++;}}
     pump();
   }
-  return{update,job,mat,group,get shown(){return shown;},stats(){let tris=0;for(const t of shown)tris+=t.mesh.geometry.index.count/3;return{tiles:shown.length,tris,queued:queue.length,busy:workers.reduce((a,w)=>a+w.busy,0),cached:tiles.size};},
+  return{update,job,mat,group,get shown(){return shown;},stats(){let tris=0;for(const t of shown)tris+=t.mesh.geometry.index.count/3;return{tiles:shown.length,tris,queued:queue.length,busy:workers.reduce((a,w)=>a+w.busy,0),cached:tiles.size,nw:workers.length,pend:pend.size,jid,wb:workers.map(w=>w.busy)};},
     idle(){return queue.length===0&&workers.every(w=>w.busy===0);},flush(){gen++;for(const t of tiles.values())drop(t);tiles.clear();}};
 })();
 // test hooks: terrain streaming state, a free camera, and the numeric checks of the real-island phase
-window.__terrain={camOverride:null,stats:()=>TERRAIN.stats(),idle:()=>TERRAIN.idle()&&SEA_TEX.ready,
+window.__terrain={camOverride:null,job:(m,p)=>TERRAIN.job(m,p),stats:()=>TERRAIN.stats(),idle:()=>TERRAIN.idle()&&SEA_TEX.ready,
   checks(){const f=v=>Math.round(v*10)/10,mk=lonLatToWorld(-155.4681,19.8207),ml=lonLatToWorld(-155.6082,19.4753);
     const top=(c,r)=>{let b=-1e9;for(let dz=-r;dz<=r;dz+=10)for(let dx=-r;dx<=r;dx+=10)b=Math.max(b,heightAt(c.x+dx,c.z+dz));return f(b);};
     const zc={};for(let z=-1500;z<=4000;z+=25)for(let x=-2500;x<=2500;x+=25){const h=heightAt(x,z),k=zoneAt(x,z,h<0?h+.5:undefined);zc[k]=(zc[k]||0)+1;}
