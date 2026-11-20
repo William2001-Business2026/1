@@ -20,6 +20,11 @@ VIEWS='[["warm",0,88,0,-0.05],["start",0,88,0,-0.05],["pool",34,-62,0.5,0.25]]' 
 - Software rendering runs at under 10 FPS, so frame-rate numbers only compare builds with each other. With `fakegpu.js` each frame waits for the GPU, so only one or two game frames pass in 10 s: **game time barely moves**. To test behaviour over time (animals noticing and fleeing, a death fall, timers), call the system's tick directly with fixed steps, e.g. `for(i=0;i<60;i++)__hm.FAUNA.tick(.05,0)`, and note that systems skip things far from the *camera*, which does not move unless frames run.
 - Software WebGL can use 6–9 GB of system RAM after Begin; a test that dies with "Target crashed" may simply be out of memory. Set the quality to medium or low in every test, and compare against the previous build (worktree) before blaming a change.
 - To screenshot DOM over the WebGPU canvas (menus, captions), grab the canvas with `__grab()`, put it in a full-screen `<img>` under the UI, then use Playwright's page screenshot.
+- **Streamed worlds:** before judging a screenshot, wait until full detail is *drawn* under the camera (the drawn tile there is the
+  finest size), prime the life streamer (`STREAM.prime(x,z,ms)`) and skip fade-ins (`STREAM.timeShift`). Coarse stand-in tiles look
+  like slabs, holes and floating objects, and half-faded trees look like ghosts: those are test artefacts, not the build. Check the
+  geometry numerically too (tile vertices against `heightAt`), and never test from a spot inside a river channel or against a wall
+  (cast a few rays from the eye first).
 - Add a `seek` hook to anything timed (the home-screen reel has `REEL.seek(shot, t)`), so a test can jump to the moment it needs.
 - Skip the slow arrival transition by setting `player.trans=1` after clicking Begin.
 - For animals, read positions from `__hm.FAUNA.list` or `__hm.SEA.schools`, stand 2–3 m away, and set `sp.flee=0` so they do not run.

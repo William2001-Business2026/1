@@ -36,3 +36,9 @@ decide "done"; the branch name; and what to report. Builders follow this skill's
    frame cost against the previous build, and old saves still loading.
 3. If QA fails, the lead sends the failures back to the builder that owns them, then QA runs again.
 4. When QA passes: README and credits, commit, push the working branch and `main`, and report to the user.
+
+## When to run as one agent instead
+Subagents start cold and re-read the project every time they start or resume, and two builders in parallel spend a usage limit
+fast (on Hale Moku both stopped twice at the limit, mid-task, with nothing committed the first time). When the user's limit is
+tight, run the phase in the main session: merge any builder branches yourself, then build and QA in one place. Either way, tell
+builders to **commit after every working step**, so a stop loses nothing.
