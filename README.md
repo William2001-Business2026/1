@@ -103,12 +103,13 @@ Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds
 
 - **Sky and light:** after dusk, cool moonlight keeps the night dark but readable. Five photographed HDRI skies (day, golden hour, sunset, afterglow, dusk) cross-fade as the sun moves. Each is turned to match the sun and lights the island (image-based lighting); the computed starry sky takes over at night.
 - **Materials:** physically based (albedo, normal, roughness) scans for sand, wet sand, grassy ground, lava rock, deck boards and palm bark.
-- **Island:** about 250 m across and 310 m from north to south, with a lumpy grassy knoll, rolling ground inland, a lava coast to the west and 34 palms.
+- **Island:** the whole of Hawaiʻi Island (the Big Island) at its real size, about 10,430 km², and real heights from US Geological Survey elevation data: Mauna Kea rises to 4,207 m and Mauna Loa to 4,169 m, and both stand on the horizon from the coast. The ground streams in around you: full detail close by, coarser farther away, out to the sea horizon.
+- **Home:** you live in Waipiʻo Valley on the windward Hāmākua coast: a black-sand beach at the valley mouth, a river along the valley floor, rainforest, and Hiʻilawe falls dropping about 450 m into its plunge pool at the head of the valley. Trees, grass, the reef and animals grow around you wherever you go, by habitat, and stay put when you come back.
 - **Zones:** the island is divided into zones, and the zone's name appears as you walk into it.
-  - **Kahakai, the beach:** where you arrive, with coconuts and building.
-  - **Kuahiwi, the mountain:** a green, fluted mountain about 75 m high, with sea cliffs on its north side and a cap of cloud drifting around the summit.
+  - **Kahakai, the beach:** Waipiʻo's black-sand beach, where you arrive, with coconuts and building.
+  - **Kuahiwi, the mountain:** the steep, fluted valley walls and the uplands above them, rising toward Mauna Kea, with a belt of trade-wind cloud on its flanks.
     - **Climbing:** gentle slopes you walk. Steeper ones slow you down. Past about 43° you climb hand over hand while holding W, using the **Strength** bar. If it runs out, or you let go on very steep ground, you slide back down. Strength returns when you stand on easier ground.
-  - **Wailele, the waterfall pool:** a 14 m waterfall pours over a glassy lip and falls white down a gorge of wet, dark rock into a pool you can swim in. Spray bursts where it lands, foam spreads and rings ripple across the pool, and mist rolls downstream on the wind. With the sun behind you, look for a rainbow in the mist. From there a river winds east to the sea, and its current carries you downstream.
+  - **Wailele, the waterfall pool:** Hiʻilawe pours over the lip and falls white about 450 m down a sheer amphitheatre of dark basalt, moss and ferns into a pool you can swim in. Spray bursts where it lands, foam spreads and rings ripple across the pool, and mist rolls downstream on the wind. With the sun behind you, look for a rainbow in the mist. From there a river winds east to the sea, and its current carries you downstream.
   - **Ka Puna Huna, the hidden spring:** the river's source, high on the mountain behind fallen boulders. Finding it adds a page to the journal.
   - **Ke Kai, the open sea.**
   - **Lalo o ke Kai, under the sea:** a fringing reef rings the island 15–65 m offshore, 2–4 m down, then drops away to 18 m. See the Undersea section below.
@@ -175,7 +176,16 @@ Rain squalls blow through now and then, more often in the wet season.
 
 Skies, materials and the boulder are from [Poly Haven](https://polyhaven.com) under CC0 (public domain). Each folder's JSON file lists the exact source asset.
 
-The scanned trees are Poly Haven's island_tree_01, island_tree_02, island_tree_03, jacaranda_tree and tree_small_02 (CC0), standing in for the Hawaiian species named in the game; the tree-fern crowns are fern_02. Leaves were thinned and simplified so a forest of them runs in a browser.
+Elevation: USGS 3DEP via AWS Terrain Tiles (public domain for the United States; sea floor from the same tiles' bathymetry).
+
+More trees from Sketchfab under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), standing in for Hawaiian species:
+[Acacia tree](https://sketchfab.com/3d-models/acacia-tree-bb14c2bb679b4d0bb1c578a27e2ddabf) by evolveduk (koa),
+[Chinese Banyan (Ficus Microcarpa)](https://sketchfab.com/3d-models/chinese-banyan-ficus-microcarpa-2a0dbcdf8f5d48f5ad79987c7a8170ce) by Valery.Li (banyan),
+[Livistona Chinensis - Fan Palm](https://sketchfab.com/3d-models/free-livistona-chinensis-fan-palm-f59bab2a81244b869e1ca5aefd4ad94a) by AllQuad (loulu crown) and
+[Realistic HD Bottlebrush laevis](https://sketchfab.com/3d-models/realistic-hd-bottlebrush-laevis-120-17859f7b38784420bdefe734533b0263) by PlantCatalog (young ʻōhiʻa, for its red brush flowers).
+Each has a near and a far version, simplified and compressed.
+
+The other scanned trees are Poly Haven's island_tree_01, island_tree_02, island_tree_03 and tree_small_02 (CC0), standing in for the Hawaiian species named in the game; the tree-fern crowns are fern_02. Leaves were thinned and simplified so a forest of them runs in a browser.
 
 The character is [Human 3D model scanned with iPhone X](https://sketchfab.com/3d-models/human-3d-model-scanned-with-iphone-x-73e467dfc8a04914bb314a9410077858) by in3D_io (CC BY 4.0); its own animation was removed. The animations are from Quaternius's Universal Animation Library, retargeted onto the scan in the game, and the base character it was made for (Universal Base Characters, with its hair) is the fallback if the scan does not load. Both are from [quaternius.com](https://quaternius.com), CC0 as downloaded. See `assets/models/README.txt`; please don't extract them for use as standalone assets.
 

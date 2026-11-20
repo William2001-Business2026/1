@@ -146,10 +146,10 @@ const FALLS=(()=>{
   const {Fn,attribute,float,vec2,vec3,vec4,mix,max,min,pow,abs,dot,normalize,length,clamp,uv,acos,positionLocal,positionWorld,cameraPosition}=TSL;
   const Rv=RIVER,P=Rv.P,j=Rv.iTop,L=new THREE.Vector3(P[j][0],Rv.wl[j]+.03,P[j][1]),Bp=P[Rv.iIn];
   const d=new THREE.Vector2(Bp[0]-L.x,Bp[1]-L.z).normalize(),tx=P[j+1][0]-P[j-1][0],tz=P[j+1][1]-P[j-1][1],tl=Math.hypot(tx,tz),n=new THREE.Vector2(-tz/tl,tx/tl);
-  const H=L.y-Rv.poolL+.25,v0=1.6,G=9.8,hw0=Rv.w[j]+.85,ROWS=56,COLS=14;
+  const H=L.y-Rv.poolL+.25,v0=1.6,G=9.8,hw0=Math.max(Rv.w[j]+.85,(L.y-Rv.poolL)*.012),ROWS=56,COLS=14;
   // where the water is at a given drop and offset across: free fall from the lip, but never inside the rock
   const along=(o,drop,off)=>{const bx=L.x+n.x*o,bz=L.z+n.y*o,y=L.y-drop;let h=v0*Math.sqrt(2*drop/G);
-    for(let q=0;q<12;q+=.1){if(heightAt(bx+d.x*q,bz+d.y*q)<y-off){h=Math.max(h,q+.15);break;}}return h;};
+    for(let q=0;q<90;q+=q<12?.1:.5){if(heightAt(bx+d.x*q,bz+d.y*q)<y-off){h=Math.max(h,q+.15);break;}}return h;}; // far enough out for a 450 m face that leans back ~32 m
   const HT=new Float32Array((ROWS+1)*COLS); // the core sheet's distance out from the lip, by row and column, for the strands to follow
   const sheet=(layer)=>{const pos=[],uvs=[],aS=[],aT=[],idx=[],off=layer?.55:.32,grow=layer?1.25:1.08,prev=new Float32Array(COLS);
     for(let r=0;r<=ROWS;r++){const s=Math.pow(r/ROWS,1.35),drop=s*H,t=(Math.sqrt(v0*v0+2*G*drop)-v0)/G+drop*.04; // seconds since the lip (a touch slowed by the rock)

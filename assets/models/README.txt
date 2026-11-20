@@ -28,9 +28,16 @@ props/  (Poly Haven, CC0 1.0, https://polyhaven.com)
   binoculars, wooden_lantern_01, Rockingchair_01, lambis_shell, stone_01, bananas, wine_barrel_01,
   wooden_crate_01, planter_pot_clay, wicker_basket_02. 1K WebP textures, meshopt geometry.
 
+trees/ (Sketchfab, Creative Commons Attribution 4.0, https://creativecommons.org/licenses/by/4.0/)
+  koa.glb, koa_far.glb                  "Acacia tree" by evolveduk  https://sketchfab.com/3d-models/acacia-tree-bb14c2bb679b4d0bb1c578a27e2ddabf  (used as koa)
+  banyan.glb, banyan_far.glb            "Chinese Banyan (Ficus Microcarpa)" by Valery.Li  https://sketchfab.com/3d-models/chinese-banyan-ficus-microcarpa-2a0dbcdf8f5d48f5ad79987c7a8170ce
+  loulu_crown.glb, loulu_crown_far.glb  "[FREE] Livistona Chinensis - Fan Palm" by AllQuad  https://sketchfab.com/3d-models/free-livistona-chinensis-fan-palm-f59bab2a81244b869e1ca5aefd4ad94a  (the loulu's crown)
+  ohia_shrub.glb, ohia_shrub_far.glb    "Realistic HD Bottlebrush laevis (1/20)" by PlantCatalog  https://sketchfab.com/3d-models/realistic-hd-bottlebrush-laevis-120-17859f7b38784420bdefe734533b0263  (young ʻōhiʻa)
+  Changes: leaves thinned and simplified into near and far versions, WebP textures, meshopt geometry. Source and licence are also in each file's asset extras.
+
 trees/  (Poly Haven, CC0 1.0, https://polyhaven.com)
-  island_tree_01, island_tree_02, island_tree_03, jacaranda_tree, tree_small_02, each as <name>.glb (near) and
-  <name>_far.glb (distant). Stand-ins: jacaranda as koa; island_tree_01 as ʻōhiʻa and kukui; island_tree_02 as ʻulu
+  island_tree_01, island_tree_02, island_tree_03, tree_small_02, each as <name>.glb (near) and
+  <name>_far.glb (distant). Stand-ins: island_tree_01 as ʻōhiʻa and kukui; island_tree_02 as ʻulu
   and ʻōhiʻa ʻai; island_tree_03 as milo; tree_small_02 as wiliwili. Leaf cards thinned, enlarged and simplified
   (about 30-45k triangles near, 5-9k far), trunks simplified, 1K/512 px WebP textures, meshopt geometry.
 

@@ -11,7 +11,7 @@
 const STREAM=(()=>{
   const layers=[],pending=[],uEye=TSL.uniform(new THREE.Vector3()),uNow=TSL.uniform(0);
   const stats={frameMs:0,maxMs:0,overBudget:0,hitches:[],built:0,dropped:0,frames:0};
-  let budget=4,lastX=1e9,lastZ=1e9,boost=0;
+  let budget=4,lastX=1e9,lastZ=1e9,boost=0,timeShift=0; // timeShift: tests jump past fade-ins (headless game time barely moves)
   const hseed=(s,cx,cz)=>{let n=Math.imul(cx|0,73856093)^Math.imul(cz|0,19349663)^Math.imul(s|0,83492791);n=Math.imul(n^(n>>>13),1274126177);return(n^(n>>>16))|0;};
   const near=(L,cx,cz,x,z)=>{const x0=cx*L.size,z0=cz*L.size,dx=Math.max(x0-x,0,x-x0-L.size),dz=Math.max(z0-z,0,z-z0-L.size);return Math.hypot(dx,dz);};
   // a layer: {name, size (m), seed, radius() (m, may follow quality), build(ch) a generator, dispose(ch), frame(x,z) each frame, prio (lower first)}
@@ -29,9 +29,10 @@ const STREAM=(()=>{
     if(r.done){ch.state=2;ch.it=null;ch.born=uNow.value;L.built++;stats.built++;if(L.ready)L.ready(ch);return true;}return false;}
   return{layer,uEye,uNow,stats,layers,
     get budget(){return budget;},set budget(v){budget=v;},
+    set timeShift(v){timeShift=v;},
     // build at least `ms` of work right now (used while the title screen loads, and by tests)
     prime(x,z,ms=1500){boost=ms;this.update(x,z);boost=0;},
-    update(x,z){const t0=performance.now();uEye.value.set(x,camera.position.y,z);uNow.value=U.uTime.value;
+    update(x,z){const t0=performance.now();uEye.value.set(x,camera.position.y,z);uNow.value=U.uTime.value+timeShift;
       const moved=Math.hypot(x-lastX,z-lastZ);
       for(const L of layers){const R=L.radius();if(Math.hypot(x-L.lx,z-L.lz)>L.size*.2||Math.abs(R-L.lr)>.5)scan(L,x,z);}
       if(moved>.5){lastX=x;lastZ=z;for(const ch of pending)ch.d=near(ch.L,ch.cx,ch.cz,x,z);pending.sort((p,q)=>(p.d+p.L.prio*8)-(q.d+q.L.prio*8));}

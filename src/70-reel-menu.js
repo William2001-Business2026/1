@@ -14,13 +14,16 @@ const REEL=(()=>{
   // each shot: [from, to] camera positions and [from, to] points to look at, built when the shot starts (some follow the world)
   const SHOTS=[
     {z:'Kahakai',e:'the beach',l:'Gather coconuts and driftwood, and build a home where the sand meets the trees.',d:9,
-      mk:()=>[new V(-24,gy(-24,85,1.3),85),new V(-33,gy(-33,77,2.2),77),new V(-52,1.5,58),new V(-54,2.5,57)]},
+      mk:()=>{const fx=-Math.sin(START.yaw),fz=-Math.cos(START.yaw),sx=-fz,sz=fx,S=START; // low over the sand, drifting along the shore, looking out to sea
+        return[new V(S.x+sx*9,gy(S.x+sx*9,S.z+sz*9,1.3),S.z+sz*9),new V(S.x-sx*5+fx*3,gy(S.x-sx*5+fx*3,S.z-sz*5+fz*3,2),S.z-sz*5+fz*3),new V(S.x+fx*60-sx*20,1,S.z+fz*60-sz*20),new V(S.x+fx*60-sx*28,2,S.z+fz*60-sz*28)];}},
     {z:'Wao Nahele',e:'the forest',l:'Koa and ʻōhiʻa over tree ferns. Track wild pigs and deer, and learn every bird in your book.',d:9,
       mk:()=>openWalk('forest',6)}, // a slow walk in under the canopy, looking up
     {z:'Wailele',e:'the waterfall pool',l:'The river falls from the mountain into a pool you can swim in, then winds through the forest to the sea.',d:9.5,
-      mk:()=>{const f=FRESH.fallAt;return[new V(45,gy(45,-51,1.4),-51),new V(39,gy(39,-61,3.2),-61),new V(f.x,f.y+3,f.z),new V(f.x,f.y+7,f.z)];}},
+      mk:()=>{const f=FRESH.fallAt,P=POOL,ex=P.x-f.x,ez=P.z-f.z,el=Math.hypot(ex,ez)||1,ux=ex/el,uz=ez/el; // from the pool's way out, walking in, looking up the falls
+        const a=[P.x+ux*48,P.z+uz*48],b=[P.x+ux*30,P.z+uz*30];return[new V(a[0],gy(a[0],a[1],1.5),a[1]),new V(b[0],gy(b[0],b[1],2.6),b[1]),new V(f.x,f.y+40,f.z),new V(f.x,f.y+110,f.z)];}},
     {z:'Kuahiwi',e:'the mountain',l:'Climb the fluted ridges to the summit, where the wind is loud and the cloud sits low. Somewhere up here, the river begins.',d:10,
-      mk:()=>[new V(PEAK.x+70,PEAK_H*.55,PEAK.z+95),new V(PEAK.x+38,PEAK_H*.92,PEAK.z+62),new V(PEAK.x,PEAK_H*.8,PEAK.z),new V(PEAK.x,PEAK_H+4,PEAK.z)]},
+      mk:()=>{const P=POOL,top=gy(P.x,P.z-900,0); // high over Waipiʻo's walls, up the valley toward Mauna Kea's real summit, 4,207 m, on the horizon
+        return[new V(P.x+120,Math.max(top,heightAt(P.x+120,P.z-1100))+420,P.z-1100),new V(P.x+60,Math.max(top,heightAt(P.x+60,P.z-500))+520,P.z-500),new V(PEAK.x,PEAK_H*.55,PEAK.z),new V(PEAK.x,PEAK_H*.62,PEAK.z)];}},
     {z:'Lalo o ke Kai',e:'under the sea',l:'Dive the reef for fish, octopus and urchins, among honu and reef sharks. Come up for air in time.',d:9,
       mk:()=>{const sc=SEA.schools[0],h=sc?sc.home:{x:-40,z:120,h:-5},top=Math.min(-1,h.h+3.2);
         return[new V(h.x+9,top,h.z+6),new V(h.x+3.5,Math.min(-1,h.h+2.2),h.z+2),new V(h.x,h.h+1,h.z),new V(h.x-1,h.h+1.4,h.z-1)];}},

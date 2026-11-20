@@ -235,12 +235,13 @@ const GRASS=(()=>{
     d.position.set(x,h+s*.15,z);d.rotation.set(R()*6,R()*6,R()*6);d.scale.set(s*(1+R()*.5),s*1.2,s*(1+R()*.5));d.updateMatrix();rocks.setMatrixAt(i++,d.matrix);colliders.push({x,z,r:s*.95});}
   // boulders round the plunge pool and either side of the waterfall's lip
   {const out=Math.atan2(RIVER.P[RIVER.iPool+14][0]-POOL.x,RIVER.P[RIVER.iPool+14][1]-POOL.z),inn=Math.atan2(RIVER.P[RIVER.iIn][0]-POOL.x,RIVER.P[RIVER.iIn][1]-POOL.z);
-   const put=(x,z,s)=>{const h=Math.min(heightAt(x,z),heightAt(x+s*.7,z),heightAt(x-s*.7,z),heightAt(x,z+s*.7),heightAt(x,z-s*.7));d.position.set(x,h+s*.15,z);d.rotation.set(R()*6,R()*6,R()*6);d.scale.set(s*(1+R()*.5),s,s*(1+R()*.4));d.updateMatrix();rocks.setMatrixAt(i++,d.matrix);colliders.push({x,z,r:s*.9});};
+   const put=(x,z,s)=>{const hs=[heightAt(x,z),heightAt(x+s*.7,z),heightAt(x-s*.7,z),heightAt(x,z+s*.7),heightAt(x,z-s*.7)],h=Math.min(...hs);if(Math.max(...hs)-h>s*1.1)return; // too steep to hold a boulder: it would hang on the face
+     d.position.set(x,h+s*.15,z);d.rotation.set(R()*6,R()*6,R()*6);d.scale.set(s*(1+R()*.5),s,s*(1+R()*.4));d.updateMatrix();rocks.setMatrixAt(i++,d.matrix);colliders.push({x,z,r:s*.9});};
    for(let k=0;k<13;k++){const a=k/13*6.283,da=b=>Math.abs(Math.atan2(Math.sin(a-b),Math.cos(a-b)));if(da(out)<.5||da(inn)<.35)continue;const r=POOL.r+.6+R()*1.6;put(POOL.x+Math.sin(a)*r,POOL.z+Math.cos(a)*r,.9+R()*1.3);}
    const P=RIVER.P,j=RIVER.iTop,tx=P[j+1][0]-P[j-1][0],tz=P[j+1][1]-P[j-1][1],l=Math.hypot(tx,tz),nx=-tz/l,nz=tx/l,w=RIVER.w[j]+1.4;
    for(const sd of[-1,1])for(let k=0;k<2;k++)put(P[j-k*3][0]+nx*sd*(w+k*.8),P[j-k*3][1]+nz*sd*(w+k*.8),1.2+R()*.9);}
   while(i<ROCKS&&t<90000){t++;const x=-40-R()*96,z=(R()-.5)*220,mk=masks(x,z),h=heightAt(x,z);if(mk.lava<.45||h<-1.2)continue;
-    const s=.25+Math.pow(R(),2.2)*1.5;d.position.set(x,h+s*.15,z);d.rotation.set(R()*6,R()*6,R()*6);d.scale.set(s*(1+R()),s,s*(1+R()*.6));d.updateMatrix();rocks.setMatrixAt(i++,d.matrix);
+    const s=.25+Math.pow(R(),2.2)*1.5;if(tnorm(x,z).y<.7)continue;d.position.set(x,h+s*.15,z);d.rotation.set(R()*6,R()*6,R()*6);d.scale.set(s*(1+R()),s,s*(1+R()*.6));d.updateMatrix();rocks.setMatrixAt(i++,d.matrix);
     if(s>.95&&h>.2)colliders.push({x,z,r:s*.9});}
   rocks.count=i;rocks.castShadow=rocks.receiveShadow=true;scene.add(rocks);scene.userData.rocks=rocks;
   // swap in a scanned boulder (Poly Haven boulder_01, CC0) once it has loaded; the shaped blobs stay until then

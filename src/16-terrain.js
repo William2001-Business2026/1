@@ -128,9 +128,11 @@ const TERRAIN=(()=>{
       const ax=abs(N0.x),az=abs(N0.z),wsum=ax.add(az).add(.001);
       const tri=texture(rockT.a,wp.zy.div(5.5)).rgb.mul(ax).add(texture(rockT.a,wp.xy.div(5.5)).rgb.mul(az)).div(wsum).div(.011);
       const big=vn(vec2(wp.x.add(wp.z).mul(.035),wp.y.mul(.05))),fine=vn(wp.xz.mul(.6).add(wp.y.mul(.4)));
-      const rock=vec3(.05,.047,.043).mul(mix(vec3(1),tri,.8)).mul(mix(.55,1,vn(vec2(wp.x.add(wp.z).mul(.9),wp.y.mul(.04))))); // water stains run down
-      const veg=sstep(.5,.72,N0.y.add(big.sub(.5).mul(.55)).add(.55)).mul(sstep(-2,40,wy)),                                  // green wherever plants can hold on
-        green=vec3(.022,.05,.016).mul(mix(.6,1.35,fine)).mul(mix(.8,1.1,big));
+      const rock=vec3(.03,.03,.029).mul(mix(vec3(1),tri,.85)).mul(mix(.75,1,vn(vec2(wp.x.add(wp.z).mul(.35),wp.y.mul(.015))))); // faint water stains run down
+      const ledge=vn(vec2(wp.x.add(wp.z).mul(.12),wp.y.mul(.22))),clump=vn(wp.xz.mul(1.3).add(wp.y.mul(.9)));          // plants hold on along ledges, in clumps
+      const veg=sstep(.42,.52,N0.y.mul(.6).add(big.sub(.5).mul(.35)).add(ledge.mul(.45)).add(clump.mul(.18))).mul(sstep(-2,40,wy)),
+        moss=texture(LAYERS[2].t.a,wp.zy.div(2.6)).rgb.mul(abs(N0.x)).add(texture(LAYERS[2].t.a,wp.xy.div(2.6)).rgb.mul(abs(N0.z))).div(abs(N0.x).add(abs(N0.z)).add(.001)).div(.17),
+        green=vec3(.024,.052,.017).mul(mix(vec3(1),moss,.7)).mul(mix(.55,1.3,clump)).mul(mix(.8,1.1,big));
       c.assign(mix(rock,green,veg));});return c;})();
   mat.colorNode=vec4(mix(mix(vCol.mul(detail).mul(macro),cliff,cl),canopy,farF).mul(mix(1,.82,wetM)).mul(mix(1,.68,U.uWet.mul(sstep(-.2,.4,wy)))).mul(mix(1,.45,puddle))
     .mul(mix(1,.78,sstep(.5,1,vMat).mul(float(1).sub(lavaM)).mul(near))).mul(mix(1,.5,spray)),1);
@@ -204,7 +206,7 @@ const TERRAIN=(()=>{
     if(t.state===2)out.push(t);else if(t.state===0)request(t,-1); // a node with nothing to draw yet comes before everything
   }
   // every tile under and around a point, from the root down to the finest, requested together (nearest and finest first)
-  function prefetch(c){let lvl=0;for(let sz=ROOT.s;sz>=MIN;sz/=2,lvl++){const r=sz<=1280?1:0;
+  function prefetch(c){let lvl=0;for(let sz=ROOT.s;sz>=MIN;sz/=2,lvl++){const r=1; // the neighbours too, at every level: a tile only splits when all four of its children are ready
     for(let j=-r;j<=r;j++)for(let i=-r;i<=r;i++){const x=ROOT.x+(Math.floor((c.x-ROOT.x)/sz)+i)*sz,z=ROOT.z+(Math.floor((c.z-ROOT.z)/sz)+j)*sz,t=tileFor(x,z,sz,lvl);
       if(t.state===0&&!skipSea(t,c))request(t,-2+(Math.abs(i)+Math.abs(j))*.1);}}}
   function apply(){const c=conf();if(c.N!==N||c.min!==MIN){N=c.N;MIN=c.min;gen++;for(const t of tiles.values())drop(t);tiles.clear();}K=c.K;uK.value=K;}
