@@ -117,8 +117,13 @@ const TERRAIN=(()=>{
   const detail=mix(vec3(1),mix(vec3(dot(det,vec3(.2126,.7152,.0722))),det,.45),near);
   const macro=vn(wp.xz.mul(.045)).mul(.3).add(.85).mul(mix(1,vn(wp.xz.mul(.13)).mul(.5).add(.72),grassM)).mul(vn(wp.xz.mul(.0021)).mul(.3).add(.85));
   // far away there are no trees drawn: the forest shows as its canopy, dark green and lumpy
-  const canopy=vec3(.018,.045,.012).mul(vn(wp.xz.mul(.02)).mul(.5).add(.75)).mul(mix(1.25,.8,aMat4.w));
-  const farF=vForest.mul(sstep(500,1500,vDist));
+  // past the trees that are drawn, the forest is its canopy: crowns about 7 m across with dark gaps between them, each crown its own
+  // shade of green (a few olive, a few with ʻōhiʻa's red), lit by the bumps in the normal below; the vegetated cliffs too
+  const cover=max(vForest,sstep(.74,.4,normalWorldGeometry.y).mul(.85)).mul(sstep(1.5,6,vY)),farF=cover.mul(sstep(170,520,vDist));
+  const cp=wp.xz.mul(.075),crown=vn(cp).mul(.6).add(vn(cp.mul(2.3).add(9)).mul(.4)),cell=floor(cp.mul(1.3)),hue=hash21(cell),gap=sstep(.3,.62,crown);
+  const stand=vn(wp.xz.mul(.0055).add(17)),pale=sstep(.62,.8,vn(wp.xz.mul(.011).add(3)));                   // stands of one kind: dark ʻōhiʻa, brighter koa, pale silver kukui
+  const canopy=mix(mix(vec3(.012,.034,.01),vec3(.028,.058,.016),stand),vec3(.06,.07,.045),pale.mul(.7)).mul(mix(.8,1.2,hue)).mul(mix(.22,1.15,gap))
+    .add(vec3(.05,.004,.004).mul(sstep(.965,.99,hash21(cell.add(5)))).mul(gap)).mul(vn(wp.xz.mul(.02)).mul(.4).add(.8)).mul(mix(1.2,.85,aMat4.w));
   const spray=(()=>{const f=FRESH_SPOT;return sstep(26,8,length(wp.xz.sub(vec2(f.x,f.z))).add(vn(wp.xz.mul(.7)).mul(4))).mul(sstep(f.y+45,f.y-2,wy));})(); // the rock the spray keeps wet
   const puddle=sstep(.6,.7,vn(wp.xz.mul(.16).add(7)).add(vn(wp.xz.mul(.5)).mul(.15))).mul(sstep(.975,.995,normalWorldGeometry.y)).mul(sstep(.3,.9,U.uWet)).mul(float(1).sub(lavaM)).mul(sstep(.5,1.2,wy)).mul(near);
   // cliffs: rock projected from the side (a texture laid from above stretches into flat slabs on a 450 m wall), mostly hidden
@@ -139,9 +144,11 @@ const TERRAIN=(()=>{
   const nr=blend((L,q)=>texture(L.t.n,q).rgb,vec3(0));
   const ph0=U.uTime.mul(.7).add(vn(wp.xz.mul(.045)).mul(7));
   const gloss=clamp(sstep(.25,.07,wy).mul(sin(ph0.sub(1.3)).mul(.5).add(.5)),0,1);
-  mat.roughnessNode=mix(mix(mix(.95,nr.z,near),.8,cl),.12,gloss.mul(sandM).mul(.9)).mul(mix(1,.7,wetM)).mul(mix(1,.55,U.uWet)).mul(mix(1,.06,puddle)).mul(mix(1,.22,spray));
+  mat.roughnessNode=mix(mix(mix(mix(.95,nr.z,near),.8,cl),1,farF),.12,gloss.mul(sandM).mul(.9)).mul(mix(1,.7,wetM)).mul(mix(1,.55,U.uWet)).mul(mix(1,.06,puddle)).mul(mix(1,.22,spray));
   mat.normalNode=Fn(()=>{ // tangent space follows the ground: X along world X, Y along world Z
-    const N=normalWorldGeometry,T=normalize(vec3(1,0,0).sub(N.mul(N.x))),B=cross(T,N);
+    const N0n=normalWorldGeometry,e=.6,cq=wp.xz.mul(.075),ch=q=>vn(q).mul(.6).add(vn(q.mul(2.3).add(9)).mul(.4));      // the canopy's bumps, far away
+    const gx=ch(cq.add(vec2(e,0))).sub(ch(cq.sub(vec2(e,0)))),gz=ch(cq.add(vec2(0,e))).sub(ch(cq.sub(vec2(0,e))));
+    const N=normalize(mix(N0n,normalize(N0n.add(vec3(gx.negate(),0,gz.negate()).mul(.9))),farF)),T=normalize(vec3(1,0,0).sub(N.mul(N.x))),B=cross(T,N);
     const t=nr.xy.mul(2).sub(1).mul(near),tz=sqrt(max(float(1).sub(dot(t,t)),0));
     const n=normalize(T.mul(t.x).add(B.mul(t.y)).add(N.mul(tz)));
     return normalize(cameraViewMatrix.mul(vec4(mix(mix(n,N,cl),N,puddle),0)).xyz);
