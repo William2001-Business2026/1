@@ -100,11 +100,16 @@ function heroLoco(dt,v){
   hero.ph=((hero.ph||0)+v*dt/Math.max(.3,stride))%1;Wk.time=hero.ph*dW;J.time=hero.ph*dJ;I.time=(I.time+dt)%I.getClip().duration;
   I.setEffectiveWeight(wI*hero.locoIn);Wk.setEffectiveWeight(wW*hero.locoIn);J.setEffectiveWeight(wJ*hero.locoIn);hero.idleW=wI;return true;}
 // after the clips: the head follows where you look, the chest breathes, and the body banks into turns and leans with speed changes
+const _hl=new THREE.Vector3();
 function heroPost(dt,spd,swim){
   const B=hero.bones||(hero.bones={neck:hero.model.getObjectByName(hero.scan?'neck_011':'neck_01'),head:hero.model.getObjectByName(hero.scan?'head_012':'Head'),
     chest:hero.model.getObjectByName(hero.scan?'spine3_010':'spine_03')});
-  let d=player.yaw-hero.bodyYaw;d=Math.atan2(Math.sin(d),Math.cos(d));
-  const look=swim||player.air?0:smooth(2.5,1.7,Math.abs(d)),want=clamp(d,-1.15,1.15)*look,pitch=clamp(-player.pitch*.45,-.4,.35)*look;  // never over the shoulder
+  let d=player.yaw-hero.bodyYaw,lp=-player.pitch*.45;
+  const tgt=hero.reach&&hero.reach.t<hero.reach.dur?hero.reach.p:(looked&&(looked.group||looked.g)?(looked.group||looked.g).getWorldPosition(_hl):null); // what you are about to touch draws the eyes
+  if(tgt&&hero.root.position.distanceTo(tgt)<4.5){const hx=tgt.x-hero.root.position.x,hz=tgt.z-hero.root.position.z;d=Math.atan2(-hx,-hz)-hero.bodyYaw;
+    lp=Math.atan2(tgt.y-(hero.root.position.y+1.6),Math.hypot(hx,hz))*.8;}
+  d=Math.atan2(Math.sin(d),Math.cos(d))-(IK.look||0);                                       // the chest already turns part of the way
+  const look=swim||player.air?0:smooth(2.5,1.7,Math.abs(d)),want=clamp(d,-1.15,1.15)*look,pitch=clamp(lp,-.55,.35)*look;  // never over the shoulder
   hero.lookY=lerp(hero.lookY||0,want,Math.min(1,dt*5));hero.lookP=lerp(hero.lookP||0,pitch,Math.min(1,dt*5));
   const up=new THREE.Vector3(0,1,0),q=new THREE.Quaternion(),pq=new THREE.Quaternion(),wq=new THREE.Quaternion(),side=new THREE.Vector3();
   const turn=(b,yaw,pit)=>{if(!b||!b.parent)return;b.getWorldQuaternion(wq);b.parent.getWorldQuaternion(pq);
@@ -118,6 +123,11 @@ function heroPost(dt,spd,swim){
   hero.bank=lerp(hero.bank||0,swim||player.air?0:clamp(-w*spd*.05,-.2,.2),Math.min(1,dt*6));hero.lean=lerp(hero.lean||0,swim||player.air?0:clamp(acc*.025,-.08,.1),Math.min(1,dt*4));
 }
 function heroOneShot(name){if(!heroShown()||!hero.acts[name])return;hero.shot=name;hero.shotT=hero.acts[name].getClip().duration*.8;}
+/* reaching for things: turn to face them, bend or kneel to their height, and guide the right hand to them over the middle of the
+   move; the head looks at them first. Low on the ground he kneels, at waist height he bends, higher up he reaches. */
+function heroReach(p){if(!p||!heroShown())return;const y=p.y-player.y,clip=y<.45?'Fixing_Kneeling':y<1.25?'PickUp_Table':'Interact';
+  heroOneShot(clip);if(!hero.acts[clip])return;const dur=Math.min(1.6,hero.acts[clip].getClip().duration*.8);
+  hero.reach={p:p.clone(),t:0,dur,low:y<.45};hero.faceTo=Math.atan2(-(p.x-player.x),-(p.z-player.z));}
 // how each item sits in the right hand: x, y, z (metres, body space), then rotation x, y, z
 const HOLD3={cup:[0,-.04,.03,0,0,0],lantern:[0,-.24,.02,0,0,0],uke:[.02,-.02,.12,0,1.57,1.2],bino:[0,-.03,.05,0,0,0],coco:[0,-.03,.05,0,0,0]};
 function holdItem(it){const g=it.group;
@@ -142,6 +152,8 @@ function updateHero(dt,moving){
     if(!hero.turn&&Math.abs(d)>1.75)hero.turn=1;
     if(hero.turn){const st=Math.sign(d)*Math.min(Math.abs(d),dt*3.2);hero.bodyYaw+=st;if(Math.abs(d)<.12)hero.turn=0;}}
   else hero.turn=0;
+  if(hero.faceTo!=null&&spd<.3){let d=hero.faceTo-hero.bodyYaw;d=Math.atan2(Math.sin(d),Math.cos(d));hero.bodyYaw+=d*Math.min(1,dt*9);if(Math.abs(d)<.05)hero.faceTo=null;}else hero.faceTo=null;
+  if(hero.reach)hero.reach.t+=dt;
   hero.root.rotation.order='YXZ';hero.root.rotation.y=hero.bodyYaw;hero.root.rotation.x=player.uw?lerp(hero.root.rotation.x,player.pitch*.85*smooth(.2,1,moving),Math.min(1,dt*3)):-(hero.lean||0); // dive head-first; on land, lean with speed changes
   hero.root.rotation.z=hero.bank||0;
   if(hero.wasAir&&!player.air)hero.landT=.28;hero.wasAir=player.air;hero.landT=Math.max(0,hero.landT-dt);hero.shotT=Math.max(0,hero.shotT-dt);
@@ -192,7 +204,7 @@ function heroIK(dt,swim){
   if(!IK.legs.length)return;
   const want=player.mode==='walk'&&!player.air&&!swim&&!player.uw&&!player.climb?1:0;IK.w=lerp(IK.w,want,1-Math.exp(-dt*10));
   hero.root.updateMatrixWorld(true);
-  if(IK.footH==null){if(hero.cur!=='Idle_Loop')return;IK.footH=Math.min(...IK.legs.map(l=>l.c.getWorldPosition(_ik.c).y-hero.root.position.y));} // ankle height above the sole, measured standing
+  if(IK.footH==null){if(!(hero.cur==='Idle_Loop'||hero.cur==='LOCO'&&(hero.idleW||0)>.95))return;IK.footH=Math.min(...IK.legs.map(l=>l.c.getWorldPosition(_ik.c).y-hero.root.position.y));} // ankle height above the sole, measured standing
   if(IK.w<.01){IK.drop=0;return;}
   const base=hero.root.position.y,offs=IK.legs.map(l=>{l.c.getWorldPosition(_ik.c);const g=groundAt(_ik.c.x,_ik.c.z);l.g=g;l.n=tnorm(_ik.c.x,_ik.c.z);return clamp(g-base,-.6,.5);});
   const drop=Math.min(0,...offs);IK.drop=lerp(IK.drop,drop*IK.w,1-Math.exp(-dt*14));
@@ -211,4 +223,30 @@ function heroIK(dt,swim){
   // stood still, the chest turns toward where you look (up to about 45°)
   let d=player.yaw-hero.bodyYaw;d=Math.atan2(Math.sin(d),Math.cos(d));const look=player.mode==='walk'&&thirdView()&&(hero.spd||0)<.15?clamp(d,-.8,.8):0;
   IK.look=lerp(IK.look,look,1-Math.exp(-dt*4));if(Math.abs(IK.look)>.01)for(const b of IK.spine)boneTurnWorld(b,_ik.q.setFromAxisAngle(_ik.up,IK.look/IK.spine.length));
+  heroPosture(dt,swim);
+}
+// posture: lean into a climb and sit back going down; shift the weight now and then while standing; carry what you hold, and
+// put the hand on what you reach for
+const _ar={a:new THREE.Vector3(),b:new THREE.Vector3(),c:new THREE.Vector3(),t:new THREE.Vector3(),u:new THREE.Vector3(),v:new THREE.Vector3(),ax:new THREE.Vector3(),q:new THREE.Quaternion()};
+function heroPosture(dt,swim){
+  if(!IK.arm){const m=hero.root,n=hero.scan?['right_shoulder_018','right_elbow_019','right_wrist_020']:['upperarm_r','lowerarm_r','hand_r'];IK.arm=n.map(x=>m.getObjectByName(x));if(IK.arm.some(b=>!b))IK.arm=[];}
+  const fx=-Math.sin(hero.bodyYaw),fz=-Math.cos(hero.bodyYaw),rx=-fz,rz=fx,onFoot=player.mode==='walk'&&!player.air&&!swim&&!player.uw;
+  const g=onFoot?(heightAt(player.x+fx*.6,player.z+fz*.6)-heightAt(player.x-fx*.6,player.z-fz*.6))/1.2:0;
+  IK.slope=lerp(IK.slope||0,clamp(g>0?g*.42:g*.22,-.12,.3)*smooth(.1,1.2,hero.spd||0),1-Math.exp(-dt*5));        // uphill: chest forward; downhill: sit back a little
+  const sway=onFoot&&(hero.idleW||0)>.5?Math.sin(performance.now()/1000*.42)*.035*(hero.idleW||0):0;               // weight from foot to foot, slowly
+  if(IK.spine.length&&(Math.abs(IK.slope)>.002||Math.abs(sway)>.002)){const ax=_ar.ax.set(rx,0,rz);for(const b of IK.spine)boneTurnWorld(b,_ar.q.setFromAxisAngle(ax,-IK.slope/IK.spine.length));
+    boneTurnWorld(IK.spine[0],_ar.q.setFromAxisAngle(_ar.u.set(fx,0,fz),sway));}
+  if(IK.arm.length!==3)return;
+  // where the right hand should be: on the thing you reach for, or holding what you carry in front of you
+  let w=0;const T=_ar.t,base=hero.root.position;
+  if(hero.reach&&hero.reach.t<hero.reach.dur){const k=hero.reach.t/hero.reach.dur;w=Math.sin(Math.PI*clamp((k-.15)/.6,0,1));T.copy(hero.reach.p);}
+  else if(held&&onFoot&&held.kind!=='uke'){const lo=held.kind==='lantern';w=.85;T.set(base.x+fx*(lo?.18:.3)+rx*(lo?.26:.16),base.y+(lo?.82:1.12),base.z+fz*(lo?.18:.3)+rz*(lo?.26:.16));}
+  IK.armW=lerp(IK.armW||0,w,1-Math.exp(-dt*12));if(IK.armW<.01)return;
+  if(hero.reach&&hero.reach.t<hero.reach.dur&&IK.spine.length){const dy=hero.reach.p.y-base.y;                    // low down: bend the back toward it, as well as the knees
+    const bend=IK.armW*clamp((1.1-dy)*.6,0,.85);if(bend>.01)for(const b of IK.spine)boneTurnWorld(b,_ar.q.setFromAxisAngle(_ar.ax.set(rx,0,rz),-bend/IK.spine.length));}
+  const [S,E,H]=IK.arm,A=S.getWorldPosition(_ar.a),B=E.getWorldPosition(_ar.b),C=H.getWorldPosition(_ar.c);
+  T.lerpVectors(C,T,IK.armW);const l1=A.distanceTo(B),l2=B.distanceTo(C),dT=clamp(A.distanceTo(T),Math.abs(l1-l2)+1e-3,(l1+l2)*.995);
+  const u=_ar.u.subVectors(A,B),v=_ar.v.subVectors(C,B),cur=u.angleTo(v),des=Math.acos(clamp((l1*l1+l2*l2-dT*dT)/(2*l1*l2),-1,1));
+  const ax=_ar.ax.crossVectors(u,v);if(ax.lengthSq()<1e-8)ax.set(0,1,0);ax.normalize();boneTurnWorld(E,_ar.q.setFromAxisAngle(ax,des-cur));    // bend the elbow
+  H.getWorldPosition(C);boneTurnWorld(S,_ar.q.setFromUnitVectors(_ar.u.subVectors(C,A).normalize(),_ar.v.subVectors(T,A).normalize()));      // swing the arm to it
 }

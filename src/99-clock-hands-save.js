@@ -55,7 +55,7 @@ function sysClick(){
   if(bookOpen){closeBook();return;}
   const k=selKind();if(build.on){placePiece();return;}
   if(!k)return;const t=looked;
-  if(t&&t.use&&t.use(k))return;
+  if(t&&t.use&&t.use(k)){if(k!=='spear')heroReach(aimPt||((t.group||t.g)&&(t.group||t.g).getWorldPosition(new THREE.Vector3())));return;}
   if(aimPt&&player.mode==='walk'){const m=masks(aimPt.x,aimPt.z);
     if(m.lava>.5&&aimPt.y>.2&&tryRecipe(k,'@rock'))return;
     if(k==='digstick'&&!t&&till(aimPt))return;}

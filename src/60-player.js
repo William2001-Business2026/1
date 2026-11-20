@@ -55,7 +55,7 @@ function pickUp(it){
   if(held)putDown(); if(held)return;physForget(it.group);
   for(const s of slots)if(s.item===it)s.item=null;
   if(it.kind==='lantern')it.hung=false; if(it.kind==='coco')it.fly=false;
-  held=it;holdItem(it);heroOneShot('Interact');SFX.pickup();
+  held=it;holdItem(it);{const g=it.group||it.g;if(g)heroReach(g.getWorldPosition(new THREE.Vector3()));}SFX.pickup();
 }
 function putDown(){
   const it=held;if(!it)return;const g=it.group,dT=Math.hypot(player.x-TABLE.x,player.z-TABLE.z);
@@ -106,6 +106,7 @@ function standUp(){W.clock.fast=false;
 function interactE(){
   if(player.mode!=='walk'){standUp();return;}
   const it=looked;if(!it)return;
+  if(it.kind!=='chair'&&it.kind!=='hammock'&&!it.pickable){const g=it.group||it.g;heroReach(aimPt||(g&&g.getWorldPosition(new THREE.Vector3())));}
   if(it.e){it.e();return;}
   if(it.kind==='chair')sit();else if(it.kind==='hammock')lie();
   else if(it.kind==='radio'){it.mode=(it.mode+1)%RADIO_MODES.length;SFX.click();if(AU.radioDuck)AU.radioDuck.gain.setTargetAtTime(1,AU.ctx.currentTime,.1);}
