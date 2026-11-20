@@ -1,0 +1,3 @@
+
+# agent team worktrees (each builder works on its own branch there)
+.claude/worktrees/
