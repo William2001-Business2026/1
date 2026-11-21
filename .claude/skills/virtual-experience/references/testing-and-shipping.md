@@ -28,6 +28,7 @@ VIEWS='[["warm",0,88,0,-0.05],["start",0,88,0,-0.05],["pool",34,-62,0.5,0.25]]' 
 - **Fast logic tests:** disable the page's own frame loop (`window.requestAnimationFrame=()=>0`) and step the game yourself with
   `__hm.update(1/60)`, pausing every ten steps (`await new Promise(r=>setTimeout(r,30))`) so worker results (terrain, physics
   ground) can arrive. Render a frame for a picture with `__hm.render()` and grab it.
+- **A stale frame is not a missing object:** under software GPUs the page's own loop can go minutes without presenting a new frame once something new must compile, so `__grab()` returns an old image and a freshly added mesh seems not to draw. Before grabbing a shot of something you just added, stop the loop and render by hand: `requestAnimationFrame=()=>0`, then a few rounds of `__hm.update(1/60); await __hm.render();` with short waits between.
 - Add a `seek` hook to anything timed (the home-screen reel has `REEL.seek(shot, t)`), so a test can jump to the moment it needs.
 - Skip the slow arrival transition by setting `player.trans=1` after clicking Begin.
 - For animals, read positions from `__hm.FAUNA.list` or `__hm.SEA.schools`, stand 2–3 m away, and set `sp.flee=0` so they do not run.

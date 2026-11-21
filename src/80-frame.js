@@ -7,7 +7,7 @@ function update(dt){
   water.position.y=Math.sin(time*.55)*.045+Math.sin(time*.23)*.02;
 
   // the clock: the sun and moon move every frame; the sky's palette and lighting follow a few times a second
-  TUBE.update(dt);SKYCLOCK.tick(dt);clockLight+=dt;if(clockLight>(W.clock.fast?.05:.25)){clockLight=0;applyTime(false);syncSlider();}
+  TUBE.update(dt);FOOT.tick(dt);SKYCLOCK.tick(dt);clockLight+=dt;if(clockLight>(W.clock.fast?.05:.25)){clockLight=0;applyTime(false);syncSlider();}
 
   // lantern
   const fl=lantern.lit?1:0,flick=.82+.18*fbm(time*7,1.7,2)+.05*Math.sin(time*23);
@@ -68,7 +68,7 @@ function update(dt){
         if(!DIVE.toldReef){DIVE.toldReef=true;toast('Past the reef the current is too strong.',3);}}}
       }
       if(!player.air)player.stride+=moving*dt;
-      if(player.stride>.78){player.stride=0;const sf=floorY(player.x,player.z,player.y)!=null?'wood':TUBE.inside(player.x,player.z,player.y)?'rock':surfaceAt(player.x,player.z);SFX.step(sf,keys.ShiftLeft?.45:.8);
+      if(player.stride>.78){player.stride=0;const sf=floorY(player.x,player.z,player.y)!=null?'wood':TUBE.inside(player.x,player.z,player.y)?'rock':surfaceAt(player.x,player.z);SFX.step(sf,keys.ShiftLeft?.45:.8);FOOT.step();
         if(sf==='water'&&U.uBio.value>.1)U.uRipples.value[rippleI++%8].set(player.x,player.z,time);}
       player.pitch=thirdView()?clamp(player.pitch,-1.05,.85):clamp(player.pitch,-1.5,1.5);
     }else if(player.mode==='sit'){let d=player.yaw-player.baseYaw;d=clamp(Math.atan2(Math.sin(d),Math.cos(d)),-1.9,1.9);player.yaw=player.baseYaw+d;player.pitch=clamp(player.pitch,-1,1.2);}
