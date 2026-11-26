@@ -27,7 +27,7 @@ function rebuildPhysPieces(){
 function physDrop(g,{vel,ball=0,float=false,onRest}={}){
   if(!PHYS.ready||TUBE.inside(g.position.x,g.position.z,g.position.y))return false;physForget(g);   // in the lava tube the ground above is no floor: set things down by hand there
   const R=PHYS.R,w=PHYS.world;
-  const box=localBox(g,new Set()),sz=box.getSize(new THREE.Vector3()),c=box.getCenter(new THREE.Vector3());if(box.isEmpty())return false;
+  const box=localBox(g,new Set()),sz=box.getSize(new THREE.Vector3()).multiply(g.scale),c=box.getCenter(new THREE.Vector3()).multiply(g.scale);if(box.isEmpty())return false;   // a shaped piece is scaled
   const rnd=()=>(Math.random()-.5)*4,body=w.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(g.position.x,g.position.y,g.position.z)
     .setRotation({x:g.quaternion.x,y:g.quaternion.y,z:g.quaternion.z,w:g.quaternion.w}).setLinvel(vel?.x||0,vel?.y||0,vel?.z||0)
     .setAngvel({x:rnd(),y:rnd(),z:rnd()}).setCcdEnabled(true));

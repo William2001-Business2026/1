@@ -164,25 +164,30 @@ function thatchPanel(tilt){const g=new THREE.Group(),h=new THREE.Group();g.add(h
 for(const k of Object.keys(K))if(K[k].place)FORMS[k]={n:K[k].n,from:k,mk:()=>K[k].mk(),y:(k==='shellstring'||k==='lei')?2.2:0};
 const FORMS_OF={stick:['post','rail'],bamboo:['bpost','bbeam','channel'],plank:['floor','wall'],frond:['thatch','pitch'],stone:['block','path'],log:['bench']};
 const formsFor=k=>FORMS_OF[k]||(K[k]&&K[k].place?[k]:null);
-const build={on:false,fi:0,rot:0,dy:0,ghost:null,key:''};
+/* shaping: a post or a board is cut to the length you want (half to twice its usual), and a long one takes two pieces of wood */
+const SHAPE={post:'y',bpost:'y',rail:'x',bbeam:'x',channel:'x',floor:'x',wall:'x',bench:'x'};
+const shapeCost=(f,s)=>SHAPE[f]&&s>1.01?2:1;
+function shapeGroup(g,f,s,tl){if(SHAPE[f]&&s&&s!==1)g.scale[SHAPE[f]]=s;if(tl)g.rotation.x=tl;return g;}
+const build={on:false,fi:0,rot:0,dy:0,ghost:null,key:'',s:1,free:false,tl:0};
 const ghostMat=new THREE.MeshBasicMaterial({color:0x8fd8ff,transparent:true,opacity:.5,depthWrite:false});
 const FUEL={stick:150,log:420,plank:200,frond:70,bamboo:150};
 const DYES=k=>K[k]&&K[k].dye;
 function addPiece(d){
   const pc=Object.assign({r:0},d),F=FORMS[pc.f];pc.d=pc.d||{};pc.r=pc.r||0;
-  pc.g=F.mk();pc.g.position.set(pc.x,pc.y,pc.z);pc.g.rotation.y=pc.r*Math.PI/4;
+  pc.g=F.mk();pc.g.position.set(pc.x,pc.y,pc.z);pc.g.rotation.order='YXZ';pc.g.rotation.y=pc.r*Math.PI/4;shapeGroup(pc.g,pc.f,pc.s,pc.tl);
+  if(pc.q)pc.g.quaternion.fromArray(pc.q);                                                       // where it came to rest after falling
   if(pc.t)tintClone(pc.g,new THREE.Color().setRGB(...pc.t,THREE.SRGBColorSpace).multiplyScalar(1.6));
   const bb=new THREE.Box3().setFromObject(pc.g),sz=bb.getSize(new THREE.Vector3()),ct=bb.getCenter(new THREE.Vector3());
   const px=new THREE.Mesh(geo.box,proxyMat);pc.g.add(px);px.scale.set(Math.max(sz.x,.2),Math.max(sz.y,.2),Math.max(sz.z,.2));pc.g.worldToLocal(ct);px.position.copy(ct);px.quaternion.copy(pc.g.quaternion).invert();
   pc.ix={pc,get verb(){return pieceVerb(pc);},label(){return pieceLabel(pc);},e(){pieceE(pc);},use(k){return pieceUse(pc,k);}};
-  pc.g.userData.item=pc.ix;scene.add(pc.g);interact.push(pc.g);W.pieces.push(pc);
+  pc.g.userData.item=pc.ix;scene.add(pc.g);interact.push(pc.g);W.pieces.push(pc);PIECEPHYS.add(pc);
   if(pc.f==='torch'){pc.light=new THREE.PointLight(new THREE.Color(1,.58,.25),0,14,2);pc.light.position.y=2.25;pc.g.add(pc.light);}
   if(pc.f==='hive'){const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(48),3));pc.bees=new THREE.Points(pg,new THREE.PointsMaterial({color:0x2a2208,size:.035}));pc.bees.frustumCulled=false;pc.bees.visible=false;pc.g.add(pc.bees);}
   return pc;
 }
 function removePiece(pc,refund=true){
-  scene.remove(pc.g);let i=interact.indexOf(pc.g);if(i>=0)interact.splice(i,1);i=W.pieces.indexOf(pc);if(i>=0)W.pieces.splice(i,1);
-  if(refund){settling?spawn(FORMS[pc.f].from,pc.x+(R()-.5)*.4,pc.z+(R()-.5)*.4,1):give(FORMS[pc.f].from,1,pc.x,pc.z);
+  PIECEPHYS.remove(pc);scene.remove(pc.g);let i=interact.indexOf(pc.g);if(i>=0)interact.splice(i,1);i=W.pieces.indexOf(pc);if(i>=0)W.pieces.splice(i,1);
+  if(refund){const nb=shapeCost(pc.f,pc.s);settling?spawn(FORMS[pc.f].from,pc.x+(R()-.5)*.4,pc.z+(R()-.5)*.4,nb):give(FORMS[pc.f].from,nb,pc.x,pc.z);
     const d=pc.d;if(d.st)for(const s of d.st)spawn(s.kind,pc.x+(R()-.5)*.5,pc.z+(R()-.5)*.5,s.n);if(d.feed)for(const s of d.feed)spawn(s.kind,pc.x,pc.z+.4,s.n);
     if(d.eggs)spawn('egg',pc.x,pc.z+.3,d.eggs);if(d.fish)spawn('fish',pc.x,pc.z+.3,d.fish);if(d.hung)for(const h of d.hung)spawn(h.kind,pc.x,pc.z,1);if(d.ing)for(const k of d.ing)spawn(k,pc.x,pc.z+.3,1);}
   if(settling)return;if(refund)settle();recompute();
@@ -210,7 +215,7 @@ function pieceE(pc){const d=pc.d;
 const rackTime=pc=>300*((roofed(pc.x,pc.z)&&homeTier>=2)||Object.values(fireRT).some(f=>f.s.lit&&Math.hypot(f.x-pc.x,f.z-pc.z)<3.2)?.5:1);
 function drawHung(pc){if(pc.hg)pc.g.remove(pc.hg);pc.hg=new THREE.Group();(pc.d.hung||[]).forEach((h,i)=>{const m=K[h.kind].mk();m.position.set(-.5+i*.5,-.14,0);m.rotation.z=Math.PI/2;pc.hg.add(m);});pc.g.add(pc.hg);}
 function pieceUse(pc,k){const d=pc.d;
-  if(DYES(k)&&!isFoodTarget(pc)&&!(k==='chili'&&pc.f==='pot')){takeFrom(k,1);const t=K[k].dye;removePiece(pc,false);addPiece({f:pc.f,x:pc.x,y:pc.y,z:pc.z,r:pc.r,d:pc.d,t});recompute();note('dye');SFX.pour();return true;}
+  if(DYES(k)&&!isFoodTarget(pc)&&!(k==='chili'&&pc.f==='pot')){takeFrom(k,1);const t=K[k].dye;removePiece(pc,false);addPiece({f:pc.f,x:pc.x,y:pc.y,z:pc.z,r:pc.r,s:pc.s,tl:pc.tl,q:pc.q,d:pc.d,t});recompute();note('dye');SFX.pour();return true;}
   if(pc.f==='crate'){const s=W.inv[W.sel];d.st=d.st||[];let e=d.st.find(q=>q.kind===k);if(!e){if(d.st.length>=8)return true;e={kind:k,n:0};d.st.push(e);}const n=Math.min(s.n,40-e.n);e.n+=n;takeFrom(k,n);SFX.knock();return true;}
   if(pc.f==='trough'&&(CHICK_LIKES(k)||GOAT_LIKES(k))){d.feed=d.feed||[];const tot=d.feed.reduce((a,s)=>a+s.n,0);if(tot>=12)return true;let e=d.feed.find(q=>q.kind===k);if(!e){e={kind:k,n:0};d.feed.push(e);}e.n++;takeFrom(k,1);SFX.thud(.2);note('trough');return true;}
   if(pc.f==='barrel'&&k==='bowl'&&d.w>=1){d.w--;takeFrom('bowl',1);give('water',1);SFX.pour();return true;}
@@ -223,43 +228,49 @@ function placePiece(){
   const k=selKind(),fs=formsFor(k);if(!fs||!build.ghost||!build.ghost.visible)return;
   const f=fs[build.fi%fs.length],g=build.ghost.position;
   if(f==='fishtrap'&&heightAt(g.x,g.z)>-.15)return;
-  if(!supportedAt(f,g.x,g.y,g.z)){noiseBurst(AU.pink,'lowpass',260,.5,.06,.01,.1);return;}
-  takeFrom(k,1);const pc=addPiece({f,x:g.x,y:g.y,z:g.z,r:build.rot});
+  const sh=SHAPE[f]?build.s:1,cost=shapeCost(f,sh);if(have(k)<cost){toast('A piece that long takes two.');return;}
+  const stands=supportedAt(f,g.x,g.y,g.z,null,null,sh);
+  takeFrom(k,cost);const pc=addPiece({f,x:g.x,y:g.y,z:g.z,r:build.free?build.rot/3:build.rot,...(sh!==1?{s:sh}:{}),...(build.tl?{tl:build.tl}:{})});
+  if(!stands){PIECEPHYS.fall(pc);note('fall');}                                                    // nothing holds it: it falls, and lies where it lands
   if(f==='barrel')pc.d.w=0;SFX[k==='stone'?'clack':'knock']();recompute();if(!selKind()||selKind()!==k)build.on=false;
 }
 function updateGhost(){
   const k=selKind(),fs=build.on&&formsFor(k);
   if(!fs||!aimPt){if(build.ghost)build.ghost.visible=false;if(!fs)build.on=false;return;}
   const f=fs[build.fi%fs.length],key=f;
-  if(build.key!==key){if(build.ghost)scene.remove(build.ghost);build.ghost=FORMS[f].mk();build.ghost.traverse(o=>{if(o.isMesh){o.material=ghostMat;o.castShadow=false;}});scene.add(build.ghost);build.key=key;}
-  const x=Math.round(aimPt.x*2)/2,z=Math.round(aimPt.z*2)/2;
+  if(build.key!==key){if(build.ghost)scene.remove(build.ghost);build.ghost=FORMS[f].mk();build.ghost.rotation.order='YXZ';build.ghost.traverse(o=>{if(o.isMesh){o.material=ghostMat;o.castShadow=false;}});scene.add(build.ghost);build.key=key;}
+  build.ghost.scale.set(1,1,1);shapeGroup(build.ghost,f,SHAPE[f]?build.s:1,build.tl);
+  const x=build.free?aimPt.x:Math.round(aimPt.x*2)/2,z=build.free?aimPt.z:Math.round(aimPt.z*2)/2;
   let y=Math.max(groundAt(x,z),f==='fishtrap'?-.4:-9)+(FORMS[f].y||0)+build.dy*.25;
   const fl=floorY(x,z,y+.3);if(fl!=null&&!build.dy&&!(FORMS[f].y>1))y=Math.max(y,fl+(FORMS[f].y||0));
-  build.ghost.visible=true;build.ghost.position.set(x,y,z);build.ghost.rotation.y=build.rot*Math.PI/4;ghostMat.color.set(supportedAt(f,x,y,z)&&!(f==='fishtrap'&&heightAt(x,z)>-.15)?0x8fd8ff:0xff7060);
+  if(f==='raft'){const fw=freshAt(x,z),wy=fw!=null&&fw>heightAt(x,z)?fw:heightAt(x,z)<0?water.position.y:null;if(wy!=null)y=wy+.02;}   // a raft sits on the water
+  build.ghost.visible=true;build.ghost.position.set(x,y,z);build.ghost.rotation.y=(build.free?build.rot/3:build.rot)*Math.PI/4;
+  ghostMat.color.set(f==='fishtrap'&&heightAt(x,z)>-.15?0xff7060:supportedAt(f,x,y,z,null,null,SHAPE[f]?build.s:1)?0x8fd8ff:0xffb050);   // blue: it stands; amber: it will fall
 }
 
 /* ───────── structure: what holds what up, what blocks the way, what can be walked on ───────── */
 const DIM={post:[2.3,.06],rail:[.08,1],bpost:[2.6,.06],bbeam:[.1,1],channel:[.06,1],floor:[.06,.5],wall:[1,.5],thatch:[.14,.62],pitch:[.5,.62],block:[.3,.2],path:[.05,.24],bench:[.22,.65],crate:[.45,.4],barrel:[.8,.33],trough:[.25,.6],nestbox:[.36,.25],rawpot:[.25,.18],pot:[.25,.18],fishtrap:[.5,.4],hive:[.9,.35],mat:[.03,.7],shellstring:[.05,.06],lei:[.05,.16],torch:[1.7,.05]};
 const hangs=f=>f==='shellstring'||f==='lei';
-function supportedAt(f,x,y,z,self,okSet){
-  if(f==='fishtrap')return true;const hang=hangs(f);
+const dimOf=(f,s)=>{const D=DIM[f]||[.3,.3];return SHAPE[f]&&s&&s!==1?(SHAPE[f]==='y'?[D[0]*s,D[1]]:[D[0],D[1]*s]):D;};
+function supportedAt(f,x,y,z,self,okSet,s){
+  if(f==='fishtrap'||f==='raft')return true;const hang=hangs(f);
   if(!hang&&y-Math.max(groundAt(x,z),floorY(x,z,y+.2)||-99)<=.32)return true;
-  for(const q of W.pieces){if(q===self||(okSet&&!okSet.has(q)))continue;const D=DIM[q.f]||[.3,.3],qa=hangs(q.f)?q.y-.9:q.y,qb=hangs(q.f)?q.y:q.y+D[0];
-    if(Math.hypot(q.x-x,q.z-z)<=D[1]+(DIM[f]||[.3,.3])[1]+.22&&qb>=y-.4&&qa<=y+.2)return true;}
+  for(const q of W.pieces){if(q===self||q.fall||(okSet&&!okSet.has(q)))continue;const D=dimOf(q.f,q.s),qa=hangs(q.f)?q.y-.9:q.y,qb=hangs(q.f)?q.y:q.y+D[0];
+    if(Math.hypot(q.x-x,q.z-z)<=D[1]+dimOf(f,s)[1]+.22&&qb>=y-.4&&qa<=y+.2)return true;}
   return false;}
 let settling=false;
 function settle(){
   if(settling)return;settling=true;const ok=new Set();let ch=true,fell=0;
-  while(ch){ch=false;for(const p of W.pieces)if(!ok.has(p)&&supportedAt(p.f,p.x,p.y,p.z,p,ok)){ok.add(p);ch=true;}}
-  for(const p of[...W.pieces])if(!ok.has(p)){removePiece(p,true);fell++;}
+  while(ch){ch=false;for(const p of W.pieces)if(!ok.has(p)&&(p.fall||supportedAt(p.f,p.x,p.y,p.z,p,ok,p.s))){ok.add(p);ch=true;}}
+  for(const p of[...W.pieces])if(!ok.has(p)){PIECEPHYS.fall(p);fell++;}                     // what held it is gone: it comes down
   settling=false;if(fell){SFX.knock();setTimeout(()=>SFX.clack(),130);setTimeout(()=>SFX.thud(.5),220);}
 }
 let pieceCols=[],floorList=[];
-function floorY(x,z,py){let best=null;for(const p of floorList){const dx=x-p.x,dz=z-p.z,a=p.r*Math.PI/4,lx=dx*Math.cos(a)-dz*Math.sin(a),lz=dx*Math.sin(a)+dz*Math.cos(a);
-  if(Math.abs(lx)<=.56&&Math.abs(lz)<=.31){const t=p.y+.03;if(t<=py+.5&&(best==null||t>best))best=t;}}return best;}
+function floorY(x,z,py){let best=null;for(const p of floorList){if(p.fall||p.q)continue;const dx=x-p.x,dz=z-p.z,a=p.r*Math.PI/4,lx=dx*Math.cos(a)-dz*Math.sin(a),lz=dx*Math.sin(a)+dz*Math.cos(a),hw=p.f==='raft'?1:.56*(p.s||1),hd=p.f==='raft'?.8:.31;
+  if(Math.abs(lx)<=hw&&Math.abs(lz)<=hd){const t=p.y+(p.f==='raft'?.15:.03);if(t<=py+.5&&(best==null||t>best))best=t;}}return best;}
 function rebuildCols(){
-  pieceCols=[];floorList=W.pieces.filter(p=>p.f==='floor');
-  const line=(p,n,half,r)=>{const a=p.r*Math.PI/4;for(let i=0;i<n;i++){const t=n>1?(i/(n-1)*2-1)*half:0;pieceCols.push({x:p.x+Math.cos(a)*t,z:p.z-Math.sin(a)*t,r});}};
+  pieceCols=[];floorList=W.pieces.filter(p=>p.f==='floor'||p.f==='raft');
+  const line=(p,n,half,r)=>{const a=p.r*Math.PI/4;half*=p.s||1;for(let i=0;i<n;i++){const t=n>1?(i/(n-1)*2-1)*half:0;pieceCols.push({x:p.x+Math.cos(a)*t,z:p.z-Math.sin(a)*t,r});}};
   for(const p of W.pieces){const h=p.y-groundAt(p.x,p.z),f=p.f;
     if((f==='post'||f==='bpost'||f==='torch')&&h<1.2)pieceCols.push({x:p.x,z:p.z,r:.1});
     else if(f==='block'&&h<.6)pieceCols.push({x:p.x,z:p.z,r:.2});

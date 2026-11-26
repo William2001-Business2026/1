@@ -252,6 +252,7 @@ const GUIDE=(()=>{
       h+=found.length?found.map(k=>'<p>'+NOTES[k]+'</p>').join(''):'<p class="pencil">Nothing written yet.</p>';const id=IDEAS.filter(i=>i[1](n)&&!n[i[2]]);if(id.length)h+='<hr>'+id.map(i=>'<p class="pencil">'+i[0]+'</p>').join('');}
     else if(pg.z){const z=pg.z;h+=`<h3>${z.t} · ${z.s}</h3><p class="intro">${z.intro}</p><h5>Plants</h5>${z.flora.map(x=>entry(x,n)).join('')}<h5>Animals</h5>${z.fauna.map(x=>entry(x,n)).join('')}<h5>What you can do</h5><ul>${z.todo.map(t=>'<li>'+t+'</li>').join('')}</ul>`;}
     else if(pg.id==='making')h+=`<h3>Making things</h3><p class="intro">Hold one thing and use it on another (left click). Everything you can make:</p><ul>${making()}</ul>`;
+    else if(pg.html)h+=pg.html();
     else if(pg.id==='food')h+='<h3>Food and cooking</h3>'+food();
     else h+='<h3>Building and growing</h3>'+building();
     h+='</div><p class="foot pencil">← → or A D to turn the page · click a tab · J, E or Esc to close</p>';

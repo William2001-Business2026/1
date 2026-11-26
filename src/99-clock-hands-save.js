@@ -81,7 +81,9 @@ function sysStrum(){if(Math.hypot(goat.x-player.x,goat.z-player.z)<28)goat.calm=
 function sysKey(e){
   const k=selKind();
   if(e.code==='KeyB'&&!held&&formsFor(k)){build.on=!build.on;build.dy=0;return true;}
-  if(e.code==='KeyR'&&build.on){build.rot=(build.rot+1)%8;return true;}
+  if(e.code==='KeyR'&&build.on){if(e.shiftKey)build.tl=build.tl>1?-1.0472:build.tl+.2618;else build.rot=build.free?(build.rot+1)%24:(build.rot+1)%8;return true;}   // Shift: tilt 15°
+  if(e.code==='KeyT'&&build.on){build.free=!build.free;build.rot=build.free?build.rot*3:Math.round(build.rot/3)%8;toast(build.free?'Free placing: anywhere, turning by 15°':'On the half-metre grid',2.5);return true;}
+  if((e.code==='BracketLeft'||e.code==='BracketRight')&&build.on){build.s=clamp(build.s+(e.code==='BracketRight'?.25:-.25),.5,2);note('shape');return true;}
   if(e.code==='KeyF'&&build.on){build.fi++;build.dy=0;return true;}
   if(e.code==='KeyX'&&looked&&looked.pc){SFX.knock();removePiece(looked.pc);return true;}
   if(e.code==='KeyQ'){cycleSel(1);return true;}
@@ -90,7 +92,7 @@ function sysKey(e){
 addEventListener('wheel',e=>{if(state!=='play'||MAPBOOK.on)return;const d=e.deltaY>0?1:-1;if(build.on)build.dy=clamp(build.dy-d,-3,14);else cycleSel(d);},{passive:true});
 function sysHint(){
   const k=selKind();if(!k)return'';const s=W.inv[W.sel];let h=K[k].n+(s.n>1?'  ×'+s.n:'');
-  if(build.on)h+='   ·   Click to place   ·   R turn   ·   F shape   ·   Wheel height   ·   B done';
+  if(build.on){const f=(formsFor(k)||[])[build.fi%((formsFor(k)||[1]).length)];h+='   ·   Click to place   ·   R turn'+(build.tl?' ('+Math.round(build.tl*57.3)+'° tilt)':'')+'   ·   F piece'+(SHAPE[f]?'   ·   [ ] length ×'+build.s:'')+'   ·   T '+(build.free?'free':'grid')+'   ·   Wheel height   ·   B done';}
   else if(formsFor(k))h+='   ·   B to build';
   return h+'   ·   G to drop';
 }
@@ -144,7 +146,7 @@ let fileHandle=null,saveT=0;
 function serialize(){return JSON.stringify({v:3,seen:W.seen,day:W.day,inv:W.inv,sel:W.sel,basket:W.basket,notes:W.notes,flags:W.flags,chick:W.chick,goat:W.goat,buff:W.buff,clock:W.clock,rainIn:W.rainIn,nodes:W.nodes,fires:W.fires,map:W.map,stamp:Date.now(),
   items:W.items.map(o=>({kind:o.kind,n:o.n,x:+o.x.toFixed(2),z:+o.z.toFixed(2),...(o.y!=null?{y:+o.y.toFixed(2)}:{})})),
   plots:W.plots.map(p=>({x:p.x,z:p.z,soil:p.soil,moist:p.moist,crop:p.crop,g:p.g,over:p.over,health:p.health,last:p.last,dry:p.dry,wild:p.wild})),
-  pieces:W.pieces.map(p=>({f:p.f,x:p.x,y:p.y,z:p.z,r:p.r,t:p.t,d:p.d}))});}
+  pieces:W.pieces.map(p=>({f:p.f,x:p.x,y:p.y,z:p.z,r:p.r,t:p.t,d:p.d,...(p.s?{s:p.s}:{}),...(p.tl?{tl:p.tl}:{}),...(p.q?{q:p.q.map(v=>+v.toFixed(4))}:{})}))});}
 function idb(fn){try{const rq=indexedDB.open('halemoku',1);rq.onupgradeneeded=()=>rq.result.createObjectStore('s');rq.onsuccess=()=>{try{fn(rq.result.transaction('s','readwrite').objectStore('s'));}catch(e){}};}catch(e){}}
 function saveNow(){const s=serialize();try{localStorage.setItem(SAVE_KEY,s);}catch(e){}idb(st=>st.put(s,SAVE_KEY));
   if(fileHandle)fileHandle.createWritable().then(w=>w.write(s).then(()=>w.close())).catch(()=>{});}
