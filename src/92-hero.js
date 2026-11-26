@@ -127,7 +127,7 @@ function heroOneShot(name){if(!heroShown()||!hero.acts[name])return;hero.shot=na
    move; the head looks at them first. Low on the ground he kneels, at waist height he bends, higher up he reaches. */
 function heroReach(p){if(!p||!heroShown())return;const y=p.y-player.y,clip=y<.45?'Fixing_Kneeling':y<1.25?'PickUp_Table':'Interact';
   heroOneShot(clip);if(!hero.acts[clip])return;const dur=Math.min(1.6,hero.acts[clip].getClip().duration*.8);
-  hero.reach={p:p.clone(),t:0,dur,low:y<.45};hero.faceTo=Math.atan2(-(p.x-player.x),-(p.z-player.z));}
+  hero.reach={p:p.clone(),t:0,dur,low:y<.45,mid:y<1.25};hero.faceTo=Math.atan2(-(p.x-player.x),-(p.z-player.z));}
 // how each item sits in the right hand: x, y, z (metres, body space), then rotation x, y, z
 const HOLD3={cup:[0,-.04,.03,0,0,0],lantern:[0,-.24,.02,0,0,0],uke:[.02,-.02,.12,0,1.57,1.2],bino:[0,-.03,.05,0,0,0],coco:[0,-.03,.05,0,0,0]};
 function holdItem(it){const g=it.group;
@@ -154,6 +154,8 @@ function updateHero(dt,moving){
   else hero.turn=0;
   if(hero.faceTo!=null&&spd<.3){let d=hero.faceTo-hero.bodyYaw;d=Math.atan2(Math.sin(d),Math.cos(d));hero.bodyYaw+=d*Math.min(1,dt*9);if(Math.abs(d)<.05)hero.faceTo=null;}else hero.faceTo=null;
   if(hero.reach)hero.reach.t+=dt;
+  if(hero.reach&&hero.reach.t<hero.reach.dur*.45){const r=hero.reach,dx=r.p.x-player.x,dz=r.p.z-player.z,d=Math.hypot(dx,dz);   // a step in, to kneel beside it
+    const stand=hero.reach.low?.32:.4;if(d>stand){const st=Math.min(d-stand,1.3*dt);const nx=player.x+dx/d*st,nz=player.z+dz/d*st;if(Math.abs(groundAt(nx,nz)-groundAt(player.x,player.z))<.35&&!TUBE.inside(player.x,player.z,player.y)){player.x=nx;player.z=nz;}}}
   hero.root.rotation.order='YXZ';hero.root.rotation.y=hero.bodyYaw;hero.root.rotation.x=player.uw?lerp(hero.root.rotation.x,player.pitch*.85*smooth(.2,1,moving),Math.min(1,dt*3)):-(hero.lean||0); // dive head-first; on land, lean with speed changes
   hero.root.rotation.z=hero.bank||0;
   if(hero.wasAir&&!player.air)hero.landT=.28;hero.wasAir=player.air;hero.landT=Math.max(0,hero.landT-dt);hero.shotT=Math.max(0,hero.shotT-dt);
@@ -245,7 +247,13 @@ function heroPosture(dt,swim){
   else if(held&&onFoot&&held.kind!=='uke'){const lo=held.kind==='lantern';w=.85;T.set(base.x+fx*(lo?.18:.3)+rx*(lo?.26:.16),base.y+(lo?.82:1.12),base.z+fz*(lo?.18:.3)+rz*(lo?.26:.16));}
   IK.armW=lerp(IK.armW||0,w,1-Math.exp(-dt*12));if(IK.armW<.01)return;
   if(hero.reach&&hero.reach.t<hero.reach.dur&&IK.spine.length){const dy=hero.reach.p.y-base.y;                    // low down: bend the back toward it, as well as the knees
-    const bend=IK.armW*clamp((1.1-dy)*.6,0,.85);if(bend>.01)for(const b of IK.spine)boneTurnWorld(b,_ar.q.setFromAxisAngle(_ar.ax.set(rx,0,rz),-bend/IK.spine.length));}
+    const bend=IK.armW*clamp((1.1-dy)*.6,0,.85);if(bend>.01)for(const b of IK.spine)boneTurnWorld(b,_ar.q.setFromAxisAngle(_ar.ax.set(rx,0,rz),bend/IK.spine.length));   // + about his right: forward
+    if(dy<.45)T.y+=.05;                                                                       // fingers close a little above what lies on the ground
+    // still out of reach (something low and a little away): lean further over it, only as far as it takes
+    const [S0,E0,H0]=IK.arm,L=S0.getWorldPosition(_ar.a).distanceTo(E0.getWorldPosition(_ar.b))+E0.getWorldPosition(_ar.b).distanceTo(H0.getWorldPosition(_ar.c));
+    for(let it=0,extra=0;dy<.6&&it<4&&extra<.8;it++){const need=S0.getWorldPosition(_ar.a).distanceTo(T)-L*.96;if(need<=.01)break;
+      const more=Math.min(.8-extra,need/.3)*IK.armW;extra+=more;const hip=IK.hip||(IK.hip=hero.model.getObjectByName('spine1_08')||IK.spine[0]);   // a hinge at the hips first, as people bend
+      boneTurnWorld(hip,_ar.q.setFromAxisAngle(_ar.ax.set(rx,0,rz),more*.65));for(const b of IK.spine)boneTurnWorld(b,_ar.q.setFromAxisAngle(_ar.ax.set(rx,0,rz),more*.35/IK.spine.length));}}
   const [S,E,H]=IK.arm,A=S.getWorldPosition(_ar.a),B=E.getWorldPosition(_ar.b),C=H.getWorldPosition(_ar.c);
   T.lerpVectors(C,T,IK.armW);const l1=A.distanceTo(B),l2=B.distanceTo(C),dT=clamp(A.distanceTo(T),Math.abs(l1-l2)+1e-3,(l1+l2)*.995);
   const u=_ar.u.subVectors(A,B),v=_ar.v.subVectors(C,B),cur=u.angleTo(v),des=Math.acos(clamp((l1*l1+l2*l2-dT*dT)/(2*l1*l2),-1,1));

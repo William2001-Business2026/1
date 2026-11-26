@@ -23,7 +23,7 @@ const FRESH_SPOT={x:POOL.x,z:POOL.z,y:RIVER.poolL};
 function terrainLook(G,x,z,h,ny,out,o){
   const lin=c=>c<=.04045?c/12.92:Math.pow((c+.055)/1.055,2.4),mix3=(a,b,t)=>{a[0]+=(b[0]-a[0])*t;a[1]+=(b[1]-a[1])*t;a[2]+=(b[2]-a[2])*t;};
   const C=terrainLook.C||(terrainLook.C=Object.fromEntries(Object.entries({
-    blackSand:[.23,.22,.21],blackWet:[.13,.125,.12],goldSand:[.84,.74,.56],goldWet:[.56,.47,.35],grass:[.25,.34,.13],lush:[.18,.3,.1],dry:[.55,.47,.27],
+    blackSand:[.215,.195,.168],blackWet:[.112,.1,.085],goldSand:[.84,.74,.56],goldWet:[.56,.47,.35],grass:[.25,.34,.13],lush:[.18,.3,.1],dry:[.55,.47,.27],
     litter:[.2,.18,.11],cliff:[.36,.34,.3],moss:[.2,.27,.12],lava:[.075,.07,.07],lava2:[.16,.14,.13],cinder:[.42,.29,.22],cinder2:[.47,.45,.42],
     reef:[.5,.47,.38],reef2:[.36,.36,.27],mud:[.25,.21,.15]}).map(([k,v])=>[k,v.map(lin)])));
   const m=G.masks(x,z),q=G.riverQ(x,z),P=G.POOL,dp=Math.hypot(x-P.x,z-P.z),wet=m.wet;
