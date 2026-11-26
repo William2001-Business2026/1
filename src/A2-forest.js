@@ -297,7 +297,15 @@ window.__tF0=performance.now();const FLORA=(()=>{
   // hāpuʻu: the scanned fern's fronds crown each fibrous trunk built from the bark scan
   gltfLoader.loadAsync('assets/models/fern.glb').then(gl=>{const src=gl.scene.getObjectByName('fern_02_b')||gl.scene.getObjectByProperty('isMesh',true);if(!src)return;
     src.updateWorldMatrix(true,false);const geo=floatGeo(src.geometry).applyMatrix4(src.matrixWorld);geo.computeBoundingBox();const b=geo.boundingBox,w=Math.max(b.max.x-b.min.x,b.max.z-b.min.z);
-    const ce=b.getCenter(new THREE.Vector3());geo.translate(-ce.x,-b.min.y,-ce.z);geo.scale(4.2/w,4.2/w*1.15,4.2/w);geo.translate(0,TEMPL.hapuu.H-.35,0);geo.computeBoundingSphere();
+    const ce=b.getCenter(new THREE.Vector3());geo.translate(-ce.x,-b.min.y,-ce.z);geo.scale(1/w,1/w,1/w);              // the scan, one unit across, from its base
+    // a ground fern lies flat; a tree fern's crown is a shuttlecock: fronds rise from the top of the trunk, arch over and droop at the
+    // tips, the young ones in the middle steeper. So the scan is bent into that arch, twice: a wide outer ring and a tighter inner one.
+    const arch=(g0,R,lift,droop,turn)=>{const g=g0.clone(),p=g.attributes.position;
+      for(let i=0;i<p.count;i++){const x=p.getX(i)*R*2,z=p.getZ(i)*R*2,y=p.getY(i)*R*1.2,r=Math.hypot(x,z)/R;
+        p.setXYZ(i,x,y+R*(lift*Math.sin(Math.min(1,r)*Math.PI*.62)*1.1-droop*r*r),z);}
+      g.rotateY(turn);g.computeVertexNormals();return g;};
+    const crown=mergeGeometries([arch(geo,2.7,.55,.72,0),arch(geo,1.55,.9,.42,.5)]);
+    geo.copy(crown);geo.translate(0,TEMPL.hapuu.H-.3,0);geo.computeBoundingSphere();
     const m0=src.material,mat=scanMat({map:m0.map,normalMap:m0.normalMap,roughnessMap:m0.roughnessMap,roughness:m0.roughness,name:'leaves'},TEMPL.hapuu.H+2.2,true,{});
     const parts=[{geo:TEMPL.hapuu.bark,mat:barkMats.hapuu},{geo,mat,leaf:true}];SRC.hapuu={near:[],mid:parts,mode:'all',k:[1,1],ver:++srcVer,H:TEMPL.hapuu.H};
     bake('hapuu',parts,TEMPL.hapuu.H+1.6,4.6);}).catch(e=>console.warn('Tree fern crowns:',e));

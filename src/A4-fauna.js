@@ -21,11 +21,19 @@ const FAUNA=(()=>{
       if(spec.tint){mat.color=new THREE.Color(...spec.tint);if(mat.emissiveMap){mat.emissiveMap=null;mat.emissive&&mat.emissive.setRGB(0,0,0);}}const mesh=new THREE.Mesh(q.g,mat);mesh.castShadow=true;mesh.receiveShadow=true;mesh.raycast=()=>{};out.add(mesh);}
     return{g:out,h:size.y*k};}
   // legs of a static quadruped or bird swing about the hip, diagonal pairs (or alternate, for birds) in step
-  function legShader(group,hip,biped){const uW=TSL.uniform(0),uA=TSL.uniform(0);const {positionLocal,positionGeometry,sin,float,vec3,select,sign,clamp}=TSL;
+  /* Animals without a skeleton move in the vertex shader (the model faces +z, its base at y=0): the legs swing below the hip; a bird's
+     neck and head pivot down to graze and bob with each step, as geese do; a mongoose bounds, its back arching, its tail swinging. */
+  function legShader(group,hip,biped,body,len){const uW=TSL.uniform(0),uA=TSL.uniform(0),uG=TSL.uniform(0);const {positionLocal,positionGeometry,sin,cos,float,vec3,select,sign,clamp,smoothstep}=TSL;
     group.traverse(o=>{if(!o.isMesh)return;const m=o.material=toNode(o.material);const y=positionGeometry.y,z=positionGeometry.z,x=positionGeometry.x;
       const w=clamp(float(hip).sub(y).div(hip*.7),0,1),side=sign(x),front=sign(z),ph=biped?side.mul(1.5708):side.mul(front).mul(1.5708);
-      const a=sin(uW.add(ph)).mul(uA).mul(w);m.positionNode=positionLocal.add(vec3(0,a.abs().mul(-.04*hip),a.mul(float(hip).sub(y).max(0))));});
-    return{uW,uA};}
+      const a=sin(uW.add(ph)).mul(uA).mul(w);let P=positionLocal.add(vec3(0,a.abs().mul(-.04*hip),a.mul(float(hip).sub(y).max(0))));
+      if(body==='bird'&&len){const pz=len*.2,py=hip*1.6,nw=smoothstep(pz-len*.02,pz+len*.1,z).mul(smoothstep(hip*1.3,hip*1.65,y));   // the neck, from its base
+        const th=uG.mul(1.8).add(sin(uW.mul(2)).mul(uA).mul(.12)).mul(nw),dy=P.y.sub(py),dz=P.z.sub(pz);
+        P=vec3(P.x,float(py).add(dy.mul(cos(th))).sub(dz.mul(sin(th))),float(pz).add(dy.mul(sin(th))).add(dz.mul(cos(th)))).add(vec3(0,0,sin(uW.mul(2)).mul(uA).mul(nw).mul(len*.05)));}
+      if(body==='lithe'&&len){const u=z.div(len*.5),arch=sin(uW.mul(2)).mul(uA).mul(float(1).sub(u.mul(u)).max(0)).mul(len*.07),tail=smoothstep(-len*.25,-len*.5,z);
+        P=P.add(vec3(sin(uW.add(z.mul(9))).mul(tail).mul(len*.09).mul(uA.add(.25)),arch.mul(float(1).sub(w)),0));}
+      m.positionNode=P;});
+    return{uW,uA,uG};}
   // the moa and the feral goat reuse the island's own rigged chicken and goat models
   const SKINNED={kao:{url:'assets/models/goat.glb',height:.9,turn:0,legs:/^thigh_stretch/,amp:.45,stride:7},moa:{url:'assets/models/rooster.glb',height:.5,turn:-Math.PI/2,legs:/thigh/i,amp:.6,stride:16}};
   const SPEC={
@@ -140,7 +148,7 @@ const FAUNA=(()=>{
       }else{let spec=sp;if(sp.turn==='auto'){ // birds: face the head, the highest point
           let hi=null,hy=-1e9,c=new V3(),n=0;gl.scene.updateMatrixWorld(true);gl.scene.traverse(o=>{if(!o.isMesh)return;const p=o.geometry.attributes.position,v=new V3();for(let i=0;i<p.count;i+=7){v.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld);c.add(v);n++;if(v.y>hy){hy=v.y;hi=v.clone();}}});
           c.multiplyScalar(1/n);spec={...sp,turn:-Math.atan2(hi.x-c.x,hi.z-c.z)};}
-        const r=bake(gl,spec);if(sp.recolour)recolour(r.g,sp.recolour);a.g.add(r.g);a.body=r.g;if(sp.hip){a.legs=legShader(r.g,sp.hip*r.h,sp.biped);a.hipH=sp.hip*r.h;}}
+        const r=bake(gl,spec);if(sp.recolour)recolour(r.g,sp.recolour);a.g.add(r.g);a.body=r.g;if(sp.hip){a.legs=legShader(r.g,sp.hip*r.h,sp.biped,key==='nene'?'bird':key==='manakuke'?'lithe':null,sp.len);a.hipH=sp.hip*r.h;}}
     }).catch(e=>console.warn('Animal',key,e));
     return a;}
   // ── behaviour ──
@@ -229,13 +237,15 @@ const FAUNA=(()=>{
         a.lie=lerp(a.lie||0,a.state==='idle'?(a.rest||0):0,Math.min(1,dt*1.5));if(a.lie>.01)a.g.position.y-=a.lie*(sp.len||.5)*.12*(a.size||1);} // settling down to rest and sleep
       if(a.mixer){a.mixer.update(dt);}
       if(a.legs){const uA=a.speed>.05?Math.min(.7,.25+a.speed*.12):0;a.legs.uA.value=lerp(a.legs.uA.value,uA,Math.min(1,dt*6));      // legs swing so a foot on the ground moves back exactly as fast as the body moves on
-        a.legPh=(a.legPh||0)+a.speed*dt*Math.PI/(2*Math.max(.12,a.legs.uA.value)*(a.hipH||.2));a.legs.uW.value=a.legPh;}
+        a.legPh=(a.legPh||0)+a.speed*dt*Math.PI/(2*Math.max(.12,a.legs.uA.value)*(a.hipH||.2));a.legs.uW.value=a.legPh;
+        a.legs.uG.value=lerp(a.legs.uG.value,a.state==='graze'||(a.state==='idle'&&Math.sin(time*.4+(a.phase||0)*7)>.35)?1:0,Math.min(1,dt*2.2));}   // head down to the grass, up to look round
       if(a.bones&&a.speed>.05){a.g.updateMatrixWorld(true);const S=a.bones.S,ax=new V3(1,0,0).applyQuaternion(a.g.getWorldQuaternion(new THREE.Quaternion())),q2=new THREE.Quaternion(),q3=new THREE.Quaternion(),ax2=new V3();
         const amp=S.amp*(a.state==='run'?1.3:1),ph=a.walk*Math.PI/(2*(a.bones.L||.4)*Math.sin(amp));for(const L of a.bones.legs){L.b.parent.getWorldQuaternion(q2).invert();ax2.copy(ax).applyQuaternion(q2);L.b.quaternion.premultiply(q3.setFromAxisAngle(ax2,Math.sin(ph+L.ph)*amp));}}
     }
   }
   const layer=STREAM.layer({name:'fauna',size:FCH,seed:128,prio:2,radius:()=>140+120*FQ,margin:30,build:homes,ready:spawnChunk,dispose:despawnChunk});
-  return{list,groups,tick,layer,quality(g){FQ=g.grass;},force(p){force=p||null;},get phase(){return phaseNow();},clipV,
+  return{list,groups,tick,layer,quality(g){FQ=g.grass;},force(p){force=p||null;},make(key,x,z){return makeOne(key,SPEC[key],{x,y:heightAt(x,z),z});},   // make: one animal, for tests
+    get phase(){return phaseNow();},clipV,
     get counts(){const n={};for(const a of list)n[a.key]=(n[a.key]||0)+1;return n;},species:Object.keys(SPEC)};
 })();
 
