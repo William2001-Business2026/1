@@ -87,7 +87,7 @@ function sysKey(e){
   if(e.code==='KeyQ'){cycleSel(1);return true;}
   return false;
 }
-addEventListener('wheel',e=>{if(state!=='play')return;const d=e.deltaY>0?1:-1;if(build.on)build.dy=clamp(build.dy-d,-3,14);else cycleSel(d);},{passive:true});
+addEventListener('wheel',e=>{if(state!=='play'||MAPBOOK.on)return;const d=e.deltaY>0?1:-1;if(build.on)build.dy=clamp(build.dy-d,-3,14);else cycleSel(d);},{passive:true});
 function sysHint(){
   const k=selKind();if(!k)return'';const s=W.inv[W.sel];let h=K[k].n+(s.n>1?'  ×'+s.n:'');
   if(build.on)h+='   ·   Click to place   ·   R turn   ·   F shape   ·   Wheel height   ·   B done';
@@ -141,7 +141,7 @@ function fromSmallIsland(d){
 
 /* ───────── saving: browser storage twice over, plus a file you can keep ───────── */
 let fileHandle=null,saveT=0;
-function serialize(){return JSON.stringify({v:3,seen:W.seen,day:W.day,inv:W.inv,sel:W.sel,basket:W.basket,notes:W.notes,flags:W.flags,chick:W.chick,goat:W.goat,buff:W.buff,clock:W.clock,rainIn:W.rainIn,nodes:W.nodes,fires:W.fires,stamp:Date.now(),
+function serialize(){return JSON.stringify({v:3,seen:W.seen,day:W.day,inv:W.inv,sel:W.sel,basket:W.basket,notes:W.notes,flags:W.flags,chick:W.chick,goat:W.goat,buff:W.buff,clock:W.clock,rainIn:W.rainIn,nodes:W.nodes,fires:W.fires,map:W.map,stamp:Date.now(),
   items:W.items.map(o=>({kind:o.kind,n:o.n,x:+o.x.toFixed(2),z:+o.z.toFixed(2),...(o.y!=null?{y:+o.y.toFixed(2)}:{})})),
   plots:W.plots.map(p=>({x:p.x,z:p.z,soil:p.soil,moist:p.moist,crop:p.crop,g:p.g,over:p.over,health:p.health,last:p.last,dry:p.dry,wild:p.wild})),
   pieces:W.pieces.map(p=>({f:p.f,x:p.x,y:p.y,z:p.z,r:p.r,t:p.t,d:p.d}))});}
@@ -153,7 +153,7 @@ function loadSave(str){
   if(d.v<3)migrateSave(d); // older maps → the real island (10-island.js)
   if(d.clock&&d.clock.h==null){const c=d.clock;d.clock={h:c.phase==='night'?21.5:c.phase==='golden'?17.1:7+(c.dayT||0)*9.5,fast:false};} // the old phased clock → an hour of the day
   [...W.items].forEach(despawn);[...W.plots].forEach(removePlot);[...W.pieces].forEach(p=>removePiece(p,false));
-  for(const k of['seen','day','inv','sel','basket','notes','flags','chick','goat','buff','clock','rainIn','nodes','fires'])if(d[k]!=null)W[k]=d[k];
+  for(const k of['seen','day','inv','sel','basket','notes','flags','chick','goat','buff','clock','rainIn','nodes','fires','map'])if(d[k]!=null)W[k]=d[k];
   if(W.buff.until>nowS()+3600)W.buff.until=0;
   for(const o of d.items||[])if(K[o.kind]){const it=spawn(o.kind,o.x,o.z,o.n,o.y);if(o.y!=null)it.y=o.y;}
   for(const p of d.plots||[])if(!p.crop||CROPS[p.crop])addPlot(p);

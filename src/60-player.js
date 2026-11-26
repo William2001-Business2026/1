@@ -129,6 +129,8 @@ function restartEvening(){
 addEventListener('keydown',e=>{
   if(e.repeat)return;keys[e.code]=true;
   if(state!=='play')return;
+  if(MAPBOOK.on){MAPBOOK.key(e);keys[e.code]=false;return;}
+  if(e.code==='KeyM'){MAPBOOK.open();return;}
   if(bookOpen){if(['KeyE','Escape','KeyG','Space','KeyJ'].includes(e.code))closeBook();else if(e.code==='ArrowLeft'||e.code==='KeyA')GUIDE.turn(-1);else if(e.code==='ArrowRight'||e.code==='KeyD')GUIDE.turn(1);return;}
   if(e.code==='KeyJ'){openBook();return;}
   if(sysKey(e))return;
@@ -154,5 +156,5 @@ canvas.addEventListener('mousedown',e=>{
 });
 addEventListener('mouseup',()=>{mouseDown=false;});
 function lock(){try{const p=canvas.requestPointerLock();if(p&&p.catch)p.catch(()=>{});}catch(e){}}
-document.addEventListener('pointerlockchange',()=>{const was=locked;locked=document.pointerLockElement===canvas;if(was&&!locked&&state==='play')openPause();});
+document.addEventListener('pointerlockchange',()=>{const was=locked;locked=document.pointerLockElement===canvas;if(was&&!locked&&state==='play'&&!bookOpen&&!MAPBOOK.on)openPause();});
 

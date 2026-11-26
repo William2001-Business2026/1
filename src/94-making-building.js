@@ -315,9 +315,10 @@ function makeFire(key,x,z){
   const light=new THREE.PointLight(new THREE.Color(1,.52,.2),0,16,2);light.position.y=1.0;g.add(light);
   const px=new THREE.Mesh(geo.cyl,proxyMat);px.scale.set(.5,.7,.5);px.position.y=.35;g.add(px);const cookG=new THREE.Group();g.add(cookG);
   const rt=fireRT[key]={g,s,x,z,woodG,fl,light,cookG,shown:''};
-  g.userData.item={get verb(){return s.cook.some(c=>cooked(c))?'take':'';},label(){return s.lit?'Fire':'Fire ring';},
-    e(){for(let i=s.cook.length-1;i>=0;i--){const c=s.cook[i];if(cooked(c)){give(c.kind==='rawpot'?'pot':'c_'+c.kind,1);if(c.kind==='rawpot')note('pot');else note('cook');s.cook.splice(i,1);}}SFX.pickup();},
-    use(k){if(FUEL[k]){s.fuel=Math.min(1800,s.fuel+FUEL[k]);takeFrom(k,1);SFX.knock();handAnim=1;return true;}
+  g.userData.item={get verb(){return s.cook.some(c=>cooked(c))?'take':!s.lit&&(s.burnt||0)>=45?'take charcoal':'';},label(){return s.lit?'Fire':'Fire ring';},
+    e(){if(!s.lit&&(s.burnt||0)>=45&&!s.cook.some(c=>cooked(c))){const n=Math.min(3,Math.floor(s.burnt/45));const got=give('charcoal',n);s.burnt=Math.max(0,s.burnt-got*45);if(got){SFX.pickup();note('charcoal');handAnim=1;}return;}for(let i=s.cook.length-1;i>=0;i--){const c=s.cook[i];if(cooked(c)){give(c.kind==='rawpot'?'pot':'c_'+c.kind,1);if(c.kind==='rawpot')note('pot');else note('cook');s.cook.splice(i,1);}}SFX.pickup();},
+    use(k){if(k==='kukui'&&s.lit){if(!have('shell')){toast('A shell to catch the soot in, first.');return false;}takeFrom('kukui',1);takeFrom('shell',1);give('ink',1);note('ink');SFX.made();handAnim=1;return true;}
+      if(FUEL[k]){s.fuel=Math.min(1800,s.fuel+FUEL[k]);takeFrom(k,1);SFX.knock();handAnim=1;return true;}
       if(s.lit&&(K[k].cook||k==='rawpot')&&s.cook.length<3){s.cook.push({kind:k,t:Date.now()});takeFrom(k,1);SFX.pickup();handAnim=1;return true;}return false;}};
   scene.add(g);interact.push(g);
 }
@@ -328,7 +329,7 @@ function dishOf(ing){const s=new Set(ing),hot=s.has('chili');let d='stew';
 function updateFires(dt,night){
   let nearLit=0;
   for(const k in fireRT){const f=fireRT[k],s=f.s;
-    if(s.lit){s.fuel-=dt;if(s.fuel<=0||(raining>.6&&!(roofed(f.x,f.z)&&homeTier>=2))){s.lit=false;s.fuel=Math.max(0,s.fuel);noiseBurst(AU.white,'bandpass',2500,.6,.08,.02,.8);}}
+    if(s.lit){s.fuel-=dt;s.burnt=Math.min(400,(s.burnt||0)+dt);if(s.fuel<=0||(raining>.6&&!(roofed(f.x,f.z)&&homeTier>=2))){s.lit=false;s.fuel=Math.max(0,s.fuel);noiseBurst(AU.white,'bandpass',2500,.6,.08,.02,.8);}}
     f.woodG.visible=s.fuel>0;f.fl.visible=s.lit;
     if(s.lit){const fk=.8+.25*fbm(time*6+f.x,2.3,2);f.light.intensity=fk*(1.2+3.2*night);f.fl.scale.set(1,fk,1);f.fl.rotation.y=time*2;nearLit=Math.max(nearLit,1-Math.hypot(player.x-f.x,player.z-f.z)/14);}else f.light.intensity=0;
     const key=s.cook.map(c=>c.kind+(cooked(c)?1:0)).join();

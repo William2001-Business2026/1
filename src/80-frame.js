@@ -7,7 +7,7 @@ function update(dt){
   water.position.y=Math.sin(time*.55)*.045+Math.sin(time*.23)*.02;
 
   // the clock: the sun and moon move every frame; the sky's palette and lighting follow a few times a second
-  TUBE.update(dt);FOOT.tick(dt);SKYCLOCK.tick(dt);clockLight+=dt;if(clockLight>(W.clock.fast?.05:.25)){clockLight=0;applyTime(false);syncSlider();}
+  TUBE.update(dt);FOOT.tick(dt);MAPBOOK.tick(dt);SKYCLOCK.tick(dt);clockLight+=dt;if(clockLight>(W.clock.fast?.05:.25)){clockLight=0;applyTime(false);syncSlider();}
 
   // lantern
   const fl=lantern.lit?1:0,flick=.82+.18*fbm(time*7,1.7,2)+.05*Math.sin(time*23);
