@@ -182,7 +182,9 @@ function refreshHand(){handDirty=false;const k=held?null:selKind();if(k===handKi
 function cycleSel(d){if(held)return;const n=W.inv.length;if(!n){W.sel=-1;return;}W.sel=((W.sel+1+d)%(n+1)+(n+1))%(n+1)-1;handDirty=true;build.on=false;}
 function sysDrop(){const k=selKind();if(!k)return;const fx=player.x-Math.sin(player.yaw)*.9,fz=player.z-Math.cos(player.yaw)*.9;
   if(groundAt(fx,fz)<.02&&k!=='fishtrap'){return;}
-  const n=keys.ShiftLeft?W.inv[W.sel].n:1;takeFrom(k,n);const before=W.items.length,it=spawn(k,fx,fz,n);SFX.step(surfaceAt(fx,fz),.6);
+  const tf=TUBE.floorAt(fx,fz,player.y);                                                                   // inside the lava tube: on its floor
+  const n=keys.ShiftLeft?W.inv[W.sel].n:1;takeFrom(k,n);const before=W.items.length,it=spawn(k,fx,fz,n,tf==null?undefined:tf);SFX.step(tf!=null?'rock':surfaceAt(fx,fz),.6);
+  if(tf!=null){it.y=tf;return;}
   if(W.items.length>before&&!K[k].place){it.g.position.set(fx,player.y+1,fz); // let go from the hand: it falls, tumbles and comes to rest
     physDrop(it.g,{vel:{x:-Math.sin(player.yaw)*.7,y:.4,z:-Math.cos(player.yaw)*.7},float:FLOATS.has(k),onRest:g=>{it.x=g.position.x;it.z=g.position.z;
       const top=g.position.y-groundAt(it.x,it.z);it.y=top>.06?g.position.y:null;}});}}

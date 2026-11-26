@@ -19,7 +19,7 @@ function update(dt){
     s.position.set(Math.sin(t*5+s.id)*.015*t,.09+t*.2,Math.cos(t*4+s.id)*.015*t);const sc=.03+t*.07;s.scale.set(sc,sc,sc);s.material.opacity=hot*.22*Math.sin(Math.PI*t)*(held===cup?.6:1);}
 
   // coconut
-  if(coco.fly){const p=cocoG.position,v=coco.vel;v.y-=9.8*dt;p.addScaledVector(v,dt);const gy=groundAt(p.x,p.z),sea=water.position.y;
+  if(coco.fly){const p=cocoG.position,v=coco.vel;v.y-=9.8*dt;p.addScaledVector(v,dt);const gy=TUBE.floorAt(p.x,p.z,p.y)??groundAt(p.x,p.z),sea=water.position.y;
     if(gy<sea-.2&&p.y<sea+.02){if(!coco.wet){coco.wet=true;if(v.length()>1.5)SFX.splash(clamp(v.length()/8,.3,1));if(U.uBio.value>.1)U.uRipples.value[rippleI++%8].set(p.x,p.z,time);}
       v.multiplyScalar(Math.exp(-3*dt));v.y+=(sea-.02-p.y)*28*dt+9.8*dt;v.y*=Math.exp(-4*dt);p.y=Math.max(p.y,gy+.12);cocoG.rotation.z=Math.sin(time*1.4)*.2;cocoG.rotation.x=Math.sin(time*1.1)*.15;}
     else if(p.y<gy+.12){p.y=gy+.12;const sp=v.length();if(sp>1.2){const sf=surfaceAt(p.x,p.z);sf==='wood'?SFX.knock():SFX.thud(clamp(sp/8,.25,1));}
