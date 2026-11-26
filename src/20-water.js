@@ -97,22 +97,30 @@ water.frustumCulled=false; scene.add(water);
    rapids, and reflects the sky like the sea does. */
 const freshMat=new THREE.MeshBasicNodeMaterial({transparent:true,depthWrite:false,fog:false});
 {
+  U.uWade=TSL.uniform(new THREE.Vector4(0,0,1,0));U.uWadeK=TSL.uniform(0);U.uWadeM=TSL.uniform(0);   // you in the river: where, which way it flows, how deep, how fast you move
   const {Fn,attribute,float,vec2,vec3,vec4,mix,max,pow,abs,dot,normalize,reflect,length,clamp,uv,positionWorld,cameraPosition}=TSL;
   const aFlow=attribute('aFlow','float').mul(U.uSwell.mul(.8).add(1)),aFoam=attribute('aFoam','float').add(U.uSwell.mul(.25)).min(1);
   freshMat.colorNode=Fn(()=>{const q=uv(),t=U.uTime,wp=positionWorld,V=normalize(cameraPosition.sub(wp)),dist=length(cameraPosition.sub(wp));
-    const a=vec2(q.x.mul(2.2),q.y.mul(.55).sub(t.mul(aFlow).mul(.55))),b=vec2(q.x.mul(5.1).add(3),q.y.mul(1.4).sub(t.mul(aFlow).mul(1.1)));
-    const h0=vn(a).add(vn(b).mul(.5)),e=.07;
-    const dx=vn(a.add(vec2(e,0))).add(vn(b.add(vec2(e,0))).mul(.5)).sub(h0),dz=vn(a.add(vec2(0,e))).add(vn(b.add(vec2(0,e))).mul(.5)).sub(h0);
+    // ripples the same size across and along (uv is metres: across/2.5, along), drifting with the current, three scales
+    const m=vec2(q.x.mul(2.5),q.y),a=m.mul(.6).sub(vec2(0,t.mul(aFlow).mul(.55))),b=m.mul(1.45).add(3).sub(vec2(0,t.mul(aFlow).mul(1.05))),c=m.mul(3.4).add(7).sub(vec2(0,t.mul(aFlow).mul(1.9)));
+    const hf=p=>vn(p.a).add(vn(p.b).mul(.5)).add(vn(p.c).mul(.22)),e=.05,o=x=>({a:a.add(x),b:b.add(x),c:c.add(x)}),h0=hf(o(vec2(0)));
+    const dx=hf(o(vec2(e,0))).sub(h0),dz=hf(o(vec2(0,e))).sub(h0);
+    // wading: the current piles up against your legs, parts round them and trails a widening white wake downstream; moving, rings spread
+    const wd=wp.xz.sub(U.uWade.xy),fd=U.uWade.zw,al=dot(wd,fd),lt=dot(wd,vec2(fd.y.negate(),fd.x)),wr=length(wd),sq=x=>x.mul(x);
+    const pil=U.uWadeK.mul(TSL.exp(sq(lt.div(.32)).negate())).mul(TSL.exp(sq(al.add(.18).div(.26)).negate()));
+    const wk=U.uWadeK.mul(sstep(-.1,.15,al)).mul(TSL.exp(sq(lt.div(al.mul(.16).add(.2))).negate())).mul(TSL.exp(al.div(-2.6)));
+    const ring=TSL.sin(wr.mul(16).sub(t.mul(9))).mul(TSL.exp(wr.mul(-1.3))).mul(U.uWadeM).mul(U.uWadeK);
     const k=float(.22).add(aFlow.mul(.12)).mul(float(1).sub(sstep(30,120,dist)));
-    const N=normalize(vec3(dx.mul(k).div(e).mul(.35),1,dz.mul(k).div(e).mul(.35)));
+    const N=normalize(vec3(dx.mul(k).div(e).mul(.35).add(wd.x.div(wr.add(.05)).mul(ring.mul(.35).add(pil.mul(.25)))),1,dz.mul(k).div(e).mul(.35).add(wd.y.div(wr.add(.05)).mul(ring.mul(.35).add(pil.mul(.25))))));
     const F=float(.02).add(pow(float(1).sub(max(dot(N,V),0)),5).mul(.98));
     const Rf0=reflect(V.negate(),N),Rf=vec3(Rf0.x,abs(Rf0.y),Rf0.z);
     const body=vec3(.018,.05,.035).mul(U.uDay.add(.05));
     const col=mix(body,grey(skyBase(Rf)),F).add(U.uSunDisc.mul(pow(max(dot(Rf,U.uSunDir),0),220).mul(.25))).toVar();
     col.assign(mix(col,vec3(.5,.56,.58).mul(U.uDay.add(.08)),aFoam.mul(.45)));            // falling, churning water is white, not a mirror
-    const streak=vn(vec2(q.x.mul(14),q.y.mul(.3).sub(t.mul(aFlow).mul(.9)))).mul(.6).add(vn(vec2(q.x.mul(31),q.y.mul(.8).sub(t.mul(aFlow).mul(1.6)))).mul(.4)); // long streaks down the flow
+    const streak=vn(vec2(q.x.mul(9),q.y.mul(.9).sub(t.mul(aFlow).mul(.9)))).mul(.6).add(vn(vec2(q.x.mul(20),q.y.mul(2.2).sub(t.mul(aFlow).mul(1.6)))).mul(.4)); // foam lines drawn out down the flow, broken, not ruled
     const fine=vn(vec2(q.x.mul(41),q.y.mul(5).sub(t.mul(aFlow).mul(4.2))));
-    const foam=clamp(aFoam.mul(sstep(.38,.72,streak.mul(.75).add(fine.mul(.35)))).add(pow(aFoam,3).mul(sstep(.3,.62,streak)).mul(.9)),0,1); // strong broken water (round rocks) stays white, in streaks
+    const foam=clamp(aFoam.mul(sstep(.38,.72,streak.mul(.75).add(fine.mul(.35)))).add(pow(aFoam,3).mul(sstep(.3,.62,streak)).mul(.9))
+      .add(pil.mul(.9)).add(wk.mul(sstep(.25,.62,fine.mul(.6).add(streak.mul(.5)))).mul(.95)),0,1); // strong broken water (round rocks, your legs) stays white, in streaks
     col.assign(mix(col,vec3(.9,.93,.95).mul(U.uDay.add(.1)),foam.mul(.9)));
     return vec4(col,max(mix(mix(.5,.32,aFoam),.96,foam),F.mul(1.2)));})();                        // clear enough to see the stream bed, opaque where it froths
 }

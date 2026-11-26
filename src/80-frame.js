@@ -7,6 +7,11 @@ function update(dt){
   water.position.y=Math.sin(time*.55)*.045+Math.sin(time*.23)*.02;
 
   // the clock: the sun and moon move every frame; the sky's palette and lighting follow a few times a second
+  {const fw=freshAt(player.x,player.z),dep=fw==null?0:fw-heightAt(player.x,player.z),W4=U.uWade.value;       // the river parts round your legs
+   if(dep>.06){const rq=riverQ(player.x,player.z),v=player.mv?Math.hypot(player.mv.x,player.mv.z):0;W4.x=player.x;W4.y=player.z;
+     if(rq&&rq.d<rq.w+2){W4.z=rq.fx;W4.w=rq.fz;}else if(v>.2){W4.z=-player.mv.x/v;W4.w=-player.mv.z/v;}
+     U.uWadeK.value=lerp(U.uWadeK.value,clamp(dep/.35,0,1)*(player.uw?0:1),1-Math.exp(-dt*4));U.uWadeM.value=lerp(U.uWadeM.value,clamp(v/2,0,1),1-Math.exp(-dt*5));}
+   else U.uWadeK.value=Math.max(0,U.uWadeK.value-dt*2);}
   TUBE.update(dt);FOOT.tick(dt);MAPBOOK.tick(dt);SKYCLOCK.tick(dt);clockLight+=dt;if(clockLight>(W.clock.fast?.05:.25)){clockLight=0;applyTime(false);syncSlider();}
 
   // lantern
