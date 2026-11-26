@@ -78,7 +78,7 @@ function update(dt){
     let roll=0;
     if(player.mode==='walk'&&player.uw){_v.set(player.x,player.y+1.65,player.z);roll=Math.sin(time*.7)*.012;}
     else if(player.mode==='walk'){
-      const fwy=freshAt(player.x,player.z);let gy=Math.max(groundAt(player.x,player.z),(fwy!=null?fwy:0)-1.12);const tubeF=TUBE.floorAt(player.x,player.z,player.y);if(tubeF!=null)gy=tubeF; // in the lava tube, its floor is the groundconst fy=floorY(player.x,player.z,player.y);if(fy!=null&&fy>gy)gy=fy;
+      const fwy=freshAt(player.x,player.z);let gy=Math.max(groundAt(player.x,player.z),(fwy!=null?fwy:0)-1.12);const tubeF=TUBE.floorAt(player.x,player.z,player.y);if(tubeF!=null)gy=tubeF;const fy=floorY(player.x,player.z,player.y);if(fy!=null&&fy>gy)gy=fy; // in the lava tube its floor is the ground; built floors stand above either
       if(player.air){ // ballistic jump under gravity; land on ground, the deck or built floors
         player.vy-=9.81*dt;player.y+=player.vy*dt;if(player.vy<-10.8&&!RAG.on)RAG.start(); // falling fast: the body goes limp
         if(player.y<=gy&&player.vy<=0){const hit=-player.vy;player.y=gy;player.vy=0;player.air=false;player.land=Math.min(1,hit/5);
