@@ -236,7 +236,7 @@ function heroIK(dt,swim){
   // stood still, the chest turns toward where you look (up to about 45°)
   let d=player.yaw-hero.bodyYaw;d=Math.atan2(Math.sin(d),Math.cos(d));const look=player.mode==='walk'&&thirdView()&&(hero.spd||0)<.15?clamp(d,-.8,.8):0;
   IK.look=lerp(IK.look,look,1-Math.exp(-dt*4));if(Math.abs(IK.look)>.01)for(const b of IK.spine)boneTurnWorld(b,_ik.q.setFromAxisAngle(_ik.up,IK.look/IK.spine.length));
-  heroPosture(dt,swim);
+  heroPosture(dt,swim);heroMotion(dt,swim);
 }
 // posture: lean into a climb and sit back going down; shift the weight now and then while standing; carry what you hold, and
 // put the hand on what you reach for
