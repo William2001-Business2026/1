@@ -42,9 +42,9 @@ const FOOT=(()=>{
     if(m.lava>.5||GROUND.slopeAt(x,z)>1.1)return null;                                                                // rock
     const gm=grassMask(x,z,h,m);if(gm<.35&&h<4)return{d:h<.45?.8:1,life:h<.45?120:100,wash:h<.32};                     // sand; wet sand at the waterline
     if(forestW(x,z)>.35)return{d:.45,life:70};return{d:.25,life:45};}                                                // forest dirt; grass
-  function add(x,z,yaw,size,kind,wet,yHint){const gnd=ground(x,z,yHint);if(!gnd&&!wet)return;
+  function add(x,z,yaw,size,kind,wet,yHint,who){const gnd=ground(x,z,yHint);if(!gnd&&!wet)return;
     const y=(TUBE.floorAt(x,z,yHint)??groundAt(x,z))+.012,n=tnorm(x,z);
-    const p=P[head]||(P[head]={});Object.assign(p,{x,y,z,yaw,size,kind,wet:wet?1:0,d:gnd?gnd.d:0,life:gnd?gnd.life:25,wash:gnd&&gnd.wash,t:0,n:n.clone()});
+    const p=P[head]||(P[head]={});Object.assign(p,{who:who||null,x,y,z,yaw,size,kind,wet:wet?1:0,d:gnd?gnd.d:0,life:gnd?gnd.life:25,wash:gnd&&gnd.wash,t:0,n:n.clone()});
     if(!gnd)p.d=0,p.life=22;if(wet&&gnd)p.life=Math.max(p.life,30);head=(head+1)%N;im.count=Math.max(im.count,head===0?N:Math.max(im.count,head));dirty=true;}
   let dirty=false,acc=0;
   function update(dt){acc+=dt;if(acc<.2&&!dirty)return;const step=acc;acc=0;dirty=false;
@@ -64,6 +64,8 @@ const FOOT=(()=>{
   const KIND={puaa:1,kia:1,kao:1,moa:2,nene:2,manakuke:3};
   function animal(a){const k=KIND[a.key];if(k==null)return;const L=a.sp.len||.6,stride=k===1?L*.42:L*.35;if(a.walk-(a.lastPrint||0)<stride)return;a.lastPrint=a.walk;
     if(Math.hypot(a.p.x-camera.position.x,a.p.z-camera.position.z)>45)return;a.pside=-(a.pside||1);
-    const rx=Math.cos(a.yaw),rz=-Math.sin(a.yaw),o=(k===1?.1:.05)*L*a.pside;add(a.p.x+rx*o,a.p.z+rz*o,a.yaw+Math.PI,k===1?.11*L+.03:k===2?.12:.07,k,false,a.p.y);}
-  return{step,tick,animal,mesh:im,get count(){let n=0;for(let i=0;i<im.count;i++)if(P[i]&&P[i].t<P[i].life)n++;return n;},ground};
+    const rx=Math.cos(a.yaw),rz=-Math.sin(a.yaw),o=(k===1?.1:.05)*L*a.pside;add(a.p.x+rx*o,a.p.z+rz*o,a.yaw+Math.PI,k===1?.11*L+.03:k===2?.12:.07,k,false,a.p.y,a.key);}
+  // the freshest animal tracks near a point: who made them, how long ago, and which way they lead
+  function read(x,z,r){let best=null;for(const p of P)if(p&&p.who&&p.t<p.life&&Math.hypot(p.x-x,p.z-z)<r&&(!best||p.t<best.t))best=p;return best;}
+  return{step,tick,animal,read,mesh:im,get count(){let n=0;for(let i=0;i<im.count;i++)if(P[i]&&P[i].t<P[i].life)n++;return n;},ground};
 })();

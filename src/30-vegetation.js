@@ -21,7 +21,8 @@ const leafTex=canvasTex(128,128,(g)=>{g.translate(64,64);for(let i=0;i<7;i++){g.
 const windU=TSL.uniform(0);
 /* Wind: a steady trade wind from the east-north-east with gusts that travel across the island as bands.
    windAt(p) gives the horizontal push at world position p (metres, xz) and how gusty it is there (0–1). */
-const WIND={dir:TSL.uniform(new THREE.Vector2(-.86,.51)),strength:TSL.uniform(.5),player:TSL.uniform(new THREE.Vector3(0,-99,0))};
+const WIND={dir:TSL.uniform(new THREE.Vector2(-.86,.51)),strength:TSL.uniform(.5),player:TSL.uniform(new THREE.Vector3(0,-99,0)),
+  animals:[0,1,2,3].map(()=>TSL.uniform(new THREE.Vector4(0,-99,0,.3)))};   // the four animals nearest you: where they are, and how wide they push
 const windAt=(p)=>{const {vec3,sin,dot,pow}=TSL;const t=U.uTime,dir=WIND.dir;
   const gust=sstep(.38,.82,vn(p.mul(.028).sub(dir.mul(t.mul(.23)))));                   // gust bands about 30 m apart, moving ~8 m/s
   const flutter=sin(t.mul(2.6).add(dot(p,dir).mul(.8)).add(vn(p.mul(.6)).mul(6))).mul(.22);
@@ -137,7 +138,9 @@ const GRASS=(()=>{
      const grow=clamp(keep.sub(info.w).div(.06),0,1).mul(clamp(STREAM.uNow.sub(born).div(.6),0,1)); // tufts sink away one by one in the distance, and new chunks grow in
      const h=positionGeometry.y,k=h.mul(h),wd=windAt(positionLocal.xz);
      const d=positionLocal.xz.sub(WIND.player.xz),near=float(1).sub(sstep(.15,.95,length(d))).mul(sstep(1.6,.4,positionLocal.y.sub(WIND.player.y).abs()));
-     const push=normalize(d.add(1e-4)).mul(near).mul(.8);                                    // blades lean away from your legs
+     let push=normalize(d.add(1e-4)).mul(near).mul(.8);                                      // blades lean away from your legs
+     for(const A of WIND.animals){const da=positionLocal.xz.sub(A.xz),na=float(1).sub(sstep(A.w.mul(.4),A.w.mul(1.6),length(da))).mul(sstep(1.2,.3,positionLocal.y.sub(A.y).abs()));
+       push=push.add(normalize(da.add(1e-4)).mul(na).mul(.6));}                               // and from the animals walking through
      const bend=wd.xy.mul(.55).add(push).mul(k);
      vBend.assign(wd.z.mul(h));
      const p=positionLocal.add(vec3(bend.x,dot(bend,bend).mul(-.45),bend.y));                // bending also lowers the tip a little
