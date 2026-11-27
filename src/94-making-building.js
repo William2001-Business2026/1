@@ -326,8 +326,9 @@ function makeFire(key,x,z){
   const light=new THREE.PointLight(new THREE.Color(1,.52,.2),0,16,2);light.position.y=1.0;g.add(light);
   const px=new THREE.Mesh(geo.cyl,proxyMat);px.scale.set(.5,.7,.5);px.position.y=.35;g.add(px);const cookG=new THREE.Group();g.add(cookG);
   const rt=fireRT[key]={g,s,x,z,woodG,fl,light,cookG,shown:''};
-  g.userData.item={get verb(){return s.cook.some(c=>cooked(c))?'take':!s.lit&&(s.burnt||0)>=45?'take charcoal':'';},label(){return s.lit?'Fire':'Fire ring';},
-    e(){if(!s.lit&&(s.burnt||0)>=45&&!s.cook.some(c=>cooked(c))){const n=Math.min(3,Math.floor(s.burnt/45));const got=give('charcoal',n);s.burnt=Math.max(0,s.burnt-got*45);if(got){SFX.pickup();note('charcoal');handAnim=1;}return;}for(let i=s.cook.length-1;i>=0;i--){const c=s.cook[i];if(cooked(c)){give(c.kind==='rawpot'?'pot':'c_'+c.kind,1);if(c.kind==='rawpot')note('pot');else note('cook');s.cook.splice(i,1);}}SFX.pickup();},
+  g.userData.item={get verb(){return s.cook.some(c=>cooked(c))?'take':!s.lit&&(s.burnt||0)>=45?'take charcoal':'travel from here';},label(){return s.lit?'Fire':'Fire ring';},
+    e(){if(!s.cook.some(c=>cooked(c))&&!(!s.lit&&(s.burnt||0)>=45)){if(TRAVEL.offer({x,z}))return;}              // nothing to take: travel to another camp
+      if(!s.lit&&(s.burnt||0)>=45&&!s.cook.some(c=>cooked(c))){const n=Math.min(3,Math.floor(s.burnt/45));const got=give('charcoal',n);s.burnt=Math.max(0,s.burnt-got*45);if(got){SFX.pickup();note('charcoal');handAnim=1;}return;}for(let i=s.cook.length-1;i>=0;i--){const c=s.cook[i];if(cooked(c)){give(c.kind==='rawpot'?'pot':'c_'+c.kind,1);if(c.kind==='rawpot')note('pot');else note('cook');s.cook.splice(i,1);}}SFX.pickup();},
     use(k){if(k==='kukui'&&s.lit){if(!have('shell')){toast('A shell to catch the soot in, first.');return false;}takeFrom('kukui',1);takeFrom('shell',1);give('ink',1);note('ink');SFX.made();handAnim=1;return true;}
       if(FUEL[k]){s.fuel=Math.min(1800,s.fuel+FUEL[k]);takeFrom(k,1);SFX.knock();handAnim=1;return true;}
       if(s.lit&&(K[k].cook||k==='rawpot')&&s.cook.length<3){s.cook.push({kind:k,t:Date.now()});takeFrom(k,1);SFX.pickup();handAnim=1;return true;}return false;}};

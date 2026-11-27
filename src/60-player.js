@@ -131,6 +131,7 @@ addEventListener('keydown',e=>{
   if(e.repeat)return;keys[e.code]=true;
   if(state!=='play')return;
   if(MAPBOOK.on){MAPBOOK.key(e);keys[e.code]=false;return;}
+  if(TRAVEL.open){if(e.code==='Escape'||e.code==='KeyE')TRAVEL.close();keys[e.code]=false;return;}
   if(e.code==='KeyM'){MAPBOOK.open();return;}
   if(bookOpen){if(['KeyE','Escape','KeyG','Space','KeyJ'].includes(e.code))closeBook();else if(e.code==='ArrowLeft'||e.code==='KeyA')GUIDE.turn(-1);else if(e.code==='ArrowRight'||e.code==='KeyD')GUIDE.turn(1);return;}
   if(e.code==='KeyJ'){openBook();return;}

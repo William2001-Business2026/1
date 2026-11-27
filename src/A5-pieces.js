@@ -6,7 +6,7 @@
    against a piece it touches); the fall itself is Rapier's. Pieces at rest are fixed bodies, so a finished house costs nothing. */
 const PIECEPHYS=(()=>{
   const fixed=new Map(),V=THREE.Vector3;
-  const solid=f=>!hangs(f)&&f!=='mat'&&f!=='channel';
+  const solid=f=>!hangs(f)&&f!=='mat'&&f!=='channel'&&f!=='raft';   // a raft moves on the water: no fixed body
   function add(pc){if(pc.fall||!PHYS.ready||!solid(pc.f))return;if(fixed.has(pc))remove(pc);
     const g=pc.g,R=PHYS.R,w=PHYS.world,box=localBox(g,new Set());if(box.isEmpty())return;const sz=box.getSize(new V()).multiply(g.scale),c=box.getCenter(new V()).multiply(g.scale);
     const body=w.createRigidBody(R.RigidBodyDesc.fixed().setTranslation(g.position.x,g.position.y,g.position.z).setRotation({x:g.quaternion.x,y:g.quaternion.y,z:g.quaternion.z,w:g.quaternion.w}));
