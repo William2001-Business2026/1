@@ -79,7 +79,7 @@ function applyGraphics(){
   setCSM(g.csm);if(csm&&csm.camera)csm.updateFrustums(); // the cascades find the camera on their first render
   const shOn=settings.shadows&&!g.noShadow;renderer.shadowMap.enabled=shOn;sun.castShadow=shOn&&sun.intensity>.05;
   lanternLight.castShadow=settings.shadows&&g.lantern;
-  GRASS.quality(g);FLORA_NEAR=24+36*g.grass;try{FAUNA.quality(g);STREAM.budget=/^Laptop/.test(g.name)?2.5:4;}catch(e){}   // (they may not exist yet at start-up); on a laptop the world fills in more gently
+  GRASS.quality(g);FLORA_NEAR=24+36*g.grass;try{FAUNA.quality(g);STREAM.budget=(/^Laptop/.test(g.name)?2.5:4)/(1+perf.cpuSave*.5);if(perf.cpuSave)FAUNA.quality({grass:g.grass*(1-.3*perf.cpuSave)});}catch(e){}   // (they may not exist yet at start-up); on a laptop the world fills in more gently
   $('v-fov').textContent='· '+settings.fov+'°';
   fpsEl.classList.toggle('on',!!settings.showFps);
   // materials only need rebuilding when shadows are switched on or off, not on every resize

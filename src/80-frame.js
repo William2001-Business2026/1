@@ -185,6 +185,7 @@ function frame(now){frameNo++;
   const FM=perf.cap30?FRAME_MS*2:FRAME_MS;if(now<perf.nextT-1.5)return;                     // 60 FPS cap (30 when the machine cannot hold more)
   perf.nextT=now-perf.nextT>FM?now+FM:perf.nextT+FM;
   const dt=Math.min((now-lastFrameAt)/1000,.05);lastFrameAt=now;
-  update(dt);post.render();perfTick(now);
+  const c0=performance.now();update(dt);post.render();perf.cpuMs=lerp(perf.cpuMs,performance.now()-c0,.05);perfTick(now);
+  if(frameNo%30===0&&renderer.resolveTimestampsAsync){renderer.resolveTimestampsAsync('render').then(()=>{const t=renderer.info.render.timestamp;if(t>0&&t<200)perf.gpuMs=lerp(perf.gpuMs||t,t,.4);}).catch(()=>{});}   // the graphics chip's own time, where the browser tells it
 }
 

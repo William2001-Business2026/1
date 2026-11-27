@@ -45,7 +45,7 @@ const saveSettings=()=>{try{localStorage.setItem('halemoku',JSON.stringify(setti
 const canvas=document.getElementById('c'),fpsEl=document.getElementById('fps');
 const FORCE_GL=/[?&]renderer=webgl\b/.test(location.search);
 const DEPTH_MODE=new URLSearchParams(location.search).get('depth')||'reversed';
-const renderer=new THREE.WebGPURenderer({canvas,antialias:false,powerPreference:'high-performance',forceWebGL:FORCE_GL,reversedDepthBuffer:DEPTH_MODE==='reversed',logarithmicDepthBuffer:DEPTH_MODE==='log'}); // reversed depth: the island is seen from 5 cm to 200 km
+const renderer=new THREE.WebGPURenderer({canvas,antialias:false,powerPreference:'high-performance',forceWebGL:FORCE_GL,trackTimestamp:true,reversedDepthBuffer:DEPTH_MODE==='reversed',logarithmicDepthBuffer:DEPTH_MODE==='log'}); // reversed depth: the island is seen from 5 cm to 200 km
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFShadowMap;
 await renderer.init();
@@ -137,7 +137,7 @@ async function detectGPU(){let n='';try{if(navigator.gpu&&GFX_API==='WebGPU'){co
   return GPU;}
 const TARGET_FPS=60,MIN_FPS=30,FRAME_MS=1000/TARGET_FPS,MAX_W=1920,MAX_H=1080;
 const shadowsOn=()=>settings.shadows&&!activeGfx().noShadow;
-const perf={cap30:false,level:1,fps:0,prevFps:0,frames:0,windowStart:0,goodSince:0,settleUntil:0,lastUp:{level:-1,at:-1e9},blocked:{},fails:{},
+const perf={cap30:false,cpuSave:0,cpuMs:0,gpuMs:0,level:1,fps:0,prevFps:0,frames:0,windowStart:0,goodSince:0,settleUntil:0,lastUp:{level:-1,at:-1e9},blocked:{},fails:{},
   dropFrom:null,ceiling:TARGET_FPS,nextT:0,shadowTick:0,shotCell:''};
 await detectGPU();if(GPU.tier==='low')perf.level=AUTO_LEVELS.findIndex(l=>l.name==='Laptop');else if(GPU.tier==='high')perf.level=0;   // where Auto starts
 function activeGfx(){return settings.quality==='auto'?AUTO_LEVELS[perf.level]:{...(PRESETS[settings.quality]||PRESETS.medium),name:settings.quality[0].toUpperCase()+settings.quality.slice(1)};}
@@ -149,7 +149,7 @@ function setAutoLevel(l,now){
 function showFps(){
   if(!fpsEl.classList.contains('on'))return;
   const g=activeGfx(),sc=Math.round(clamp(g.scale*settings.scale,.4,1)*100);
-  fpsEl.textContent=`${Math.round(perf.fps)} FPS${perf.cap30?' (paced to 30)':''} · ${GFX_API} · ${canvas.width}×${canvas.height}${sc<100?' @ '+sc+'%':''} · ${settings.quality==='auto'?'Auto: '+g.name:g.name}${GPU.name?' · '+GPU.name.slice(0,40):''}`;
+  fpsEl.textContent=`${Math.round(perf.fps)} FPS${perf.cap30?' (paced to 30)':''} · CPU ${perf.cpuMs.toFixed(1)} ms${perf.gpuMs?' · GPU '+perf.gpuMs.toFixed(1)+' ms':''}${perf.cpuSave?' · lighter CPU '+perf.cpuSave:''} · ${GFX_API} · ${canvas.width}×${canvas.height}${sc<100?' @ '+sc+'%':''} · ${settings.quality==='auto'?'Auto: '+g.name:g.name}${GPU.name?' · '+GPU.name.slice(0,40):''}`;
 }
 // Called once per drawn frame. Judges the frame rate over one-second windows.
 function perfTick(now){
@@ -167,7 +167,10 @@ function perfTick(now){
   if(prev&&prev<slow&&fps<slow){ // two slow seconds in a row
     if(perf.lastUp.level===perf.level&&now-perf.lastUp.at<8000){ // a step up that did not hold: wait 1, 2, 4… minutes before trying it again
       const n=perf.fails[perf.level]=(perf.fails[perf.level]||0)+1;perf.blocked[perf.level]=now+60000*Math.pow(2,Math.min(n-1,4));}
-    const worst=Math.max(fps,prev);perf.dropFrom={level:perf.level,fps:worst};
+    const worst=Math.max(fps,prev);
+    // the graphics chip is idle and the processor is busy: lighten the work on the processor, not the picture
+    if(perf.gpuMs>0&&perf.gpuMs<FRAME_MS*.55&&perf.cpuMs>FRAME_MS*.6&&perf.cpuSave<2){perf.cpuSave++;perf.settleUntil=now+3000;applyGraphics();showFps();return;}
+    perf.dropFrom={level:perf.level,fps:worst};
     if(perf.level===AUTO_LEVELS.length-1&&worst<50&&!perf.cap30){perf.cap30=true;perf.settleUntil=now+3000;showFps();return;}   // the cheapest level still cannot hold 60: an even 30 is smoother than a ragged 40
     setAutoLevel(perf.level+(worst<target*.6?2:1),now);return;}
   if(fps<slow){perf.goodSince=now;return;}
