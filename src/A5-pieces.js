@@ -7,11 +7,10 @@
 const PIECEPHYS=(()=>{
   const fixed=new Map(),V=THREE.Vector3;
   const solid=f=>!hangs(f)&&f!=='mat'&&f!=='channel'&&f!=='raft';   // a raft moves on the water: no fixed body
+  const walk=f=>f==='floor'||f==='path'||f==='raft'||f==='bench';          // walked on or over: they carry you, they do not stop you
   function add(pc){if(pc.fall||!PHYS.ready||!solid(pc.f))return;if(fixed.has(pc))remove(pc);
-    const g=pc.g,R=PHYS.R,w=PHYS.world,box=localBox(g,new Set());if(box.isEmpty())return;const sz=box.getSize(new V()).multiply(g.scale),c=box.getCenter(new V()).multiply(g.scale);
-    const body=w.createRigidBody(R.RigidBodyDesc.fixed().setTranslation(g.position.x,g.position.y,g.position.z).setRotation({x:g.quaternion.x,y:g.quaternion.y,z:g.quaternion.z,w:g.quaternion.w}));
-    w.createCollider(R.ColliderDesc.cuboid(Math.max(sz.x/2,.02),Math.max(sz.y/2,.02),Math.max(sz.z/2,.02)).setTranslation(c.x,c.y,c.z).setFriction(.8),body);fixed.set(pc,body);}
-  function remove(pc){const b=fixed.get(pc);if(b&&PHYS.world){PHYS.world.removeRigidBody(b);}fixed.delete(pc);}
+    const body=SOLID.add(pc.g,{blocks:!walk(pc.f)&&!pc.q});if(body)fixed.set(pc,body);}                 // a fitted skin; a fallen piece lies low and does not stop you
+  function remove(pc){if(fixed.has(pc))SOLID.remove(pc.g);fixed.delete(pc);}
   function land(pc,g){pc.fall=false;const gy=groundAt(g.position.x,g.position.z);if(g.position.y<gy-.5)g.position.y=gy;            // never lost under the ground
     pc.x=g.position.x;pc.y=g.position.y;pc.z=g.position.z;pc.q=g.quaternion.toArray();g.updateMatrixWorld(true);add(pc);recompute();}
   function fall(pc){remove(pc);pc.fall=true;pc.g.updateMatrixWorld(true);

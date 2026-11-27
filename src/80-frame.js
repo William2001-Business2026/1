@@ -12,7 +12,7 @@ function update(dt){
      if(rq&&rq.d<rq.w+2){W4.z=rq.fx;W4.w=rq.fz;}else if(v>.2){W4.z=-player.mv.x/v;W4.w=-player.mv.z/v;}
      U.uWadeK.value=lerp(U.uWadeK.value,clamp(dep/.35,0,1)*(player.uw?0:1),1-Math.exp(-dt*4));U.uWadeM.value=lerp(U.uWadeM.value,clamp(v/2,0,1),1-Math.exp(-dt*5));}
    else U.uWadeK.value=Math.max(0,U.uWadeK.value-dt*2);}
-  TUBE.update(dt);FOOT.tick(dt);MAPBOOK.tick(dt);PIECEPHYS.tick(dt);ATMOS.tick(dt);LIFE.tick(dt);TRAVEL.tick(dt);SKYCLOCK.tick(dt);clockLight+=dt;if(clockLight>(W.clock.fast?.05:.25)){clockLight=0;applyTime(false);syncSlider();}
+  TUBE.update(dt);FOOT.tick(dt);MAPBOOK.tick(dt);PIECEPHYS.tick(dt);ATMOS.tick(dt);LIFE.tick(dt);TRAVEL.tick(dt);SOLID.tick();SKYCLOCK.tick(dt);clockLight+=dt;if(clockLight>(W.clock.fast?.05:.25)){clockLight=0;applyTime(false);syncSlider();}
 
   // lantern
   const fl=lantern.lit?1:0,flick=.82+.18*fbm(time*7,1.7,2)+.05*Math.sin(time*23);
@@ -61,6 +61,7 @@ function update(dt){
           else{const k=clamp(1-(grade-.4)*1.1,.3,1);dx*=k;dz*=k;}}                                    // steep ground uphill is slow going
         let nx=player.x+dx,nz=player.z+dz;
         for(const cs of[colliders,pieceCols])for(const c of cs){const ox=nx-c.x,oz=nz-c.z,d=Math.hypot(ox,oz),m=c.r+.3;if(d<m&&d>1e-4){nx=c.x+ox/d*m;nz=c.z+oz/d*m;}}
+        {const r=SOLID.move(player.x,player.y,player.z,nx-player.x,nz-player.z);nx=r.x;nz=r.z;}          // and along the fitted skins of solid things
         if(inTube){const o={x:nx,z:nz};TUBE.constrain(o);nx=o.x;nz=o.z;}                       // the tube's walls
         moving=Math.hypot(nx-player.x,nz-player.z)/dt;if(moving<Math.hypot(V.x,V.z)*.4){V.x*=.85;V.z*=.85;} // blocked: stop pushing into it
         player.x=nx;player.z=nz;}

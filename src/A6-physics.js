@@ -13,7 +13,7 @@ import(new URL('vendor/rapier/rapier.mjs',document.baseURI).href).then(async mod
   for(const pm of palms){const lx=pm.crown.x-pm.x,lz=pm.crown.z-pm.z;                                                          // leaning trunks
     for(let t=0;t<=1.001;t+=.2){const k=Math.pow(t,1.8);w.createCollider(R.ColliderDesc.ball(.22).setTranslation(pm.x+lx*k,pm.y-.15+t*pm.H,pm.z+lz*k));}}
   const rk=scene.userData.rocks,M=new THREE.Matrix4(),P=new THREE.Vector3(),Q=new THREE.Quaternion(),Sc=new THREE.Vector3();
-  if(rk)for(let i=0;i<rk.count;i++){rk.getMatrixAt(i,M);M.decompose(P,Q,Sc);w.createCollider(R.ColliderDesc.ball(.75*Math.min(Sc.x,Sc.y,Sc.z)).setTranslation(P.x,P.y,P.z));}
+  // (the rocks get fitted skins in AE-solids.js)
   PHYS.me=w.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(player.x,player.y+.85,player.z));         // you
   w.createCollider(R.ColliderDesc.capsule(.55,.3),PHYS.me);
   PHYS.ready=true;rebuildPhysPieces();
