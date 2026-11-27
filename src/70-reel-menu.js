@@ -73,7 +73,7 @@ function applyGraphics(){
   const g=activeGfx();
   sizeRenderer();
   scenePass.setResolutionScale(clamp(g.scale*settings.scale,.4,1));
-  buildPost({ao:settings.post&&g.ao,bloom:settings.post&&g.bloom,grade:settings.post,aa:g.aa});
+  buildPost({ao:settings.post&&g.ao,bloom:settings.post&&g.bloom,grade:settings.post,aa:g.aa,rays:settings.post?g.rays||0:0});
   postU.uGrain.value=settings.post?.035:0;postU.uVig.value=settings.post?.55:0;
   if(sun.shadow.mapSize.x!==g.shadow){sun.shadow.mapSize.set(g.shadow,g.shadow);sun.shadow.needsUpdate=true;}
   setCSM(g.csm);if(csm&&csm.camera)csm.updateFrustums(); // the cascades find the camera on their first render

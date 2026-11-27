@@ -67,11 +67,19 @@ const gradeFn=(()=>{const {Fn,float,vec3,vec4,dot,mix,fract,hash,screenUV,screen
     k.assign(mix(vec3(dot(k,vec3(.299,.587,.114))),k,1.1));k.assign(mix(k,k.mul(k).mul(float(3).sub(k.mul(2))),.3));
     const n=hash(screenCoordinate.x.floor().add(screenCoordinate.y.floor().mul(4099)).add(fract(postU.uTime).mul(611953).floor()));
     return vec4(k.add(n.sub(.5).mul(postU.uGrain)),c.a);});})();
+/* Sun shafts: light from the bright sky streaks out from the sun through whatever stands in front of it (leaves, trunks, the falls'
+   spray), the way the eye sees god rays. A radial blur of the frame's brightest parts toward the sun's place on screen. */
+const GR={sun:TSL.uniform(new THREE.Vector2(.5,.5)),k:TSL.uniform(0),col:TSL.uniform(new THREE.Color(1,.9,.75)),thr:TSL.uniform(.5),gain:TSL.uniform(1.3)};
+function godRays(col,N){const {Fn,Loop,uv,vec2,vec3,float,dot,max,min,fract,sin,exp}=TSL;return Fn(()=>{const o=vec3(0).toVar(),q=uv(),d=GR.sun.sub(q).mul(.6/N);
+  const jit=fract(sin(dot(q,vec2(12.9898,78.233))).mul(43758.5453)),p=q.add(d.mul(jit)).toVar(),w=float(1).toVar();      // a different start for each pixel: no ghost copies of the sun
+  Loop(N,()=>{p.addAssign(d);const c=col.sample(p).rgb,e=p.sub(GR.sun),l=min(max(dot(c,vec3(.3,.59,.11)).sub(GR.thr),0),3).mul(exp(dot(e,e).mul(-14)));   // only the sky round the sun shines
+    o.addAssign(vec3(l).mul(w));w.mulAssign(.9);});
+  return o.mul(GR.col).mul(GR.k.mul(GR.gain).div(N));})();}
 function buildPost(g){
   // ambient occlusion has to read the depth buffer, which WebGPU cannot do from a multisampled one,
   // so with AO the scene renders without MSAA and is smoothed with FXAA after tone mapping instead
   const samples=g.ao?0:g.aa,useFxaa=g.ao&&g.aa>0;
-  const key=[g.ao,g.bloom,g.grade,samples,useFxaa].join();if(key===postKey)return;postKey=key;
+  const key=[g.ao,g.bloom,g.grade,samples,useFxaa,g.rays].join();if(key===postKey)return;postKey=key;
   const {vec4}=TSL;
   scenePass.options.samples=samples;
   const col=scenePass.getTextureNode('output');let hdr=col;
@@ -84,6 +92,7 @@ function buildPost(g){
     hdr=vec4(col.rgb.mul(aoClean.r),col.a);
   }
   if(g.bloom){if(!bloomNode)bloomNode=bloom(col,.32,.7,1.15);hdr=hdr.add(bloomNode);}
+  if(g.rays)hdr=hdr.add(vec4(godRays(col,g.rays),0));
   let out=TSL.renderOutput(hdr);
   if(useFxaa)out=fxaa(out);
   if(g.grade)out=gradeFn(out);
@@ -97,9 +106,9 @@ function buildPost(g){
    - Frames are capped at 60 per second, so 120 Hz and 144 Hz screens do not do double the work.
    - On Auto, quality steps down when the frame rate drops and back up when there is headroom. */
 const PRESETS={ // aa: MSAA samples (WebGPU allows 1 or 4); shadowEvery: redraw the sun's shadow map every n frames
-  low:   {scale:.75,shadow:1024,shadowEvery:3,aa:0,ao:false,bloom:false,grass:.35,lantern:false},
-  medium:{scale:1,  shadow:2048,shadowEvery:2,aa:4,ao:false,bloom:true, grass:.7, lantern:false},
-  high:  {scale:1,  shadow:2048,shadowEvery:1,aa:4,ao:true, bloom:true, grass:1,  lantern:true,csm:true}, // csm: three cascaded 2048 px shadow maps out to 140 m
+  low:   {scale:.75,shadow:1024,shadowEvery:3,aa:0,ao:false,bloom:false,grass:.35,lantern:false,rays:10},
+  medium:{scale:1,  shadow:2048,shadowEvery:2,aa:4,ao:false,bloom:true, grass:.7, lantern:false,rays:16},
+  high:  {scale:1,  shadow:2048,shadowEvery:1,aa:4,ao:true, bloom:true, grass:1,  lantern:true,csm:true,rays:24}, // csm: three cascaded 2048 px shadow maps out to 140 m
   // laptops and integrated graphics: fewer, nearer trees and grass, coarser far terrain, a smaller shadow map redrawn less often
   laptop:{scale:.6, shadow:1024,shadowEvery:4,aa:0,ao:false,bloom:false,grass:.15,lantern:false,terrain:{N:32,K:1.35,min:160}}
 };

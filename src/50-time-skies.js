@@ -115,7 +115,7 @@ function applyTime(force){
   if(sI>.02||moonI<.01){sun.color.setRGB(...sc);sun.intensity=sI;S.light.copy(S.dir);}
   else{sun.color.setRGB(.6,.68,.95);sun.intensity=moonI;S.light.copy(S.moonDir);}
   sunBase=sun.intensity;sun.castShadow=shadowsOn()&&sun.intensity>.02;
-  hemi.color.setRGB(...zen).lerp(new THREE.Color(...hor),.55); hemi.groundColor.setRGB(hor[0]*.5+.1*day,hor[1]*.45+.08*day,hor[2]*.4+.05*day);
+  hemi.color.setRGB(...zen).lerp(new THREE.Color(...hor),.55); hemi.groundColor.setRGB(hor[0]*.5+.1*day,hor[1]*.45+.08*day,hor[2]*.4+.05*day);hemi.userData.g0=hemi.groundColor.clone();
   const hw=pickSky(e,hI); // with a photographed sky, the sky itself lights the island instead of the flat hemisphere light
   hemi.intensity=hemiBase=hI*(1-hw); scene.environmentIntensity=envBase=.55+.45*hw;
   {const nt=smooth(-3,-11,e),mf=.35+.65*S.illum*smooth(-2,10,S.moonEl);moon.intensity=.12*nt*mf;moon.color.setRGB(.55,.64,.9);moon.position.copy(S.moonDir).multiplyScalar(90); // the night sky's own glow; darker on a moonless night
