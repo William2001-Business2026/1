@@ -202,8 +202,9 @@ const TERRAIN=(()=>{
     geo.setIndex(indexFor(N));geo.computeBoundingSphere();
     const mesh=new THREE.Mesh(geo,mat);mesh.position.set(t.x+t.s/2,0,t.z+t.s/2);mesh.matrixAutoUpdate=false;mesh.updateMatrix();
     mesh.receiveShadow=true;mesh.castShadow=t.s<=640;mesh.frustumCulled=t.s<=2560;mesh.visible=false;mesh.userData.tile=t;
-    t.mesh=mesh;t.state=2;t.hmin=m.hmin;t.hmax=m.hmax;group.add(mesh);}
-  function drop(t){if(t.mesh){group.remove(t.mesh);t.mesh.geometry.dispose();t.mesh=null;}t.state=0;}
+    t.mesh=mesh;t.state=2;t.hmin=m.hmin;t.hmax=m.hmax;group.add(mesh);pickDirty=true;}
+  let pickDirty=true,picks=0;const lastPick=new THREE.Vector3(1e9,0,0);
+  function drop(t){if(t.mesh){group.remove(t.mesh);t.mesh.geometry.dispose();t.mesh=null;}t.state=0;pickDirty=true;}
   let frameT=0,shown=[],lastCam=new THREE.Vector3(1e9,0,0),pending=0;
   // which tiles to draw: split while near; a node is only replaced by its children once all of them can be drawn
   function wantSplit(t,c){if(t.s<=MIN)return false;const [d]=nodeDist(c.x,c.y,c.z,t.x,t.z,t.s);return d<K*t.s;}
@@ -227,9 +228,12 @@ const TERRAIN=(()=>{
     const o=window.__terrain&&window.__terrain.camOverride;if(o){camera.position.set(...o.pos);camera.lookAt(...o.look);camera.updateMatrixWorld();sky.position.copy(camera.position);}
     frameT++;apply();const c=camera.position;
     if(c.distanceTo(lastCam)>150)prefetch(c);lastCam.copy(c);                // a teleport or a cut: ask for the whole column down to full detail at once
+    // walking the whole tree of tiles costs a few ms; standing still with nothing new arrived, the answer is the same as last time
+    if(!pickDirty&&c.distanceTo(lastPick)<1.2){pump();return;}
+    pickDirty=false;lastPick.copy(c);picks++;
     const root=tileFor(ROOT.x,ROOT.z,ROOT.s,0),out=[];pickTiles(root,c,out,0);
     for(const t of shown)if(t.mesh)t.mesh.visible=false;for(const t of out)t.mesh.visible=true;shown=out;
-    if(frameT%60===0){let n=0;for(const t of tiles.values())if(frameT-t.used>600&&t.s<ROOT.s){drop(t);tiles.delete(t.key);n++;}}
+    if(picks%60===0){let n=0;for(const t of tiles.values())if(frameT-t.used>600&&t.s<ROOT.s){drop(t);tiles.delete(t.key);n++;}}
     pump();
   }
   return{update,job,mat,group,get tiles(){return tiles;},get gen(){return gen;},get shown(){return shown;},stats(){let tris=0;for(const t of shown)tris+=t.mesh.geometry.index.count/3;return{tiles:shown.length,tris,queued:queue.length,busy:workers.reduce((a,w)=>a+w.busy,0),cached:tiles.size,nw:workers.length,pend:pend.size,jid,wb:workers.map(w=>w.busy)};},

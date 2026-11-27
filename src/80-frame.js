@@ -1,6 +1,6 @@
 let clockLight=0;
 /* ───────────────────────── frame loop ───────────────────────── */
-const ray=new THREE.Raycaster();ray.far=3.3;
+const ray=new THREE.Raycaster();ray.far=3.3;const PICK={n:0,ok:false,last:null,obj:null,cand:[]};
 let lastFrameAt=performance.now(),time=0,lastLabel='',lastHint='';
 function update(dt){
   time+=dt;U.uTime.value=time;windU.value=time;postU.uTime.value=time;
@@ -123,10 +123,13 @@ function update(dt){
       if(held.kind!=='cup'||useAnim<=0)held.group.position.y=held.hold.p[1]+Math.sin(player.bobT*2)*.006;}}
 
     // what am I looking at
-    looked=null;
-    if(playing&&player.mode==='walk'&&player.zoom<.3){
-      const tp=thirdView();ray.far=tp?3.3+hero.camDist:3.3;ray.setFromCamera({x:0,y:0},camera);const hits=ray.intersectObjects(interact,true);
-      for(const h of hits){if(tp&&Math.hypot(h.point.x-player.x,h.point.z-player.z)>2.4)continue;let o=h.object;while(o&&!o.userData.item)o=o.parent;if(o&&o.userData.item!==held){looked=o.userData.item;if(h.instanceId!=null)looked.hitId=h.instanceId;break;}}
+    // (only things within reach of the camera are tested, and only every other frame: testing everything was ~2 ms a frame)
+    const pickNow=(PICK.n=(PICK.n+1)%2)===0||!PICK.ok;if(!pickNow&&PICK.last&&interact.includes(PICK.obj)){looked=PICK.last;}else looked=null;
+    if(pickNow&&playing&&player.mode==='walk'&&player.zoom<.3){
+      const tp=thirdView();ray.far=tp?3.3+hero.camDist:3.3;ray.setFromCamera({x:0,y:0},camera);const cp=camera.position,R2=(ray.far+3.5)**2;PICK.cand.length=0;
+      for(const o of interact){if(o.visible===false)continue;if(o.isInstancedMesh){if(!o.boundingSphere)o.computeBoundingSphere();const b=o.boundingSphere;if(!b||Math.hypot(b.center.x+o.position.x-cp.x,b.center.z+o.position.z-cp.z)-b.radius<ray.far+1)PICK.cand.push(o);continue;}const p=o.position;if((p.x-cp.x)**2+(p.z-cp.z)**2<R2)PICK.cand.push(o);}
+      const hits=ray.intersectObjects(PICK.cand,true);PICK.ok=true;PICK.last=null;PICK.obj=null;
+      for(const h of hits){if(tp&&Math.hypot(h.point.x-player.x,h.point.z-player.z)>2.4)continue;let o=h.object;while(o&&!o.userData.item)o=o.parent;if(o&&o.userData.item!==held){looked=o.userData.item;PICK.last=looked;PICK.obj=o;if(h.instanceId!=null)looked.hitId=h.instanceId;break;}}
     }
     let lt='',ht='';
     if(looked){const sl=itemLabel(looked);if(sl&&!W.seen[sl])W.seen[sl]=1;const v=looked.verb;lt=itemLabel(looked)+(v?'  ·  E to '+v:'')+(looked.pc?'  ·  X to take apart':'');}
@@ -175,8 +178,8 @@ function update(dt){
 let frameNo=0;
 function frame(now){frameNo++;
   requestAnimationFrame(frame);
-  if(now<perf.nextT-1.5)return;                                    // 60 FPS cap
-  perf.nextT=now-perf.nextT>FRAME_MS?now+FRAME_MS:perf.nextT+FRAME_MS;
+  const FM=perf.cap30?FRAME_MS*2:FRAME_MS;if(now<perf.nextT-1.5)return;                     // 60 FPS cap (30 when the machine cannot hold more)
+  perf.nextT=now-perf.nextT>FM?now+FM:perf.nextT+FM;
   const dt=Math.min((now-lastFrameAt)/1000,.05);lastFrameAt=now;
   update(dt);post.render();perfTick(now);
 }

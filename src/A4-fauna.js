@@ -10,16 +10,20 @@ const FAUNA=(()=>{
   const toNode=m=>m.isNodeMaterial?m.clone():new THREE.MeshStandardNodeMaterial({map:m.map,normalMap:m.normalMap,roughnessMap:m.roughnessMap,metalnessMap:m.metalnessMap,aoMap:m.aoMap,
     roughness:m.roughness??.8,metalness:m.metalness??0,color:m.color?m.color.clone():new THREE.Color(1,1,1),transparent:m.transparent,alphaTest:m.alphaTest,side:m.side,name:m.name});
   // bake a static model into one canonical mesh: y up, feet at 0, facing +z, scaled to `len` along its body
-  function bake(gl,spec){gl.scene.updateMatrixWorld(true);const meshes=[];gl.scene.traverse(o=>{if(o.isMesh)meshes.push(o);});
-    const out=new THREE.Group(),box=new THREE.Box3();
+  // each species is baked once and its geometry shared by every animal of it: baking again for each one that streamed in was a 20 ms hitch
+  const BAKED=new Map();
+  function bake(gl,spec){const key=[spec.file,spec.turn,spec.cut,spec.len,spec.tint].join('|');let B=BAKED.get(key);if(!B){B=bake0(gl,spec);BAKED.set(key,B);}
+    const out=new THREE.Group();for(const q of B.parts){const mesh=new THREE.Mesh(q.g,q.mat);mesh.castShadow=true;mesh.receiveShadow=true;mesh.raycast=()=>{};out.add(mesh);}return{g:out,h:B.h};}
+  function bake0(gl,spec){gl.scene.updateMatrixWorld(true);const meshes=[];gl.scene.traverse(o=>{if(o.isMesh)meshes.push(o);});
+    const out=[],box=new THREE.Box3();
     const geos=meshes.map(m=>{const g=floatGeo(m.geometry).applyMatrix4(m.matrixWorld);g.rotateY(spec.turn||0);return{g,mat:toNode(m.material)};});
     for(const {g} of geos){g.computeBoundingBox();box.union(g.boundingBox);}
     if(spec.cut){const cy=box.min.y+(box.max.y-box.min.y)*spec.cut;for(const q of geos){const p=q.g.attributes.position,ix=q.g.index;if(!ix)continue;const keep=[];
       for(let i=0;i<ix.count;i+=3){const a=ix.getX(i),b=ix.getX(i+1),c=ix.getX(i+2);if(Math.max(p.getY(a),p.getY(b),p.getY(c))>cy)keep.push(a,b,c);}q.g.setIndex(keep);}box.min.y=cy;} // cut away the display base
     const size=box.getSize(new V3()),k=spec.len/Math.max(size.x,size.z),cx=(box.min.x+box.max.x)/2,cz=(box.min.z+box.max.z)/2;
     for(const q of geos){q.g.translate(-cx,-box.min.y,-cz);q.g.scale(k,k,k);q.g.computeBoundingSphere();const mat=q.mat;
-      if(spec.tint){mat.color=new THREE.Color(...spec.tint);if(mat.emissiveMap){mat.emissiveMap=null;mat.emissive&&mat.emissive.setRGB(0,0,0);}}const mesh=new THREE.Mesh(q.g,mat);mesh.castShadow=true;mesh.receiveShadow=true;mesh.raycast=()=>{};out.add(mesh);}
-    return{g:out,h:size.y*k};}
+      if(spec.tint){mat.color=new THREE.Color(...spec.tint);if(mat.emissiveMap){mat.emissiveMap=null;mat.emissive&&mat.emissive.setRGB(0,0,0);}}out.push({g:q.g,mat});}
+    return{parts:out,h:size.y*k};}
   // legs of a static quadruped or bird swing about the hip, diagonal pairs (or alternate, for birds) in step
   /* Animals without a skeleton move in the vertex shader (the model faces +z, its base at y=0): the legs swing below the hip; a bird's
      neck and head pivot down to graze and bob with each step, as geese do; a mongoose bounds, its back arching, its tail swinging. */
@@ -72,7 +76,7 @@ const FAUNA=(()=>{
   function habitat(zone,x,z){const h=heightAt(x,z);if(h<1.3||freshAt(x,z)!=null||nearStart(x,z,25)||nearHome(x,z,10))return null;const fw=forestW(x,z),m=masks(x,z),zn=zoneAt(x,z),ny=tnorm(x,z).y;
     if(zone==='forest'&&fw>.5&&ny>.6)return{x,z,y:h};if(zone==='edge'&&fw<.4&&fw>.02&&m.d>20&&ny>.6)return{x,z,y:h};
     if(zone==='mountain'&&zn==='mountain'&&ny>.6)return{x,z,y:h};if(zone==='grass'&&fw<.2&&zn!=='mountain'&&m.d>28&&m.lava<.3&&ny>.7)return{x,z,y:h};return null;}
-  const FCH=128;let FQ=1;
+  const FCH=128;let FQ=Math.max(.4,.35+.65*activeGfx().grass);   // fewer animals, nearer, on lighter settings
   function* homes(ch){const R=ch.R,cx=ch.x0+FCH/2,cz=ch.z0+FCH/2;ch.plans=[];
     // the birds perch in this chunk's trees: wait until they are planned, so the same birds come back to the same trees
     for(let k=0;k<600;k++){let ok=true;for(let i=0;i<2;i++)for(let j=0;j<2;j++){const c=FLORA.layer.chunks.get((Math.floor(ch.x0/64)+i)+','+(Math.floor(ch.z0/64)+j));if(c&&c.state!==2)ok=false;}if(ok)break;yield;}
@@ -235,7 +239,8 @@ const FAUNA=(()=>{
       if(GROUND.includes(sp.zone)){const nn=tnorm(a.p.x,a.p.z),ty=new V3(nn.x,1,nn.z).normalize();a.tilt=(a.tilt||new V3(0,1,0)).lerp(ty,Math.min(1,dt*4));
         a.g.quaternion.premultiply(new THREE.Quaternion().setFromUnitVectors(new V3(0,1,0),a.tilt));                // standing on the slope, not plumb on it
         a.lie=lerp(a.lie||0,a.state==='idle'?(a.rest||0):0,Math.min(1,dt*1.5));if(a.lie>.01)a.g.position.y-=a.lie*(sp.len||.5)*.12*(a.size||1);} // settling down to rest and sleep
-      if(a.mixer){a.mixer.update(dt);}
+      if(a.mixer){const far=Math.hypot(a.p.x-camera.position.x,a.p.z-camera.position.z)>35;a.mixAcc=(a.mixAcc||0)+dt;   // far off, a skeleton moves every third frame
+        if(!far||(a.mixI=((a.mixI||0)+1)%3)===0){a.mixer.update(a.mixAcc);a.mixAcc=0;}}
       if(a.legs){const uA=a.speed>.05?Math.min(.7,.25+a.speed*.12):0;a.legs.uA.value=lerp(a.legs.uA.value,uA,Math.min(1,dt*6));      // legs swing so a foot on the ground moves back exactly as fast as the body moves on
         a.legPh=(a.legPh||0)+a.speed*dt*Math.PI/(2*Math.max(.12,a.legs.uA.value)*(a.hipH||.2));a.legs.uW.value=a.legPh;
         a.legs.uG.value=lerp(a.legs.uG.value,a.state==='graze'||(a.state==='idle'&&Math.sin(time*.4+(a.phase||0)*7)>.35)?1:0,Math.min(1,dt*2.2));}   // head down to the grass, up to look round
@@ -244,7 +249,7 @@ const FAUNA=(()=>{
     }
   }
   const layer=STREAM.layer({name:'fauna',size:FCH,seed:128,prio:2,radius:()=>140+120*FQ,margin:30,build:homes,ready:spawnChunk,dispose:despawnChunk});
-  return{list,groups,tick,layer,quality(g){FQ=g.grass;},force(p){force=p||null;},make(key,x,z){return makeOne(key,SPEC[key],{x,y:heightAt(x,z),z});},   // make: one animal, for tests
+  return{list,groups,tick,layer,quality(g){FQ=Math.max(.4,.35+.65*g.grass);},force(p){force=p||null;},make(key,x,z){return makeOne(key,SPEC[key],{x,y:heightAt(x,z),z});},   // make: one animal, for tests
     get phase(){return phaseNow();},clipV,
     get counts(){const n={};for(const a of list)n[a.key]=(n[a.key]||0)+1;return n;},species:Object.keys(SPEC)};
 })();

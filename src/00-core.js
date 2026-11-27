@@ -99,7 +99,9 @@ function buildPost(g){
 const PRESETS={ // aa: MSAA samples (WebGPU allows 1 or 4); shadowEvery: redraw the sun's shadow map every n frames
   low:   {scale:.75,shadow:1024,shadowEvery:3,aa:0,ao:false,bloom:false,grass:.35,lantern:false},
   medium:{scale:1,  shadow:2048,shadowEvery:2,aa:4,ao:false,bloom:true, grass:.7, lantern:false},
-  high:  {scale:1,  shadow:2048,shadowEvery:1,aa:4,ao:true, bloom:true, grass:1,  lantern:true,csm:true} // csm: three cascaded 2048 px shadow maps out to 140 m
+  high:  {scale:1,  shadow:2048,shadowEvery:1,aa:4,ao:true, bloom:true, grass:1,  lantern:true,csm:true}, // csm: three cascaded 2048 px shadow maps out to 140 m
+  // laptops and integrated graphics: fewer, nearer trees and grass, coarser far terrain, a smaller shadow map redrawn less often
+  laptop:{scale:.6, shadow:1024,shadowEvery:4,aa:0,ao:false,bloom:false,grass:.15,lantern:false,terrain:{N:32,K:1.35,min:160}}
 };
 const AUTO_LEVELS=[ // best first; Auto starts at Medium
   {...PRESETS.high,name:'High'},
@@ -108,12 +110,28 @@ const AUTO_LEVELS=[ // best first; Auto starts at Medium
   {...PRESETS.medium,scale:.7,aa:0,name:'Medium, 70%'},
   {...PRESETS.low,name:'Low'},
   {...PRESETS.low,scale:.6,name:'Low, 60%'},
-  {...PRESETS.low,scale:.5,name:'Low, 50%'}
+  {...PRESETS.low,scale:.5,name:'Low, 50%'},
+  {...PRESETS.laptop,name:'Laptop'},
+  {...PRESETS.laptop,scale:.5,name:'Laptop, 50%'},
+  {...PRESETS.laptop,scale:.45,grass:.06,noShadow:true,name:'Laptop, no shadows'}
 ];
+/* Which graphics chip this is, from its name: integrated chips (Intel, AMD's laptop graphics, phones) start Auto at Laptop, not
+   Medium, so a laptop is smooth from the first second instead of after half a minute of stepping down. */
+const GPU={name:'',tier:'mid'};
+async function detectGPU(){let n='';try{if(navigator.gpu&&GFX_API==='WebGPU'){const a=await navigator.gpu.requestAdapter({powerPreference:'high-performance'});const i=a&&(a.info||(a.requestAdapterInfo&&await a.requestAdapterInfo()));if(i)n=[i.vendor,i.architecture,i.device,i.description].filter(Boolean).join(' ');}}catch(e){}
+  if(!n)try{const gl=document.createElement('canvas').getContext('webgl2'),x=gl&&gl.getExtension('WEBGL_debug_renderer_info');if(x)n=gl.getParameter(x.UNMASKED_RENDERER_WEBGL)+' '+gl.getParameter(x.UNMASKED_VENDOR_WEBGL);}catch(e){}
+  GPU.name=n;const s=n.toLowerCase();
+  const low=/intel|iris|uhd|hd graphics|gen-?1[0-9]|xe\b|radeon\(tm\) graphics|radeon graphics|vega [0-9]+ |\b(680|780|880|890)m\b|mali|adreno|powervr|swiftshader|llvmpipe|software|microsoft basic/.test(s)&&!/arc a[0-9]/.test(s);
+  const high=/rtx|rx [6-9][0-9]{3}|rx 7[0-9]{3}|radeon pro w|apple m[1-4] (pro|max|ultra)|geforce gtx 1[0-9]{3}|titan/.test(s);
+  GPU.tier=low?'low':high?'high':'mid';
+  if((navigator.hardwareConcurrency||8)<=4&&GPU.tier!=='high')GPU.tier='low';
+  return GPU;}
 const TARGET_FPS=60,MIN_FPS=30,FRAME_MS=1000/TARGET_FPS,MAX_W=1920,MAX_H=1080;
-const perf={level:1,fps:0,prevFps:0,frames:0,windowStart:0,goodSince:0,settleUntil:0,lastUp:{level:-1,at:-1e9},blocked:{},fails:{},
+const shadowsOn=()=>settings.shadows&&!activeGfx().noShadow;
+const perf={cap30:false,level:1,fps:0,prevFps:0,frames:0,windowStart:0,goodSince:0,settleUntil:0,lastUp:{level:-1,at:-1e9},blocked:{},fails:{},
   dropFrom:null,ceiling:TARGET_FPS,nextT:0,shadowTick:0,shotCell:''};
-function activeGfx(){return settings.quality==='auto'?AUTO_LEVELS[perf.level]:{...PRESETS[settings.quality],name:settings.quality[0].toUpperCase()+settings.quality.slice(1)};}
+await detectGPU();if(GPU.tier==='low')perf.level=AUTO_LEVELS.findIndex(l=>l.name==='Laptop');else if(GPU.tier==='high')perf.level=0;   // where Auto starts
+function activeGfx(){return settings.quality==='auto'?AUTO_LEVELS[perf.level]:{...(PRESETS[settings.quality]||PRESETS.medium),name:settings.quality[0].toUpperCase()+settings.quality.slice(1)};}
 function setAutoLevel(l,now){
   l=clamp(l,0,AUTO_LEVELS.length-1);if(l===perf.level)return;
   if(l<perf.level)perf.lastUp={level:l,at:now};
@@ -122,7 +140,7 @@ function setAutoLevel(l,now){
 function showFps(){
   if(!fpsEl.classList.contains('on'))return;
   const g=activeGfx(),sc=Math.round(clamp(g.scale*settings.scale,.4,1)*100);
-  fpsEl.textContent=`${Math.round(perf.fps)} FPS · ${GFX_API} · ${canvas.width}×${canvas.height}${sc<100?' @ '+sc+'%':''} · ${settings.quality==='auto'?'Auto: '+g.name:g.name}`;
+  fpsEl.textContent=`${Math.round(perf.fps)} FPS${perf.cap30?' (paced to 30)':''} · ${GFX_API} · ${canvas.width}×${canvas.height}${sc<100?' @ '+sc+'%':''} · ${settings.quality==='auto'?'Auto: '+g.name:g.name}${GPU.name?' · '+GPU.name.slice(0,40):''}`;
 }
 // Called once per drawn frame. Judges the frame rate over one-second windows.
 function perfTick(now){
@@ -141,7 +159,8 @@ function perfTick(now){
     if(perf.lastUp.level===perf.level&&now-perf.lastUp.at<8000){ // a step up that did not hold: wait 1, 2, 4… minutes before trying it again
       const n=perf.fails[perf.level]=(perf.fails[perf.level]||0)+1;perf.blocked[perf.level]=now+60000*Math.pow(2,Math.min(n-1,4));}
     const worst=Math.max(fps,prev);perf.dropFrom={level:perf.level,fps:worst};
-    setAutoLevel(perf.level+(worst<MIN_FPS?2:1),now);return;}
+    if(perf.level===AUTO_LEVELS.length-1&&worst<50&&!perf.cap30){perf.cap30=true;perf.settleUntil=now+3000;showFps();return;}   // the cheapest level still cannot hold 60: an even 30 is smoother than a ragged 40
+    setAutoLevel(perf.level+(worst<target*.6?2:1),now);return;}
   if(fps<slow){perf.goodSince=now;return;}
   if(fps>=target*.95&&perf.level>0&&now-perf.goodSince>8000&&!((perf.blocked[perf.level-1]||0)>now))setAutoLevel(perf.level-1,now); // 8 smooth seconds: try one step better
 }

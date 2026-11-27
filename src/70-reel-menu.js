@@ -77,16 +77,16 @@ function applyGraphics(){
   postU.uGrain.value=settings.post?.035:0;postU.uVig.value=settings.post?.55:0;
   if(sun.shadow.mapSize.x!==g.shadow){sun.shadow.mapSize.set(g.shadow,g.shadow);sun.shadow.needsUpdate=true;}
   setCSM(g.csm);if(csm&&csm.camera)csm.updateFrustums(); // the cascades find the camera on their first render
-  renderer.shadowMap.enabled=settings.shadows;sun.castShadow=settings.shadows&&sun.intensity>.05;
+  const shOn=settings.shadows&&!g.noShadow;renderer.shadowMap.enabled=shOn;sun.castShadow=shOn&&sun.intensity>.05;
   lanternLight.castShadow=settings.shadows&&g.lantern;
-  GRASS.quality(g);FLORA_NEAR=24+36*g.grass;
+  GRASS.quality(g);FLORA_NEAR=24+36*g.grass;try{FAUNA.quality(g);STREAM.budget=/^Laptop/.test(g.name)?2.5:4;}catch(e){}   // (they may not exist yet at start-up); on a laptop the world fills in more gently
   $('v-fov').textContent='· '+settings.fov+'°';
   fpsEl.classList.toggle('on',!!settings.showFps);
   // materials only need rebuilding when shadows are switched on or off, not on every resize
-  if(lastShadowsOn!==null&&lastShadowsOn!==settings.shadows)scene.traverse(o=>{if(o.material&&o.isMesh)o.material.needsUpdate=true;});
-  lastShadowsOn=settings.shadows;
+  if(lastShadowsOn!==null&&lastShadowsOn!==shOn)scene.traverse(o=>{if(o.material&&o.isMesh)o.material.needsUpdate=true;});
+  lastShadowsOn=shOn;
 }
-function describeGfx(){$('v-gfx').textContent='Drawing with '+GFX_API+(GFX_API==='WebGPU'?'':FORCE_GL?' (chosen in the address)':navigator.gpu?' (WebGPU could not start on this device)':' (this browser has no WebGPU)')+'. Up to 1920×1080 at 60 FPS.';}
+function describeGfx(){$('v-gfx').textContent=(GPU.name?'Graphics: '+GPU.name.slice(0,60)+(GPU.tier==='low'?' (integrated: Auto starts at Laptop)':'')+'. ':'')+'Drawing with '+GFX_API+(GFX_API==='WebGPU'?'':FORCE_GL?' (chosen in the address)':navigator.gpu?' (WebGPU could not start on this device)':' (this browser has no WebGPU)')+'. Up to 1920×1080 at 60 FPS.';}
 function applyAudio(){if(!AU.ctx)return;const t=AU.ctx.currentTime;AU.master.gain.setTargetAtTime(settings.master,t,.05);AU.amb.gain.setTargetAtTime(settings.amb,t,.05);AU.mus.gain.setTargetAtTime(settings.music,t,.05);}
 bind('s-quality','quality','str',applyGraphics);bind('s-scale','scale','num',applyGraphics);bind('s-shadows','shadows','check',applyGraphics);
 bind('s-post','post','check',applyGraphics);bind('s-fps','showFps','check',applyGraphics);bind('s-fov','fov','num',applyGraphics);

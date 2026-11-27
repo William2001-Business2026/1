@@ -114,7 +114,7 @@ function applyTime(force){
   const moonI=.55*S.illum*smooth(1,14,S.moonEl)*smooth(-3,-9,e);
   if(sI>.02||moonI<.01){sun.color.setRGB(...sc);sun.intensity=sI;S.light.copy(S.dir);}
   else{sun.color.setRGB(.6,.68,.95);sun.intensity=moonI;S.light.copy(S.moonDir);}
-  sunBase=sun.intensity;sun.castShadow=settings.shadows&&sun.intensity>.02;
+  sunBase=sun.intensity;sun.castShadow=shadowsOn()&&sun.intensity>.02;
   hemi.color.setRGB(...zen).lerp(new THREE.Color(...hor),.55); hemi.groundColor.setRGB(hor[0]*.5+.1*day,hor[1]*.45+.08*day,hor[2]*.4+.05*day);
   const hw=pickSky(e,hI); // with a photographed sky, the sky itself lights the island instead of the flat hemisphere light
   hemi.intensity=hemiBase=hI*(1-hw); scene.environmentIntensity=envBase=.55+.45*hw;

@@ -259,7 +259,7 @@ window.__tF0=performance.now();const FLORA=(()=>{
         if(performance.now()-t0<2)for(const rk in ch.groups)if(ch.groups[rk].ver!==SRC[rk].ver){meshChunk(ch);break;}   // a scan has loaded: redo a few chunks a frame
         assign(ch,ex,ez);
         if(!ch.cols&&ch.d<70)STREAM.addCols(ch,ch.colsList);else if(ch.cols&&ch.d>100)STREAM.dropCols(ch);}       // trunks you can bump into, near you
-      if(impDirty||Math.hypot(ex-impX,ez-impZ)>5){impDirty=false;impX=ex;impZ=ez;fillImps(ex,ez);}}});
+      if(impDirty||Math.hypot(ex-impX,ez-impZ)>10){impDirty=false;impX=ex;impZ=ez;fillImps(ex,ez);}}});
   // physics: trunks become solid for things you throw, while their chunk lives
   let physSynced=false;
   // ── the scanned trees ──
