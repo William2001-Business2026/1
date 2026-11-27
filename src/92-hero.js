@@ -99,6 +99,13 @@ function heroLoco(dt,v){
   const stride=lerp(1.45*dW,3.4*dJ,wJ/(wW+wJ+1e-4));                                       // metres per cycle, at each clip's own pace
   hero.ph=((hero.ph||0)+v*dt/Math.max(.3,stride))%1;Wk.time=hero.ph*dW;J.time=hero.ph*dJ;I.time=(I.time+dt)%I.getClip().duration;
   I.setEffectiveWeight(wI*hero.locoIn);Wk.setEffectiveWeight(wW*hero.locoIn);J.setEffectiveWeight(wJ*hero.locoIn);hero.idleW=wI;return true;}
+/* wet: out of the sea or the river his skin and clothes are darker and glossy, drying over a couple of minutes (faster in sun and
+   wind); wading wets him to the depth he stood in. */
+function heroWet(dt,swim){const fw=freshAt(player.x,player.z),h=heightAt(player.x,player.z),dep=player.uw||swim?2:Math.max(h<0?-h:0,fw!=null?fw-h:0);
+  const lvl=clamp(dep/1.1,0,1);if(lvl>(hero.wet||0))hero.wet=lvl;else hero.wet=Math.max(0,(hero.wet||0)-dt/(120/(1+sun.intensity*.12+WIND.strength.value*.5)));
+  if(!hero.mats){hero.mats=[];hero.model.traverse(o=>{if(o.isMesh&&o.material)for(const m of[].concat(o.material))if(m.color&&!hero.mats.some(q=>q.m===m))hero.mats.push({m,c:m.color.clone(),r:m.roughness??.8});});}
+  const w=hero.wet;if(Math.abs(w-(hero.wetShown??-1))<.01)return;hero.wetShown=w;
+  for(const q of hero.mats){q.m.color.copy(q.c).multiplyScalar(1-.38*w);q.m.roughness=q.r*(1-.55*w);}}
 // after the clips: the head follows where you look, the chest breathes, and the body banks into turns and leans with speed changes
 const _hl=new THREE.Vector3();
 function heroPost(dt,spd,swim){
@@ -167,11 +174,13 @@ function updateHero(dt,moving){
   else if(moving>.2){want='Walk_Loop';ts=clamp(moving/1.45,.6,1.5);}
   else if(hero.turn){want='Walk_Loop';ts=.8;}                                                 // small steps round
   else if(hero.shotT>0)want=hero.shot;
+  else if((keys.ShiftLeft||keys.ShiftRight)&&moving<.15&&hero.acts.Crouch_Idle_Loop&&player.mode==='walk')want='Crouch_Idle_Loop';   // creeping, he crouches low when he stops
   else if(held&&held.kind==='lantern')want='Idle_Torch_Loop';
   const loco=/^(Idle_Loop|Walk_Loop|Jog_Fwd_Loop)$/.test(want)&&!hero.turn&&heroLoco(dt,moving);  // on foot: blended by speed
   if(!loco){heroPlay(want,player.air||hero.landT>0?.12:.25);hero.idleW=want==='Idle_Loop'?1:0;
     if(/Walk_Loop|Jog_Fwd/.test(hero.cur))hero.acts[hero.cur].setEffectiveTimeScale(ts);}  // feet match the ground speed
   hero.mixer.update(dt);
+  heroWet(dt,swim);
   heroPost(dt,moving,swim);
   RAG.blendPose();
   heroIK(dt,swim);

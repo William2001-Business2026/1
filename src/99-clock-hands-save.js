@@ -87,6 +87,7 @@ function sysKey(e){
   if(e.code==='KeyF'&&build.on){build.fi++;build.dy=0;return true;}
   if(e.code==='KeyX'&&looked&&looked.pc){SFX.knock();removePiece(looked.pc);return true;}
   if(e.code==='KeyQ'){cycleSel(1);return true;}
+  if(e.code==='KeyZ'){hero.shoulder=-(hero.shoulder??1);return true;}                            // the other shoulder
   return false;
 }
 addEventListener('wheel',e=>{if(state!=='play'||MAPBOOK.on)return;const d=e.deltaY>0?1:-1;if(build.on)build.dy=clamp(build.dy-d,-3,14);else cycleSel(d);},{passive:true});

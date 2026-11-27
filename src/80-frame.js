@@ -97,13 +97,17 @@ function update(dt){
     else{_v.set(-.42,-.52,0);hamSwing.localToWorld(_v);roll=hamSwing.rotation.x*.7;}
     if(thirdView()){ // over the right shoulder, kept above the ground and the sea
       const cp=Math.cos(player.pitch),sy=Math.sin(player.yaw),cy=Math.cos(player.yaw),fx=-sy*cp,fy=Math.sin(player.pitch),fz=-cy*cp;
-      const d=hero.camDist*(1-.3*Math.max(0,fy)),py=player.uw?player.y+1.55:Math.max(player.y+1.55,water.position.y+.4);
-      _v.set(player.x-fx*d+cy*.42,py-fy*d,player.z-fz*d-sy*.42);
-      {const hx=player.x,hz=player.z,dx=_v.x-hx,dz=_v.z-hz,L2=dx*dx+dz*dz;let tHit=1;
+      // the camera's anchor follows you on a spring: a little behind when you set off, a little ahead when you stop, bumps smoothed
+      const CA=hero.ca||(hero.ca=new THREE.Vector3(player.x,player.y,player.z));if(CA.distanceTo(_v.set(player.x,player.y,player.z))>6)CA.copy(_v);
+      CA.x=lerp(CA.x,player.x,1-Math.exp(-dt*9));CA.z=lerp(CA.z,player.z,1-Math.exp(-dt*9));CA.y=lerp(CA.y,player.y,1-Math.exp(-dt*(player.air?4:7)));
+      hero.sh=lerp(hero.sh??1,hero.shoulder??1,1-Math.exp(-dt*6));                                     // Z swaps the shoulder
+      const d=hero.camDist*(1-.3*Math.max(0,fy)),py=player.uw?CA.y+1.55:Math.max(CA.y+1.55,water.position.y+.4);
+      _v.set(CA.x-fx*d+cy*.42*hero.sh,py-fy*d,CA.z-fz*d-sy*.42*hero.sh);
+      {const hx=CA.x,hz=CA.z,dx=_v.x-hx,dz=_v.z-hz,L2=dx*dx+dz*dz;let tHit=1;
        for(const c of colliders){const ox=c.x-hx,oz=c.z-hz;if(Math.abs(ox)>d+2||Math.abs(oz)>d+2)continue;const t=clamp((ox*dx+oz*dz)/Math.max(L2,1e-6),0,1),px=dx*t-ox,pz=dz*t-oz;
          if(px*px+pz*pz<(c.r+.25)*(c.r+.25)&&t<tHit)tHit=Math.max(.12,t-(c.r+.3)/Math.sqrt(Math.max(L2,1e-6)));}
        hero.camK=lerp(hero.camK??1,tHit,1-Math.exp(-dt*(tHit<(hero.camK??1)?14:3)));  // pull in fast, ease back out
-       _v.set(hx+dx*hero.camK,lerp(player.y+1.55,_v.y,hero.camK),hz+dz*hero.camK);TUBE.clampCam(_v,player);}
+       _v.set(hx+dx*hero.camK,lerp(CA.y+1.55,_v.y,hero.camK),hz+dz*hero.camK);TUBE.clampCam(_v,player);}
       const inT=TUBE.inside(player.x,player.z,player.y),gy=inT?(TUBE.floorAt(_v.x,_v.z,player.y)??player.y)+.3:(player.uw?groundAt(_v.x,_v.z):Math.max(groundAt(_v.x,_v.z),water.position.y))+.3;if(_v.y<gy)_v.y=gy;if(inT)TUBE.clampCam(_v,player);if(player.uw&&_v.y>water.position.y-.3)_v.y=water.position.y-.3;roll=0;}
     if(player.trans<1){player.trans=Math.min(1,player.trans+dt/.9);const k=player.trans*player.trans*(3-2*player.trans);camera.position.lerpVectors(player.from,_v,k);}
     else camera.position.copy(_v);
