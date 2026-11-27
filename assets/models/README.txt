@@ -11,11 +11,12 @@ islander_scan.glb  (Creative Commons Attribution 4.0, https://creativecommons.or
 
 islander.glb, islander_moves.glb
   Quaternius "Universal Base Characters" (Superhero Male, Standard version) and
-  "Universal Animation Library" (Standard version), https://quaternius.com
+  "Universal Animation Library" and "Universal Animation Library 2" (Standard versions), https://quaternius.com
   The downloaded packs (December 2025 releases) are licensed CC0 1.0, as stated in their bundled
   License files. Quaternius now publishes new releases under the Quaternius Asset License, which allows
   use in games but not redistribution of the assets on their own; please do not extract these files
-  for use as standalone assets. islander_moves.glb holds only the 17 animations the game plays.
+  for use as standalone assets. islander_moves.glb holds only the 41 animations the game plays (24 from the
+  first library, 17 from the second, merged by bone name; both rigs are the same).
 
 goat.glb, hen.glb, rooster.glb  (Creative Commons Attribution 4.0, https://creativecommons.org/licenses/by/4.0/)
   "Goat" by GerardoA400            https://sketchfab.com/3d-models/goat-5d7431517b634f4e9e8c0f3729cd9c59

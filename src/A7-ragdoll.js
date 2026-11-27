@@ -71,6 +71,11 @@ const RAG=(()=>{
     for(const p of parts){if(!p.par)continue;const Pp=by[p.par],qi=Pp.cap0.clone().invert();p.P=Pp;
       const A=U.clone().applyQuaternion(p.cap0).applyQuaternion(qi).normalize(),F=F0.clone().applyQuaternion(qi);F.addScaledVector(A,-F.dot(A));
       if(F.lengthSq()<1e-4)F.set(1,0,0).addScaledVector(A,-A.x);p.A=A;p.Fr=F.normalize();p.Sr=new V().crossVectors(p.Fr,A).normalize();}}
+  // bracing: each upper arm turns toward the ground in the direction of the fall (a soft drive on its spin, like a reflex)
+  function brace(k){const pv=parts[0]&&parts[0].body.linvel();if(!pv)return;const T=new V(pv.x*.35,-1,pv.z*.35).normalize();
+    for(const p of parts){if(p.nm!=='uarmL'&&p.nm!=='uarmR'&&p.nm!=='farmL'&&p.nm!=='farmR')continue;const r=p.body.rotation(),d=U.clone().applyQuaternion(new Q(r.x,r.y,r.z,r.w)),n=new V().crossVectors(d,T);
+      const s=n.length();if(s<1e-4)continue;n.multiplyScalar(1/s);const ang=Math.acos(clamp(d.dot(T),-1,1)),w=p.body.angvel(),add=Math.min(12,ang/.18)*k;
+      p.body.setAngvel({x:w.x+n.x*add,y:w.y+n.y*add,z:w.z+n.z*add},true);}}
   function stop(){const w=PHYS.world;for(const j of joints)w.removeImpulseJoint(j,true);for(const p of parts)w.removeRigidBody(p.body);joints=[];parts=[];on=false;
     PHYS.me.collider(0).setCollisionGroups(0xFFFFFFFF);}
   // the bones follow the bodies, parents first
@@ -81,7 +86,7 @@ const RAG=(()=>{
       b.updateMatrixWorld(true);}}
   function update(dt){
     if(blend>0){blend=Math.max(0,blend-dt/.7);return;}
-    if(!on)return;t+=dt;if(RAG.lim!==false)limits();const pv=parts[0].body,tr=pv.translation(),v=pv.linvel();
+    if(!on)return;t+=dt;if(RAG.lim!==false)limits();if(t<.6)brace(1-t/.6);const pv=parts[0].body,tr=pv.translation(),v=pv.linvel();
     player.x=tr.x;player.z=tr.z;player.y=Math.max(groundAt(tr.x,tr.z),tr.y-.9);player.air=false;player.vy=0;      // the camera and the world follow him
     if(tr.y<groundAt(tr.x,tr.z)-1.5){y0=Math.max(y0,tr.y);getUp();return;}                                       // slipped through the ground (no physics tile yet): stand him up there
     const sp=parts.reduce((s,p)=>{const l=p.body.linvel();return s+Math.hypot(l.x,l.y,l.z);},0)/parts.length;still=sp<.35?still+dt:0;
@@ -95,7 +100,7 @@ const RAG=(()=>{
     const torso=parts.find(p=>p.nm==='torso'),r=torso.body.rotation(),f=new V(0,0,1).applyQuaternion(new Q(r.x,r.y,r.z,r.w));
     stop();hero.bodyYaw=Math.atan2(-f.x,-f.z);hero.root.rotation.set(0,hero.bodyYaw,0);hero.root.position.set(player.x,player.y,player.z);hero.root.updateMatrixWorld(true);
     pel.parent.updateWorldMatrix(true,false);const lm=pel.parent.matrixWorld.clone().invert().multiply(pw);saved.pelvisPos=new V().setFromMatrixPosition(lm);
-    blend=1;hero.shot='Fixing_Kneeling';hero.shotT=1.4;SFX.cloth&&SFX.cloth();}
+    blend=1;hero.shot=hero.acts.LayToIdle?'LayToIdle':'Fixing_Kneeling';hero.shotT=hero.acts.LayToIdle?hero.acts.LayToIdle.getClip().duration*.9:1.4;SFX.cloth&&SFX.cloth();}
   // after the animation: ease from the lying pose into it
   function blendPose(){if(blend<=0||!saved)return;const k=blend*blend*(3-2*blend);
     for(const [b,q] of saved)b.quaternion.slerp(q,k);const pel=hero.model.getObjectByName('pelvis_01');if(pel&&saved.pelvisPos)pel.position.lerp(saved.pelvisPos,k);hero.model.updateMatrixWorld(true);}

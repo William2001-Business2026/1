@@ -50,8 +50,13 @@ function update(dt){
       if(player.uw)moving=swimUnder(f,s,dt,wy);
       else{
       // momentum: you speed up over about half a second and come to a stop over a third, and have little control in the air
+      if(!(f||s))player.pushing=0;
       const V=player.mv||(player.mv={x:0,z:0});{const l=Math.hypot(f,s)||1,sy=Math.sin(player.yaw),cy=Math.cos(player.yaw),tx=f||s?(-sy*f+cy*s)/l*sp:0,tz=f||s?(-cy*f-sy*s)/l*sp:0;
-        const k=1-Math.exp(-dt*(player.air?1.1:Math.hypot(tx,tz)>Math.hypot(V.x,V.z)?5.2:8.5));V.x+=(tx-V.x)*k;V.z+=(tz-V.z)*k;if(!(f||s)&&Math.hypot(V.x,V.z)<.05)V.x=V.z=0;}
+        // the body's velocity follows where you steer on a critically damped spring, acceleration carried as its state: a push
+        // that builds and eases, never a jolt (Holden's simulation_positions_update, Motion-Matching, MIT)
+        const hl=player.air?.9:Math.hypot(tx,tz)>Math.hypot(V.x,V.z)?.24:.16,y=(4*Math.LN2/(hl+1e-5))/2,ey=Math.exp(-y*dt);V.ax=V.ax||0;V.az=V.az||0;
+        {const j0x=V.x-tx,j1x=V.ax+j0x*y;V.x=ey*(j0x+j1x*dt)+tx;V.ax=ey*(V.ax-j1x*y*dt);const j0z=V.z-tz,j1z=V.az+j0z*y;V.z=ey*(j0z+j1z*dt)+tz;V.az=ey*(V.az-j1z*y*dt);}
+        if(!(f||s)&&Math.hypot(V.x,V.z)<.05){V.x=V.z=V.ax=V.az=0;}}
       if(V.x||V.z){
         let dx=V.x*dt,dz=V.z*dt;
         const inTube=TUBE.inside(player.x,player.z,player.y);
@@ -61,14 +66,16 @@ function update(dt){
           else{const k=clamp(1-(grade-.4)*1.1,.3,1);dx*=k;dz*=k;}}                                    // steep ground uphill is slow going
         let nx=player.x+dx,nz=player.z+dz;
         for(const cs of[colliders,pieceCols])for(const c of cs){const ox=nx-c.x,oz=nz-c.z,d=Math.hypot(ox,oz),m=c.r+.3;if(d<m&&d>1e-4){nx=c.x+ox/d*m;nz=c.z+oz/d*m;}}
-        {const r=SOLID.move(player.x,player.y,player.z,nx-player.x,nz-player.z);nx=r.x;nz=r.z;}          // and along the fitted skins of solid things
+        {const r=SOLID.move(player.x,player.y,player.z,nx-player.x,nz-player.z);nx=r.x;nz=r.z;          // and along the fitted skins of solid things
+         const sp0=Math.hypot(V.x,V.z),want=Math.hypot(dx,dz),got=Math.hypot(nx-player.x,nz-player.z);player.pushing=(f||s)&&want>1e-4&&got<want*.3?(player.pushing||0)+dt:0;   // pressing on but going nowhere: pushing
+         if(sp0>2.6&&!(hero.stagT>0)&&got<want*.35&&player.pushing<.05){hero.stagHard=sp0>3.4;hero.stagT=hero.stagHard?.9:.55;V.x*=-.25;V.z*=-.25;SFX.knock&&SFX.knock();}}   // ran into it: a stagger
         if(inTube){const o={x:nx,z:nz};TUBE.constrain(o);nx=o.x;nz=o.z;}                       // the tube's walls
         moving=Math.hypot(nx-player.x,nz-player.z)/dt;if(moving<Math.hypot(V.x,V.z)*.4){V.x*=.85;V.z*=.85;} // blocked: stop pushing into it
         player.x=nx;player.z=nz;}
       if(fw!=null&&deep>.35){const q=riverQ(player.x,player.z);                // the river's current carries you downstream
         if(q&&q.d<q.w+.3){const gr=Math.max(0,RIVER.wl[Math.floor(q.i)]-RIVER.wl[Math.min(RIVER.P.length-1,Math.floor(q.i)+2)])/2;const cs=clamp(.4+gr*30,.4,4)*smooth(.35,1,deep)*dt;player.x+=q.fx*cs;player.z+=q.fz*cs;}}
       if(deep<.5&&!player.air&&!player.climb&&!TUBE.inside(player.x,player.z,player.y)){const gx=heightAt(player.x+.4,player.z)-heightAt(player.x-.4,player.z),gz=heightAt(player.x,player.z+.4)-heightAt(player.x,player.z-.4),g=Math.hypot(gx,gz)/.8;
-        if(g>1.25){const v=Math.min(3,(g-1.25)*3+.8)*dt/(g*.8);player.x-=gx*v;player.z-=gz*v;if(!STAM.slid){STAM.slid=true;}}          // on a slope this steep you slide unless you hold on
+        if(g>1.25){const v=Math.min(3,(g-1.25)*3+.8)*dt/(g*.8);player.x-=gx*v;player.z-=gz*v;player.slideT=.25;if(!STAM.slid){STAM.slid=true;}}          // on a slope this steep you slide unless you hold on
         if(g<.8)STAM.v=Math.min(STAM.max,STAM.v+dt*6);}
       if(fw==null&&deep>1){const off=-masks(player.x,player.z).d;if(off>80){const k=(off-80)*.6*dt,r=Math.hypot(player.x,player.z);player.x-=player.x/r*k;player.z-=player.z/r*k; // past the reef the current turns you back
         if(!DIVE.toldReef){DIVE.toldReef=true;toast('Past the reef the current is too strong.',3);}}}

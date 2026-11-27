@@ -41,13 +41,13 @@ function heroMotion(dt,swim){
   // standing a while: a few things people do
   const still=onFoot&&spd<.1&&!(hero.reach&&hero.reach.t<hero.reach.dur)&&!held&&(hero.shotT||0)<=0&&hero.cur==='LOCO';
   MOT.idleT=still?MOT.idleT+dt:0;
-  if(!MOT.v&&MOT.idleT>MOT.nextV){const V=['look','roll','down','shift','look'];MOT.v=V[Math.floor(Math.random()*V.length)];MOT.vT=0;MOT.vDur={look:3.4,roll:2.2,down:1.8,shift:3.2}[MOT.v];}
+  if(!MOT.v&&MOT.idleT>MOT.nextV){const V=['look','roll','down','shift','look','fold'];MOT.v=V[Math.floor(Math.random()*V.length)];MOT.vT=0;MOT.vDur={look:3.4,roll:2.2,down:1.8,shift:3.2,fold:5}[MOT.v];if(MOT.v==='fold')heroAct('Idle_FoldArms_Loop',5);}
   if(MOT.v){MOT.vT+=dt;const k=Math.sin(Math.PI*clamp(MOT.vT/MOT.vDur,0,1))*(still?1:0),p=MOT.vT/MOT.vDur;
     if(MOT.v==='look'){const a=Math.sin(p*Math.PI*2)*.75*k;turnW(B.neck,UP,a*.4);turnW(B.head,UP,a*.6);}
     else if(MOT.v==='roll'){const a=Math.sin(p*Math.PI*2);turnW(B.sL,F,.18*k*a);turnW(B.sR,F,-.18*k*a);turnW(B.sL,R,-.12*k);turnW(B.sR,R,-.12*k);turnW(B.chest,R,-.06*k);}
     else if(MOT.v==='down'){turnW(B.neck,R,.35*k);turnW(B.head,R,.2*k);}
     else if(MOT.v==='shift'){turnW(B.hip,F,.07*k);turnW(B.chest,F,-.05*k);}
-    if(MOT.vT>=MOT.vDur||!still){MOT.v=null;MOT.idleT=0;MOT.nextV=6+Math.random()*9;}}
+    if(MOT.vT>=MOT.vDur||!still){if(MOT.v==='fold'&&hero.shot==='Idle_FoldArms_Loop')hero.shotT=0;MOT.v=null;MOT.idleT=0;MOT.nextV=6+Math.random()*9;}}
   // out of breath
   const tired=onFoot?clamp(1-STAM.v/STAM.max*2.4,0,1):0;MOT.tired=lerp(MOT.tired||0,tired,1-Math.exp(-dt*1.5));
   if(MOT.tired>.02){const br=Math.sin(performance.now()/1000*3.4)*.05*MOT.tired;turnW(B.chest,R,br);turnW(B.neck,R,.18*MOT.tired);}
@@ -59,3 +59,24 @@ function heroMotion(dt,swim){
     if(handG.parent===hero.socket){if(MOT.hs0==null)MOT.hs0=handG.scale.x;handG.position.set(-.2*c,-.04,.05);handG.rotation.set(0,0,0);handG.scale.setScalar(lerp(MOT.hs0,1,c));}}   // a load is shown at its full size
   else if(handG.parent===hero.socket&&MOT.hs0!=null){handG.position.set(0,-.03,.05);handG.scale.setScalar(MOT.hs0);MOT.hs0=null;}
 }
+
+/* Inertialization (as in Holden's Motion-Matching, and Bollo's GDC 2016 talk): a new clip starts at once, at full weight; the
+   difference between the pose you were in and the new clip's pose is kept as an offset on each bone and dies away on a critically
+   damped spring. No two clips are blended, so nothing floats or slides between them, and the body keeps its momentum through the
+   change. */
+const INERT={bones:null,prev:null,off:null,pending:false,hl:.11,
+  mark(){this.pending=true;},
+  apply(dt){const M=hero.model;if(!M)return;if(!this.bones){this.bones=[];M.traverse(o=>{if(o.isBone)this.bones.push(o);});this.prev=this.bones.map(b=>b.quaternion.clone());this.off=this.bones.map(()=>({x:new THREE.Vector3(),v:new THREE.Vector3()}));return;}
+    const B=this.bones,q=new THREE.Quaternion(),r=new THREE.Vector3();
+    if(this.pending){this.pending=false;for(let i=0;i<B.length;i++){q.copy(B[i].quaternion).invert().premultiply(this.prev[i]);   // offset = previous pose relative to the new one
+        if(q.w<0){q.x=-q.x;q.y=-q.y;q.z=-q.z;q.w=-q.w;}const s=Math.sqrt(1-Math.min(1,q.w*q.w)),ang=2*Math.acos(Math.min(1,q.w));
+        const o=this.off[i];o.x.set(q.x,q.y,q.z).multiplyScalar(s>1e-6?ang/s:0);o.v.set(0,0,0);}}
+    const y=(4*Math.LN2/(this.hl+1e-5))/2,ey=Math.exp(-y*dt);
+    for(let i=0;i<B.length;i++){const o=this.off[i];if(o.x.lengthSq()<1e-8&&o.v.lengthSq()<1e-8){this.prev[i].copy(B[i].quaternion);continue;}
+      const j1=o.v.clone().addScaledVector(o.x,y);o.x.addScaledVector(j1,dt).multiplyScalar(ey);o.v.addScaledVector(j1,-y*dt).multiplyScalar(ey);   // decay_spring_damper_exact
+      const a=o.x.length();if(a>1e-6){q.setFromAxisAngle(r.copy(o.x).multiplyScalar(1/a),a);B[i].quaternion.premultiply(q);}
+      this.prev[i].copy(B[i].quaternion);}}};
+
+// the scan's own clips for what he does with his hands (Quaternius Universal Animation Library 2, CC0): chopping, planting,
+// watering, harvesting, eating, throwing, opening a crate
+function heroAct(name,dur){if(!hero.acts||!hero.acts[name]||!heroShown()||player.mode!=='walk')return;heroOneShot(name);if(dur)hero.shotT=dur;}

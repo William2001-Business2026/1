@@ -87,7 +87,7 @@ function useHeld(){
   else if(it.kind==='coco'){
     const f=_fwd.set(0,0,-1).applyQuaternion(camera.quaternion);const from=heroShown();scene.add(it.group);
     if(from)it.group.position.copy(hero.socket.position).addScaledVector(f,.25);else{it.group.position.copy(camera.position).addScaledVector(f,.6);it.group.position.y-=.15;}
-    it.vel.copy(f).multiplyScalar(9.5);it.vel.y+=2.6;it.fly=true;it.wet=false;held=null;
+    it.vel.copy(f).multiplyScalar(9.5);it.vel.y+=2.6;it.fly=true;it.wet=false;held=null;heroAct('OverhandThrow',.7);
     if(physDrop(it.group,{vel:it.vel,ball:.12,float:true}))it.fly=false; // a real rigid body: bounces, rolls downhill, floats
     noiseBurst(AU.pink,'bandpass',600,.6,.08,.05,.2);
   }else if(it.kind==='uke'){SFX.strum(0);sysStrum();}

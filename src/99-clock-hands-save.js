@@ -67,7 +67,7 @@ function sysUseLegacy(it){
   if(it.kind==='cup'&&it.sips===0){
     const bar=t&&t.pc&&t.pc.f==='barrel'&&t.pc.d.w>=1;
     if(!it.water&&(t===springIx||bar)){it.water=true;if(bar)t.pc.d.w--;SFX.pour();note('water');useAnim=1;return true;}
-    const p=it.water&&t&&W.plots.find(q=>q.ix===t);if(p){p.moist=1;it.water=false;SFX.pour();note('water');useAnim=1;drawPlot(p);return true;}
+    const p=it.water&&t&&W.plots.find(q=>q.ix===t);if(p){heroAct('Farm_Watering');p.moist=1;it.water=false;SFX.pour();note('water');useAnim=1;drawPlot(p);return true;}
     const pot=it.water&&t&&t.pc&&t.pc.f==='pot'&&!t.pc.d.water;if(pot){t.pc.d.water=true;it.water=false;SFX.pour();return true;}
     if(it.water&&!t)return true;
   }

@@ -22,14 +22,14 @@ function tryRecipe(h,t,target,pt){
   const r=RECIPES.find(r=>r.h===h&&r.t===t&&have(h)>=(r.n||1));if(!r)return false;
   handAnim=1;
   if(r.hits){const key=h+t+(target?target.x+','+target.z:'');if(work.key!==key){work.key=key;work.n=0;}work.n++;
-    h==='axe'?SFX.chop():SFX.clack();if(work.n<r.hits)return true;work.key='';}
+    h==='axe'?(SFX.chop(),heroAct('TreeChopping_Loop',1.1)):SFX.clack();if(work.n<r.hits)return true;work.key='';}
   if(!r.keep)takeFrom(h,r.n||1);
   let x=pt?pt.x:null,z=pt?pt.z:null;
   if(target){x=target.x;z=target.z;target.n--;if(target.n<=0)despawn(target);}
   for(const[k,n]of r.out){if(r.toHand||x==null)give(k,n);else spawn(k,x+(R()-.5)*.25,z+(R()-.5)*.25,n);}
   note(r.note);SFX.made();return true;
 }
-function eat(k){
+function eat(k){heroAct('Consume');
   const tier=K[k].food;takeFrom(k,1);handAnim=1;SFX.sip();
   if(k==='taro'){note('rawtaro');noiseBurst(AU.white,'bandpass',900,2,.06,.02,.15);return;}
   const sp=[1,1.08,1.18,1.28,1.36][tier],carry=[0,0,4,8,12][tier],dur=[0,120,300,600,900][tier]*(homeTier>=3?2:1);
@@ -92,8 +92,8 @@ function addPlot(d){
   p.ix={get verb(){return stageOf(p)>=5?'harvest':'';},label(){return p.crop?CROPS[p.crop].n:'Turned earth';},
     e(){if(stageOf(p)>=5)harvest(p);},
     use(k){
-      if(!p.crop&&K[k].crop){takeFrom(k,1);const c=K[k].crop;if(p.last===c)p.soil=Math.max(.05,p.soil-.12);p.crop=c;p.g=0;p.over=0;p.health=1;p.dry=0;SFX.thud(.3);note('plant');handAnim=1;return true;}
-      if(k==='water'){takeFrom(k,1);give('bowl',1);p.moist=1;SFX.pour();note('water');handAnim=1;return true;}
+      if(!p.crop&&K[k].crop){heroAct('Farm_PlantSeed');takeFrom(k,1);const c=K[k].crop;if(p.last===c)p.soil=Math.max(.05,p.soil-.12);p.crop=c;p.g=0;p.over=0;p.health=1;p.dry=0;SFX.thud(.3);note('plant');handAnim=1;return true;}
+      if(k==='water'){heroAct('Farm_Watering');takeFrom(k,1);give('bowl',1);p.moist=1;SFX.pour();note('water');handAnim=1;return true;}
       if(k==='seaweed'||k==='manure'){takeFrom(k,1);p.soil=Math.min(1,p.soil+.3);SFX.thud(.25);note('soil');handAnim=1;return true;}
       if(k==='digstick'&&!p.crop){removePlot(p);SFX.thud(.4);return true;}
       return false;}};
@@ -128,7 +128,7 @@ function yieldOf(p){const c=CROPS[p.crop];let y=c.yield*(.5+.5*p.soil)*p.health*
   if(W.chick.fed>.5&&Math.hypot(p.x-chickHome.x,p.z-chickHome.z)<15)y*=1.1;
   return Math.max(Math.ceil(c.yield*.5),Math.round(y));}
 const tweens=[];
-function harvest(p){
+function harvest(p){heroAct('Farm_Harvest');
   const c=CROPS[p.crop],kind=p.crop,n=yieldOf(p),old=p.plant;
   if(old){p.grp.remove(old);old.position.copy(p.grp.position).y+=.12;scene.add(old);tweens.push({t:0,d:.45,f(k){old.position.y+=.012;old.scale.setScalar(1+.25*Math.sin(Math.PI*k)-k*k);old.rotation.y+=.1;},end(){scene.remove(old);}});}
   give(kind,n,p.x,p.z);if(c.extra)give(c.extra[0],c.extra[1],p.x,p.z);
@@ -141,7 +141,7 @@ function harvest(p){
 function till(a){
   const x=Math.round(a.x),z=Math.round(a.z),sf=surfaceAt(x,z);
   if(!['grass','sand'].includes(sf)||heightAt(x,z)<.9||plotAt(x,z)||Math.hypot(x-LANAI.x,z-LANAI.z)<4.4)return false;
-  addPlot({x,z,soil:sf==='grass'?.62:.36,moist:.4});SFX.thud(.5);noiseBurst(AU.pink,'bandpass',700,.6,.1,.02,.2);note('till');handAnim=1;return true;
+  addPlot({x,z,soil:sf==='grass'?.62:.36,moist:.4});SFX.thud(.5);noiseBurst(AU.pink,'bandpass',700,.6,.1,.02,.2);note('till');handAnim=1;heroAct('Farm_Harvest');return true;
 }
 
 /* ───────── building: free pieces on a half-metre grid ───────── */
@@ -205,7 +205,7 @@ function pieceVerb(pc){const d=pc.d;
   if(pc.f==='pot')return d.done?'take':'';if(isRack(pc)&&d.hung&&d.hung.length)return'take down';
   return'';}
 function pieceE(pc){const d=pc.d;
-  if(pc.f==='crate'&&d.st&&d.st.length){const s=d.st[0],got=give(s.kind,s.n,null,null,true);s.n-=got;if(s.n<=0)d.st.shift();else d.st.push(d.st.shift());SFX.knock();return;}
+  if(pc.f==='crate'&&d.st&&d.st.length){heroAct('Chest_Open',.9);const s=d.st[0],got=give(s.kind,s.n,null,null,true);s.n-=got;if(s.n<=0)d.st.shift();else d.st.push(d.st.shift());SFX.knock();return;}
   if(pc.f==='nestbox'&&d.eggs){d.eggs-=give('egg',d.eggs,null,null,true);SFX.pickup();return;}
   if(pc.f==='fishtrap'&&d.fish){d.fish-=give('fish',d.fish,null,null,true);SFX.splash(.4);return;}
   if(pc.f==='hive'&&d.honey){d.honey-=give('honey',d.honey,null,null,true);note('honey');SFX.pickup();return;}

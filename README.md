@@ -228,7 +228,9 @@ The forest floor's fallen trunk, stump, mossy rocks and roots are Poly Haven's d
 
 The other scanned trees are Poly Haven's island_tree_01, island_tree_02, island_tree_03 and tree_small_02 (CC0), standing in for the Hawaiian species named in the game; the tree-fern crowns are fern_02. Leaves were thinned and simplified so a forest of them runs in a browser.
 
-The character is [Human 3D model scanned with iPhone X](https://sketchfab.com/3d-models/human-3d-model-scanned-with-iphone-x-73e467dfc8a04914bb314a9410077858) by in3D_io (CC BY 4.0); its own animation was removed. The animations are from Quaternius's Universal Animation Library, retargeted onto the scan in the game, and the base character it was made for (Universal Base Characters, with its hair) is the fallback if the scan does not load. Both are from [quaternius.com](https://quaternius.com), CC0 as downloaded. See `assets/models/README.txt`; please don't extract them for use as standalone assets.
+The character is [Human 3D model scanned with iPhone X](https://sketchfab.com/3d-models/human-3d-model-scanned-with-iphone-x-73e467dfc8a04914bb314a9410077858) by in3D_io (CC BY 4.0); its own animation was removed. The animations are from Quaternius's Universal Animation Library and Universal Animation Library 2 (41 clips, merged by bone name), retargeted onto the scan in the game, and the base character it was made for (Universal Base Characters, with its hair) is the fallback if the scan does not load. Both are from [quaternius.com](https://quaternius.com), CC0 as downloaded. See `assets/models/README.txt`; please don't extract them for use as standalone assets.
+
+The coded motion on top of the clips follows techniques published with Daniel Holden's [Motion-Matching](https://github.com/orangeduck/Motion-Matching) (MIT): critically damped velocity springs for the walk speed, and inertialization so one move hands over to the next without a cross-fade.
 
 The animals are from Sketchfab under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/):
 [Goat](https://sketchfab.com/3d-models/goat-5d7431517b634f4e9e8c0f3729cd9c59) by GerardoA400,

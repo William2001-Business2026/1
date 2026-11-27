@@ -55,7 +55,7 @@ Promise.all([gltfLoader.loadAsync('assets/models/islander.glb'),gltfLoader.loadA
     if(hero.scan&&o.material){o.material.side=THREE.FrontSide;o.material.roughness=.85;}}}); // eyebrows share the greyscale hair material
   model.rotation.y+=Math.PI; // the model faces +Z; the game's "forward" is -Z
   hero.root.add(model);hero.mixer=new THREE.AnimationMixer(model);
-  for(const clip of clips){const a=hero.mixer.clipAction(clip);if(/Start|Land|Enter|Exit|Interact|PickUp/.test(clip.name)){a.setLoop(THREE.LoopOnce,1);a.clampWhenFinished=true;}hero.acts[clip.name]=a;}
+  for(const clip of clips){const a=hero.mixer.clipAction(clip);if(/Start|Land|Enter|Exit|Interact|PickUp|Roll|Hit_|Death|Chest_Open|ClimbUp|Consume|Farm_|OverhandThrow|LayToIdle|Yes/.test(clip.name)){a.setLoop(THREE.LoopOnce,1);a.clampWhenFinished=true;}hero.acts[clip.name]=a;}
   hero.model=model;hero.hand=model.getObjectByName(hero.scan?'right_wrist_020':'hand_r');hero.px=player.x;hero.pz=player.z;hero.ready=true;heroPlay('Idle_Loop',0);applyView();
   if(hero.scan)return;                                                   // the scanned islander wears his own clothes and hair
   try{dressMalo(model);}catch(e){console.warn('Malo:',e);}
@@ -85,7 +85,7 @@ function dressMalo(model){
   hero.malo={front:flap(zmax*1.1+.006),back:flap(zmin*1.1-.006)};
 }
 const LOCO=['Idle_Loop','Walk_Loop','Jog_Fwd_Loop'];
-function heroPlay(name,fade=.22){if(hero.cur===name)return;const a=hero.acts[name];if(!a)return;
+function heroPlay(name,fade=.22){if(hero.cur===name)return;const a=hero.acts[name];if(!a)return;fade=0;INERT.mark();   // switched at once; inertialization carries the old pose out
   if(hero.cur==='LOCO'){for(const n of LOCO){const l=hero.acts[n];if(l&&l!==a)fade>0?l.fadeOut(fade):l.stop();}a.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).play();if(fade>0)a.fadeIn(fade);hero.cur=name;return;}
   const p=hero.acts[hero.cur];a.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).play();if(p&&fade>0)a.crossFadeFrom(p,fade,false);else if(p)p.stop();hero.cur=name;}
 /* Walking and running, the way open-world games do it: idle, walk and jog are not swapped but blended by how fast you are actually
@@ -93,8 +93,8 @@ function heroPlay(name,fade=.22){if(hero.cur===name)return;const a=hero.acts[nam
    change never pops. Speed itself has weight (see the frame loop), so the blend rises and falls smoothly. */
 function heroLoco(dt,v){
   const A=hero.acts,I=A.Idle_Loop,Wk=A.Walk_Loop,J=A.Jog_Fwd_Loop;if(!I||!Wk||!J)return false;
-  if(hero.cur!=='LOCO'){const p=A[hero.cur];if(p)p.fadeOut(.28);for(const a of[I,Wk,J]){a.reset().play();a.setEffectiveTimeScale(0);a.setEffectiveWeight(0);}hero.cur='LOCO';hero.locoIn=0;}
-  hero.locoIn=Math.min(1,(hero.locoIn||0)+dt/.28);
+  if(hero.cur!=='LOCO'){const p=A[hero.cur];if(p)p.stop();for(const a of[I,Wk,J]){a.reset().play();a.setEffectiveTimeScale(0);a.setEffectiveWeight(0);}hero.cur='LOCO';hero.locoIn=1;INERT.mark();}
+  hero.locoIn=1;
   const wI=1-smooth(.06,1.1,v),wJ=smooth(1.7,3.1,v),wW=Math.max(0,1-wI-wJ),dW=Wk.getClip().duration,dJ=J.getClip().duration;
   const stride=lerp(1.45*dW,3.4*dJ,wJ/(wW+wJ+1e-4));                                       // metres per cycle, at each clip's own pace
   hero.ph=((hero.ph||0)+v*dt/Math.max(.3,stride))%1;Wk.time=hero.ph*dW;J.time=hero.ph*dJ;I.time=(I.time+dt)%I.getClip().duration;
@@ -165,12 +165,19 @@ function updateHero(dt,moving){
     const stand=hero.reach.low?.32:.4;if(d>stand){const st=Math.min(d-stand,1.3*dt);const nx=player.x+dx/d*st,nz=player.z+dz/d*st;if(Math.abs(groundAt(nx,nz)-groundAt(player.x,player.z))<.35&&!TUBE.inside(player.x,player.z,player.y)){player.x=nx;player.z=nz;}}}
   hero.root.rotation.order='YXZ';hero.root.rotation.y=hero.bodyYaw;hero.root.rotation.x=player.uw?lerp(hero.root.rotation.x,player.pitch*.85*smooth(.2,1,moving),Math.min(1,dt*3)):-(hero.lean||0); // dive head-first; on land, lean with speed changes
   hero.root.rotation.z=hero.bank||0;
-  if(hero.wasAir&&!player.air)hero.landT=.28;hero.wasAir=player.air;hero.landT=Math.max(0,hero.landT-dt);hero.shotT=Math.max(0,hero.shotT-dt);
+  if(hero.wasAir&&!player.air){hero.landT=.28;if((hero.fallV||0)<-7.2&&hero.acts.Roll&&(hero.spd||0)>.8){hero.rollT=hero.acts.Roll.getClip().duration*.85;hero.landT=0;}}   // a hard landing on the run: a roll
+  if(player.air)hero.fallV=player.vy;hero.rollT=Math.max(0,(hero.rollT||0)-dt);hero.wasAir=player.air;hero.landT=Math.max(0,hero.landT-dt);hero.shotT=Math.max(0,hero.shotT-dt);hero.stagT=Math.max(0,(hero.stagT||0)-dt);player.slideT=Math.max(0,(player.slideT||0)-dt);
   let want='Idle_Loop',ts=1;
   if(swim)want=moving>.3?'Swim_Fwd_Loop':'Swim_Idle_Loop';
   else if(player.air)want=player.vy>.8?'Jump_Start':'Jump_Loop';
+  else if((player.slideT||0)>0&&hero.acts.Slide_Loop)want='Slide_Loop';                    // sliding down steep ground, crouched and balancing
+  else if(hero.rollT>0)want='Roll';
   else if(hero.landT>0)want='Jump_Land';
+  else if(hero.stagT>0)want=hero.stagHard&&hero.acts.Hit_Knockback?'Hit_Knockback':'Hit_Chest';
+  else if(player.pushing>.25&&hero.acts.Push_Loop)want='Push_Loop';
+  else if(moving>.2&&MOT.carry>.5&&hero.acts.Walk_Carry_Loop){want='Walk_Carry_Loop';ts=clamp(moving/1.3,.6,1.6);}  // a load in both arms
   else if(moving>2.3){want='Jog_Fwd_Loop';ts=clamp(moving/3.4,.7,1.3);}
+  else if(moving>.2&&(keys.ShiftLeft||keys.ShiftRight)&&hero.acts.Crouch_Fwd_Loop){want='Crouch_Fwd_Loop';ts=clamp(moving/1.05,.6,1.5);}   // creeping: crouched
   else if(moving>.2){want='Walk_Loop';ts=clamp(moving/1.45,.6,1.5);}
   else if(hero.turn){want='Walk_Loop';ts=.8;}                                                 // small steps round
   else if(hero.shotT>0)want=hero.shot;
@@ -178,8 +185,9 @@ function updateHero(dt,moving){
   else if(held&&held.kind==='lantern')want='Idle_Torch_Loop';
   const loco=/^(Idle_Loop|Walk_Loop|Jog_Fwd_Loop)$/.test(want)&&!hero.turn&&heroLoco(dt,moving);  // on foot: blended by speed
   if(!loco){heroPlay(want,player.air||hero.landT>0?.12:.25);hero.idleW=want==='Idle_Loop'?1:0;
-    if(/Walk_Loop|Jog_Fwd/.test(hero.cur))hero.acts[hero.cur].setEffectiveTimeScale(ts);}  // feet match the ground speed
+    if(/Walk_Loop|Jog_Fwd|Crouch_Fwd|Walk_Carry/.test(hero.cur))hero.acts[hero.cur].setEffectiveTimeScale(ts);}  // feet match the ground speed
   hero.mixer.update(dt);
+  INERT.apply(dt);
   heroWet(dt,swim);
   heroPost(dt,moving,swim);
   RAG.blendPose();
