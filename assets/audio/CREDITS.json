@@ -1,0 +1,74 @@
+[
+ {
+  "layer": "surf",
+  "id": 428087,
+  "name": "wave loop 2.wav",
+  "by": "klangfabrik",
+  "url": "https://freesound.org/people/klangfabrik/sounds/428087/",
+  "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+  "loop_s": 60
+ },
+ {
+  "layer": "falls",
+  "id": 442475,
+  "name": "Big waterfall in forest.wav",
+  "by": "BonnyOrbit",
+  "url": "https://freesound.org/people/BonnyOrbit/sounds/442475/",
+  "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+  "loop_s": 60
+ },
+ {
+  "layer": "river",
+  "id": 588179,
+  "name": "Mountain River 001.wav",
+  "by": "Auxide_Audio",
+  "url": "https://freesound.org/people/Auxide_Audio/sounds/588179/",
+  "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+  "loop_s": 42
+ },
+ {
+  "layer": "rain",
+  "id": 614203,
+  "name": "Tropical Rain - moderate",
+  "by": "nyoz",
+  "url": "https://freesound.org/people/nyoz/sounds/614203/",
+  "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+  "loop_s": 56
+ },
+ {
+  "layer": "birds",
+  "id": 148872,
+  "name": "Tropical_Dawn_3.wav",
+  "by": "profdrums",
+  "url": "https://freesound.org/people/profdrums/sounds/148872/",
+  "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+  "loop_s": 60
+ },
+ {
+  "layer": "night",
+  "id": 615489,
+  "name": "Coqui Eleuterodactilus Portorricensis - Masterize.wav",
+  "by": "JLTA5",
+  "url": "https://freesound.org/people/JLTA5/sounds/615489/",
+  "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+  "loop_s": 60
+ },
+ {
+  "layer": "wind",
+  "id": 711106,
+  "name": "Wind on bushes with muffled gust of wind, twig branch, close to desert ground",
+  "by": "felix.blume",
+  "url": "https://freesound.org/people/felix.blume/sounds/711106/",
+  "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+  "loop_s": 60
+ },
+ {
+  "layer": "cave",
+  "id": 162116,
+  "name": "Water Dripping (Large Echo)",
+  "by": "editor_adp",
+  "url": "https://freesound.org/people/editor_adp/sounds/162116/",
+  "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+  "loop_s": 59
+ }
+]

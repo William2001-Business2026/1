@@ -86,6 +86,20 @@ The chat runs on [Supabase](https://supabase.com) and is **off until it is confi
 
 Built-in safeguards: messages are limited to 500 characters and 5 per 10 seconds per player, a small word filter stars out listed words, and database rules stop players reading private rooms they have not joined or posting under another name.
 
+
+### Recorded sound
+
+Real recordings play under the island's sound, each a seamless loop cut from a Creative Commons 0 (public domain) recording on [Freesound](https://freesound.org). Thank you to the recordists:
+
+- Surf: [wave loop 2.wav](https://freesound.org/people/klangfabrik/sounds/428087/) by klangfabrik (CC0)
+- Waterfall: [Big waterfall in forest.wav](https://freesound.org/people/BonnyOrbit/sounds/442475/) by BonnyOrbit (CC0)
+- River: [Mountain River 001.wav](https://freesound.org/people/Auxide_Audio/sounds/588179/) by Auxide_Audio (CC0)
+- Rain: [Tropical Rain - moderate](https://freesound.org/people/nyoz/sounds/614203/) by nyoz (CC0)
+- Forest by day: [Tropical_Dawn_3.wav](https://freesound.org/people/profdrums/sounds/148872/) by profdrums (CC0)
+- Night (coquí frogs): [Coqui Eleuterodactilus Portorricensis - Masterize.wav](https://freesound.org/people/JLTA5/sounds/615489/) by JLTA5 (CC0)
+- Wind: [Wind on bushes with muffled gust of wind, twig branch, close to desert ground](https://freesound.org/people/felix.blume/sounds/711106/) by felix.blume (CC0)
+- Cave drips: [Water Dripping (Large Echo)](https://freesound.org/people/editor_adp/sounds/162116/) by editor_adp (CC0)
+
 ## Files
 
 | Path | What it is |

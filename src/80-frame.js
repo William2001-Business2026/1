@@ -12,7 +12,7 @@ function update(dt){
      if(rq&&rq.d<rq.w+2){W4.z=rq.fx;W4.w=rq.fz;}else if(v>.2){W4.z=-player.mv.x/v;W4.w=-player.mv.z/v;}
      U.uWadeK.value=lerp(U.uWadeK.value,clamp(dep/.35,0,1)*(player.uw?0:1),1-Math.exp(-dt*4));U.uWadeM.value=lerp(U.uWadeM.value,clamp(v/2,0,1),1-Math.exp(-dt*5));}
    else U.uWadeK.value=Math.max(0,U.uWadeK.value-dt*2);}
-  TUBE.update(dt);FOOT.tick(dt);MAPBOOK.tick(dt);PIECEPHYS.tick(dt);ATMOS.tick(dt);LIFE.tick(dt);TRAVEL.tick(dt);SOLID.tick();SKYCLOCK.tick(dt);clockLight+=dt;if(clockLight>(W.clock.fast?.05:.25)){clockLight=0;applyTime(false);syncSlider();}
+  TUBE.update(dt);FOOT.tick(dt);MAPBOOK.tick(dt);PIECEPHYS.tick(dt);ATMOS.tick(dt);LIFE.tick(dt);TRAVEL.tick(dt);SOLID.tick();REC.tick(dt);SKYCLOCK.tick(dt);clockLight+=dt;if(clockLight>(W.clock.fast?.05:.25)){clockLight=0;applyTime(false);syncSlider();}
 
   // lantern
   const fl=lantern.lit?1:0,flick=.82+.18*fbm(time*7,1.7,2)+.05*Math.sin(time*23);

@@ -116,12 +116,12 @@ Object.assign(SFX,{
 });
 function initAudio2(){
   if(!AU.ctx||AU.rainG)return;const c=AU.ctx;
-  AU.rainG=AU.G(0,AU.amb);AU.loop(AU.pink,AU.filt('highpass',1400,.3,AU.rainG));AU.loop(AU.white,AU.filt('bandpass',6500,.4,AU.G(.25,AU.rainG)));
+  AU.rainG=AU.G(0,AU.nat||AU.amb);AU.loop(AU.pink,AU.filt('highpass',1400,.3,AU.rainG));AU.loop(AU.white,AU.filt('bandpass',6500,.4,AU.G(.25,AU.rainG)));
   // rain on leaves: a patter of drops on the canopy; on a roof: a low drumming; on the sea: a soft, wide hiss
-  AU.rainLeafG=AU.G(0,AU.amb);AU.loop(AU.pink,AU.filt('bandpass',2600,.7,AU.rainLeafG));{const b=c.createBuffer(1,c.sampleRate*2,c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()<.004?(Math.random()*2-1):(d[i-1]||0)*.9;
+  AU.rainLeafG=AU.G(0,AU.nat||AU.amb);AU.loop(AU.pink,AU.filt('bandpass',2600,.7,AU.rainLeafG));{const b=c.createBuffer(1,c.sampleRate*2,c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()<.004?(Math.random()*2-1):(d[i-1]||0)*.9;
     const s=c.createBufferSource();s.buffer=b;s.loop=true;s.connect(AU.filt('highpass',1200,.5,AU.G(1.4,AU.rainLeafG)));s.start();}
-  AU.rainRoofG=AU.G(0,AU.amb);AU.loop(AU.brown,AU.filt('lowpass',700,.6,AU.rainRoofG));AU.loop(AU.pink,AU.filt('bandpass',1800,1.2,AU.G(.4,AU.rainRoofG)));
-  AU.rainSeaG=AU.G(0,AU.amb);AU.loop(AU.white,AU.filt('highpass',3200,.3,AU.rainSeaG));AU.loop(AU.pink,AU.filt('lowpass',500,.4,AU.G(.6,AU.rainSeaG)));
+  AU.rainRoofG=AU.G(0,AU.nat||AU.amb);AU.loop(AU.brown,AU.filt('lowpass',700,.6,AU.rainRoofG));AU.loop(AU.pink,AU.filt('bandpass',1800,1.2,AU.G(.4,AU.rainRoofG)));
+  AU.rainSeaG=AU.G(0,AU.nat||AU.amb);AU.loop(AU.white,AU.filt('highpass',3200,.3,AU.rainSeaG));AU.loop(AU.pink,AU.filt('lowpass',500,.4,AU.G(.6,AU.rainSeaG)));
   AU.preG=AU.G(0,AU.radioBus);AU.loop(AU.white,AU.filt('bandpass',1800,2,AU.preG));
   AU.fireG=AU.G(0,AU.amb);AU.loop(AU.brown,AU.filt('lowpass',500,.4,AU.fireG));
   {const cr=c.createScriptProcessor?null:null;const b=c.createBuffer(1,c.sampleRate*3,c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()<.0006?(Math.random()*2-1):d[i-1]*.82||0;

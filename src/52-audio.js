@@ -25,26 +25,26 @@ function initAudio(){
   const filt=(type,f,q,dest)=>{const b=ctx.createBiquadFilter();b.type=type;b.frequency.value=f;b.Q.value=q;if(dest)b.connect(dest);return b;};
   AU.G=G;AU.filt=filt;AU.loop=loop;
   // surf: low rumble + wash
-  AU.surfG=G(0,AU.amb);AU.surfF=filt('lowpass',600,.3,AU.surfG);loop(AU.brown,AU.surfF);
-  AU.washG=G(0,AU.amb);AU.washF=filt('bandpass',1800,.4,AU.washG);loop(AU.pink,AU.washF);
+  AU.nat=G(1,AU.amb);AU.fallSyn=null;AU.surfG=G(0,AU.nat);AU.surfF=filt('lowpass',600,.3,AU.surfG);loop(AU.brown,AU.surfF);
+  AU.washG=G(0,AU.nat);AU.washF=filt('bandpass',1800,.4,AU.washG);loop(AU.pink,AU.washF);
   // wind and palm rustle
-  AU.windG=G(0,AU.amb);loop(AU.pink,filt('bandpass',420,.5,AU.windG));
-  AU.rustG=G(0,AU.amb);loop(AU.white,filt('highpass',4200,.3,filt('lowpass',9000,.3,AU.rustG)));
+  AU.windG=G(0,AU.nat);loop(AU.pink,filt('bandpass',420,.5,AU.windG));
+  AU.rustG=G(0,AU.nat);loop(AU.white,filt('highpass',4200,.3,filt('lowpass',9000,.3,AU.rustG)));
   // the waterfall: a deep roar and a bright hiss, heard from where it falls and fading with distance
   AU.fallP=ctx.createPanner();AU.fallP.panningModel='equalpower';AU.fallP.distanceModel='inverse';AU.fallP.refDistance=7;AU.fallP.rolloffFactor=1.15;AU.fallP.connect(AU.amb);
   {const fp=FRESH.fallAt;if(AU.fallP.positionX){AU.fallP.positionX.value=fp.x;AU.fallP.positionY.value=fp.y+5;AU.fallP.positionZ.value=fp.z;}else AU.fallP.setPosition(fp.x,fp.y+5,fp.z);}
-  AU.fallG=G(.6,AU.fallP);loop(AU.brown,filt('lowpass',620,.4,AU.fallG));loop(AU.pink,filt('bandpass',2400,.6,G(.35,AU.fallG)));
+  AU.fallSyn=G(1,AU.fallP);AU.fallG=G(.6,AU.fallSyn);loop(AU.brown,filt('lowpass',620,.4,AU.fallG));loop(AU.pink,filt('bandpass',2400,.6,G(.35,AU.fallG)));
   // close to the plunge: the crash of water hitting water, sharp and bright, which only the last few tens of metres let you hear
   AU.splashP=ctx.createPanner();AU.splashP.panningModel='equalpower';AU.splashP.distanceModel='exponential';AU.splashP.refDistance=6;AU.splashP.rolloffFactor=1.6;AU.splashP.connect(AU.amb);
   {const fp=FRESH.fallAt;if(AU.splashP.positionX){AU.splashP.positionX.value=fp.x;AU.splashP.positionY.value=fp.y+.5;AU.splashP.positionZ.value=fp.z;}else AU.splashP.setPosition(fp.x,fp.y+.5,fp.z);}
   AU.splashG=G(.55,AU.splashP);loop(AU.white,filt('highpass',1800,.4,filt('peaking',4200,.8,AU.splashG)));loop(AU.pink,filt('bandpass',900,.9,G(.4,AU.splashG)));
   // the river's babble, and the wind's howl over the summit
-  AU.riverG=G(0,AU.amb);AU.riverF=filt('bandpass',1500,1.1,AU.riverG);loop(AU.pink,AU.riverF);
+  AU.riverG=G(0,AU.nat);AU.riverF=filt('bandpass',1500,1.1,AU.riverG);loop(AU.pink,AU.riverF);
   AU.howlG=G(0,AU.amb);AU.howlF=filt('bandpass',760,6,AU.howlG);loop(AU.pink,AU.howlF);
-  AU.canopyG=G(0,AU.amb);loop(AU.pink,filt('highpass',1600,.4,filt('lowpass',7000,.4,AU.canopyG)));
+  AU.canopyG=G(0,AU.nat);loop(AU.pink,filt('highpass',1600,.4,filt('lowpass',7000,.4,AU.canopyG)));
   AU.uwG=G(0,AU.amb);loop(AU.brown,filt('lowpass',240,.5,AU.uwG));loop(AU.pink,filt('bandpass',900,2,G(.15,AU.uwG))); // the hush and crackle of the reef
   // night insects
-  AU.crick=G(0,AU.amb);{const o=ctx.createOscillator();o.frequency.value=4350;const g1=G(.5),g2=G(0);
+  AU.crick=G(0,AU.nat);{const o=ctx.createOscillator();o.frequency.value=4350;const g1=G(.5),g2=G(0);
     const l1=ctx.createOscillator();l1.frequency.value=27;const lg1=G(.5);l1.connect(lg1);lg1.connect(g1.gain);
     const l2=ctx.createOscillator();l2.type='square';l2.frequency.value=1.35;const lg2=G(.5);l2.connect(lg2);lg2.connect(g2.gain);g2.gain.value=.5;
     o.connect(g1);g1.connect(g2);g2.connect(filt('lowpass',5200,.5,AU.crick));o.start();l1.start();l2.start();}
