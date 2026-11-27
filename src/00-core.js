@@ -4,6 +4,8 @@ import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { ao } from 'three/addons/tsl/display/GTAONode.js';
 import { denoise } from 'three/addons/tsl/display/DenoiseNode.js';
 import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
+import { ssgi } from 'three/addons/tsl/display/SSGINode.js';
+import { traa } from 'three/addons/tsl/display/TRAANode.js';
 import { mergeVertices as mergeVerts, mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
@@ -28,7 +30,7 @@ function fbm(x,z,o=4){let a=.5,s=0,f=1;for(let i=0;i<o;i++){s+=a*vnoise(x*f,z*f)
 const srgb=(r,g,b)=>new THREE.Color().setRGB(r,g,b,THREE.SRGBColorSpace);
 
 /* ───────────────────────── settings ───────────────────────── */
-const settings={quality:'auto',showFps:false,view:'third',scale:1,shadows:true,post:true,fov:70,master:.8,amb:.8,music:.5,sens:1,invertY:false,bob:true,photo:false};
+const settings={gi:false,quality:'auto',showFps:false,view:'third',scale:1,shadows:true,post:true,fov:70,master:.8,amb:.8,music:.5,sens:1,invertY:false,bob:true,photo:false};
 try{const saved=JSON.parse(localStorage.getItem('halemoku')||'{}');if(!saved.v)delete saved.quality;Object.assign(settings,saved);}catch(e){}
 settings.v=2;
 // physics state (the Rapier world itself is set up near the end of this script); declared early because loading a save already touches it
@@ -75,13 +77,29 @@ function godRays(col,N){const {Fn,Loop,uv,vec2,vec3,float,dot,max,min,fract,sin,
   Loop(N,()=>{p.addAssign(d);const c=col.sample(p).rgb,e=p.sub(GR.sun),l=min(max(dot(c,vec3(.3,.59,.11)).sub(GR.thr),0),3).mul(exp(dot(e,e).mul(-14)));   // only the sky round the sun shines
     o.addAssign(vec3(l).mul(w));w.mulAssign(.9);});
   return o.mul(GR.col).mul(GR.k.mul(GR.gain).div(N));})();}
+let giNodes=null;
 function buildPost(g){
   // ambient occlusion has to read the depth buffer, which WebGPU cannot do from a multisampled one,
   // so with AO the scene renders without MSAA and is smoothed with FXAA after tone mapping instead
-  const samples=g.ao?0:g.aa,useFxaa=g.ao&&g.aa>0;
-  const key=[g.ao,g.bloom,g.grade,samples,useFxaa,g.rays].join();if(key===postKey)return;postKey=key;
+  const samples=g.ao||g.gi?0:g.aa,useFxaa=g.ao&&g.aa>0&&!g.gi;
+  const key=[g.ao,g.bloom,g.grade,samples,useFxaa,g.rays,g.gi,g.giQ].join();if(key===postKey)return;postKey=key;
   const {vec4}=TSL;
   scenePass.options.samples=samples;
+  /* Bounced light (Settings): screen-space global illumination. Light that falls on one surface lights the ones near it in its colour
+     (sunlit sand warms a trunk, a red wall tints the floor), with its own ambient occlusion; the frame is smoothed over time (TRAA),
+     which also antialiases it. The scene pass then also writes each pixel's diffuse colour, normal and motion. */
+  if(g.gi){const {mrt,output,diffuseColor,normalView,velocity,packNormalToRGB,unpackRGBToNormal,sample}=TSL;
+    if(!giNodes){scenePass.setMRT(mrt({output,diffuseColor,normal:packNormalToRGB(normalView),velocity}));
+      scenePass.getTexture('diffuseColor').type=THREE.UnsignedByteType;scenePass.getTexture('normal').type=THREE.UnsignedByteType;
+      const nT=scenePass.getTextureNode('normal'),N=sample(uv=>unpackRGBToNormal(nT.sample(uv))),c=scenePass.getTextureNode('output'),d=scenePass.getTextureNode('depth');
+      const gp=ssgi(c,d,N,camera);gp.radius.value=2.5;gp.giIntensity.value=12;gp.aoIntensity.value=.55;   /* outdoors: contact shadows, not interior gloom */giNodes={gp,c,d,dif:scenePass.getTextureNode('diffuseColor'),vel:scenePass.getTextureNode('velocity')};}
+    const G=giNodes,[sl,st]=g.giQ==='high'?[2,12]:g.giQ==='low'?[1,8]:[1,12];G.gp.sliceCount.value=sl;G.gp.stepCount.value=st;
+    const comp=vec4(G.c.rgb.mul(TSL.mix(1,G.gp.getAONode(),.32)).add(G.dif.rgb.mul(G.gp.getGINode().rgb).mul(1.6)),G.c.a);
+    let hdrG=traa(comp,G.d,G.vel,camera);
+    if(g.bloom){if(!bloomNode)bloomNode=bloom(G.c,.32,.7,1.15);hdrG=hdrG.add(bloomNode);}
+    if(g.rays)hdrG=hdrG.add(vec4(godRays(G.c,g.rays),0));
+    let o=TSL.renderOutput(hdrG);if(g.grade)o=gradeFn(o);post.outputNode=o;post.needsUpdate=true;return;}
+  if(giNodes){scenePass.setMRT(null);giNodes=null;bloomNode=null;}                         // bounced light switched off: the plain pass again
   const col=scenePass.getTextureNode('output');let hdr=col;
   if(g.ao){
     if(!aoNode){const depth=scenePass.getTextureNode('depth');

@@ -72,8 +72,8 @@ function setCSM(on){
 function applyGraphics(){
   const g=activeGfx();
   sizeRenderer();
-  scenePass.setResolutionScale(clamp(g.scale*settings.scale,.4,1));
-  buildPost({ao:settings.post&&g.ao,bloom:settings.post&&g.bloom,grade:settings.post,aa:g.aa,rays:settings.post?g.rays||0:0});
+  scenePass.setResolutionScale(settings.gi&&settings.post?1:clamp(g.scale*settings.scale,.4,1));   // bounced light's temporal smoothing needs the full-size frame
+  buildPost({ao:settings.post&&g.ao,bloom:settings.post&&g.bloom,grade:settings.post,aa:g.aa,rays:settings.post?g.rays||0:0,gi:settings.post&&settings.gi,giQ:g.name.startsWith('High')?'high':/^(Low|Laptop)/.test(g.name)?'low':'medium'});
   postU.uGrain.value=settings.post?.035:0;postU.uVig.value=settings.post?.55:0;
   if(sun.shadow.mapSize.x!==g.shadow){sun.shadow.mapSize.set(g.shadow,g.shadow);sun.shadow.needsUpdate=true;}
   setCSM(g.csm);if(csm&&csm.camera)csm.updateFrustums(); // the cascades find the camera on their first render
@@ -88,7 +88,7 @@ function applyGraphics(){
 }
 function describeGfx(){$('v-gfx').textContent=(GPU.name?'Graphics: '+GPU.name.slice(0,60)+(GPU.tier==='low'?' (integrated: Auto starts at Laptop)':'')+'. ':'')+'Drawing with '+GFX_API+(GFX_API==='WebGPU'?'':FORCE_GL?' (chosen in the address)':navigator.gpu?' (WebGPU could not start on this device)':' (this browser has no WebGPU)')+'. Up to 1920×1080 at 60 FPS.';}
 function applyAudio(){if(!AU.ctx)return;const t=AU.ctx.currentTime;AU.master.gain.setTargetAtTime(settings.master,t,.05);AU.amb.gain.setTargetAtTime(settings.amb,t,.05);AU.mus.gain.setTargetAtTime(settings.music,t,.05);}
-bind('s-quality','quality','str',applyGraphics);bind('s-scale','scale','num',applyGraphics);bind('s-shadows','shadows','check',applyGraphics);
+bind('s-quality','quality','str',applyGraphics);bind('s-scale','scale','num',applyGraphics);bind('s-shadows','shadows','check',applyGraphics);bind('s-gi','gi','check',applyGraphics);
 bind('s-post','post','check',applyGraphics);bind('s-fps','showFps','check',applyGraphics);bind('s-fov','fov','num',applyGraphics);
 bind('s-master','master','num',applyAudio);bind('s-amb','amb','num',applyAudio);bind('s-music','music','num',applyAudio);
 bind('s-sens','sens','num');bind('s-view','view','str',()=>applyView());bind('s-invert','invertY','check');bind('s-bob','bob','check');bind('s-photo','photo','check');

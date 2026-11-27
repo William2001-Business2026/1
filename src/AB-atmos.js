@@ -38,7 +38,7 @@ const ATMOS=(()=>{
     // light off the ground
     if((bT-=dt)<=0&&hemi.userData.g0){bT=.25;const A=albedo(c.x,c.z),lit=Math.min(1,sun.intensity/3)*(1-cave);
       G.copy(hemi.userData.g0).multiplyScalar(.55).add(new THREE.Color(A.r*(.6+2.4*lit),A.g*(.6+2.4*lit),A.b*(.6+2.4*lit)));hemi.userData.gWant=G.clone();}
-    if(hemi.userData.gWant)hemi.groundColor.lerp(hemi.userData.gWant,1-Math.exp(-dt*2));
+    if(settings.gi&&settings.post){if(hemi.userData.g0)hemi.groundColor.copy(hemi.userData.g0);}else if(hemi.userData.gWant)hemi.groundColor.lerp(hemi.userData.gWant,1-Math.exp(-dt*2));   // with true bounced light on, no stand-in
     // fog: thick at dawn and after rain, a little in the evening, none at midday; fog colour follows the sky
     const h=W.clock.h,dawn=smooth(4.6,6.2,h)*smooth(9.2,7.4,h),eve=smooth(17,19,h)*smooth(23,20.5,h)*.35,wet=Math.max(typeof raining!=='undefined'?raining:0,(W.rainLeft>0?.6:0));
     fogK=lerp(fogK,Math.min(1,dawn*.9+eve+wet*.7)*(cave>.2?0:1)*(und?0:1)*(activeGfx().grass<.2?.6:1),1-Math.exp(-dt*.3));if(window.__fogk!=null)fogK=window.__fogk;uFog.value=fogK;
