@@ -31,7 +31,9 @@ The island is drawn with **WebGPU** where the browser supports it (current Chrom
 | 60 FPS | Frames are capped at 60 per second, including on 120 Hz and 144 Hz screens. |
 | At least 30 FPS | On **Auto** quality (the default), the game lowers quality within about two seconds when the frame rate drops, and raises it again after eight smooth seconds. |
 
-Auto moves between seven levels, from High (ambient occlusion, 4096-pixel shadows, lantern shadows) down to Low at 50% render scale. It detects screens that refresh slower than 60 Hz and does not lower quality for them. **Settings → Show frame rate** displays the live frame rate, renderer, render size and current level. Choosing Low, Medium or High turns Auto off.
+Auto moves between ten levels, from High (ambient occlusion, 4096-pixel shadows, lantern shadows) down to Low at 50% render scale. It detects screens that refresh slower than 60 Hz and does not lower quality for them. **Settings → Show frame rate** displays the live frame rate, renderer, render size and current level. Choosing Low, Medium or High turns Auto off.
+
+**On a laptop:** the game reads the name of your graphics chip when it starts. Integrated graphics (Intel Iris and UHD, AMD's laptop Radeon graphics, and similar) start Auto at **Laptop**: 60% render scale, fewer and nearer trees, grass and animals, coarser far terrain, and a smaller shadow map redrawn every fourth frame. Below it are Laptop at 50% and Laptop without shadows; if even that cannot hold 50 FPS, the game paces an even 30 FPS, which feels smoother than a frame rate that swings. You can also pick **Laptop** yourself under Settings, Quality, and turn on Show frame rate to see the level, the render size and the chip. On a laptop with two graphics chips, set the browser to use the dedicated one (Windows: Settings, System, Display, Graphics), and keep the laptop plugged in: on battery most laptops slow the graphics down.
 
 Very old or very weak graphics chips may still fall below 30 FPS at the lowest level.
 
