@@ -25,6 +25,19 @@ const ATMOS=(()=>{
       m.position.set((R5()-.5)*55,-.5+R5()*2.5,(R5()-.5)*55);m.renderOrder=3;m.frustumCulled=false;m.raycast=()=>{};g.add(m);}
     g.visible=false;scene.add(g);banks.push({g,x:0,z:0,t:-1});}
   let fogK=0;
+  /* cloud shadows: fair-weather trade cumulus about a kilometre up drift over the island with the wind, each throwing a soft
+     shadow a few hundred metres across, more of them and larger as the sky clouds over before rain. The sun's own colour is
+     varied across the ground (the shadow is cast along the sun's direction from the cloud layer), so every lit surface gets
+     them, with or without shadow maps. sunC carries the sun's colour times its intensity, which a light's own colour node replaces. */
+  const sunC=TSL.uniform(new THREE.Color()),uCS=TSL.uniform(1);
+  {const {Fn,positionWorld,vec2,float,max}=TSL;
+   sun.colorNode=Fn(()=>{const sd=U.uSunDir,lift=float(950).div(max(sd.y,.12));
+     const p=positionWorld.xz.add(vec2(sd.x,sd.z).mul(lift)).sub(WIND.dir.mul(U.uTime.mul(7)));      // cloud base 950 m, drifting ~7 m/s
+     const n=vn(p.mul(1/260)).mul(.65).add(vn(p.mul(1/90).add(17)).mul(.35)),th=float(.55).sub(U.uCover.mul(.25));
+     return sunC.mul(float(1).sub(sstep(th,th.add(.16),n).mul(.68).mul(uCS)));})();}
+  const cloudAt=(x,z)=>{const sd=U.uSunDir.value,l=950/Math.max(sd.y,.12),t=U.uTime.value*7,wd=WIND.dir.value,px=x+sd.x*l-wd.x*t,pz=z+sd.z*l-wd.y*t;   // the same, on the CPU
+    const n=vnC(px/260,pz/260)*.65+vnC(px/90+17,pz/90+17)*.35,th=.55-U.uCover.value*.25;return smooth(th,th+.16,n)*.68*uCS.value;};
+  function light(){sunC.value.copy(sun.color).multiplyScalar(sun.intensity);uCS.value=1-.6*U.uCover.value;}   // every frame, before the render
   function placeBank(b){const c=camera.position;for(let t=0;t<12;t++){const a=Math.random()*6.283,d=25+Math.random()*120,x=c.x+Math.cos(a)*d,z=c.z+Math.sin(a)*d,h=heightAt(x,z);
       if(h<1)continue;let lower=0;for(let j=0;j<6;j++){const aa=j*1.047;if(heightAt(x+Math.cos(aa)*40,z+Math.sin(aa)*40)>h+4)lower++;}   // a hollow: higher ground round it
       if(lower<3&&h>40)continue;b.x=x;b.z=z;b.y=h;b.t=0;b.life=90+Math.random()*120;b.g.position.set(x,h,z);b.g.visible=true;return;}b.g.visible=false;}
@@ -46,5 +59,5 @@ const ATMOS=(()=>{
     const wd=WIND.dir.value;for(const b of banks){if(fogK<.03){b.g.visible=false;b.t=-1;continue;}
       if(b.t<0||b.t>b.life||Math.hypot(b.x-c.x,b.z-c.z)>200)placeBank(b);b.t+=dt;b.x+=wd.x*dt*.6;b.z+=wd.y*dt*.6;
       const life=window.__fogk!=null?1:smooth(0,15,b.t)*smooth(b.life,b.life-15,b.t);b.g.position.set(b.x,b.y,b.z);b.g.scale.setScalar(.8+.4*life);for(const m of b.g.children){m.visible=life>.02;m.rotation.y=Math.atan2(c.x-b.x-m.position.x,c.z-b.z-m.position.z);}}}
-  return{tick,get fog(){return fogK;}};
+  return{tick,light,cloudAt,get fog(){return fogK;}};
 })();

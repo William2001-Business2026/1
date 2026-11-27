@@ -2,7 +2,7 @@
 /* Shaders are written in TSL, Three.js's shading language. The same code compiles to WGSL for
    WebGPU and to GLSL for the WebGL 2 fallback, so both renderers draw the same island. */
 const WK=6,WW=.7;
-const {U,uRipplesNode,sstep,hash21,vn,fbmN,grey,skyBase,skyRad,wavePh,waveAmp,skyMat,envSkyMat,SKYU}=(()=>{
+const {U,uRipplesNode,sstep,hash21,vn,vnC,fbmN,grey,skyBase,skyRad,wavePh,waveAmp,skyMat,envSkyMat,SKYU}=(()=>{
 const {Fn,If,Loop,uniform,uniformArray,texture,float,vec2,vec3,dot,fract,floor,mix,clamp,max,pow,exp,sin,sqrt,length,normalize,step,atan,acos,dFdx,dFdy,positionLocal}=TSL;
 const U={ // shared uniforms (same names and .value API as before)
   uTime:uniform(0),uSunDir:uniform(new THREE.Vector3(0,1,0)),uMoonDir:uniform(new THREE.Vector3(0,-1,0)),uMoonL:uniform(0),uZenith:uniform(new THREE.Color()),uHorizon:uniform(new THREE.Color()),
@@ -20,6 +20,10 @@ const hash31=Fn(([p0])=>{const p=fract(p0.mul(.3183099).add(.1)).mul(17).toVar()
 const vn=Fn(([p])=>{const i=floor(p),f0=fract(p),f=f0.mul(f0).mul(float(3).sub(f0.mul(2)));
   return mix(mix(hash21(i),hash21(i.add(vec2(1,0))),f.x),mix(hash21(i.add(vec2(0,1))),hash21(i.add(vec2(1,1))),f.x),f.y);})
   .setLayout({name:'vn',type:'float',inputs:[{name:'p',type:'vec2'}]});
+// the same value noise on the CPU, for things that must agree with a shader (where a cloud shadow falls, how the wind blows)
+const frC=x=>x-Math.floor(x),hash21C=(x,y)=>{let px=frC(x*123.34),py=frC(y*456.21);const d=px*(px+45.32)+py*(py+45.32);px+=d;py+=d;return frC(px*py);};
+const vnC=(x,y)=>{const ix=Math.floor(x),iy=Math.floor(y),fx0=x-ix,fy0=y-iy,fx=fx0*fx0*(3-2*fx0),fy=fy0*fy0*(3-2*fy0);
+  const a=hash21C(ix,iy),b=hash21C(ix+1,iy),c=hash21C(ix,iy+1),d=hash21C(ix+1,iy+1);return (a+(b-a)*fx)+((c+(d-c)*fx)-(a+(b-a)*fx))*fy;};
 const fbmN=Fn(([p0])=>{const p=vec2(p0).toVar(),a=float(.5).toVar(),s=float(0).toVar();
   Loop(5,()=>{s.addAssign(a.mul(vn(p)));p.assign(p.mul(2.03).add(17.1));a.mulAssign(.5);});return s;})
   .setLayout({name:'fbmN',type:'float',inputs:[{name:'p0',type:'vec2'}]});
@@ -95,7 +99,7 @@ skyMat.colorNode=skyColor(true)();
 // the sky that lights the island: no sun disc (the sun's light comes from the sun lamp)
 const envSkyMat=new THREE.MeshBasicNodeMaterial({side:THREE.BackSide,depthWrite:false,fog:false});
 envSkyMat.colorNode=skyColor(false)();
-return {U,uRipplesNode,sstep,hash21,vn,fbmN,grey,skyBase,skyRad,wavePh,waveAmp,skyMat,envSkyMat,SKYU};
+return {U,uRipplesNode,sstep,hash21,vn,vnC,fbmN,grey,skyBase,skyRad,wavePh,waveAmp,skyMat,envSkyMat,SKYU};
 })();
 U.uWet=TSL.uniform(0);U.uSwell=TSL.uniform(0); // how wet the ground is after rain, and how swollen the river
 U.uUnder=TSL.uniform(0);U.uFogCol=TSL.uniform(new THREE.Color()); // under water: 1 while the camera is below the surface, and the colour of the haze

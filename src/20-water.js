@@ -102,9 +102,15 @@ const freshMat=new THREE.MeshBasicNodeMaterial({transparent:true,depthWrite:fals
   const aFlow=attribute('aFlow','float').mul(U.uSwell.mul(.8).add(1)),aFoam=attribute('aFoam','float').add(U.uSwell.mul(.25)).min(1);
   freshMat.colorNode=Fn(()=>{const q=uv(),t=U.uTime,wp=positionWorld,V=normalize(cameraPosition.sub(wp)),dist=length(cameraPosition.sub(wp));
     // ripples the same size across and along (uv is metres: across/2.5, along), drifting with the current, three scales
-    const m=vec2(q.x.mul(2.5),q.y),a=m.mul(.6).sub(vec2(0,t.mul(aFlow).mul(.55))),b=m.mul(1.45).add(3).sub(vec2(0,t.mul(aFlow).mul(1.05))),c=m.mul(3.4).add(7).sub(vec2(0,t.mul(aFlow).mul(1.9)));
-    const hf=p=>vn(p.a).add(vn(p.b).mul(.5)).add(vn(p.c).mul(.22)),e=.05,o=x=>({a:a.add(x),b:b.add(x),c:c.add(x)}),h0=hf(o(vec2(0)));
-    const dx=hf(o(vec2(e,0))).sub(h0),dz=hf(o(vec2(0,e))).sub(h0);
+    /* two-phase flow (Vlachos, "Water Flow in Portal 2", SIGGRAPH 2010): scrolling by time x speed stretches the pattern without
+       end wherever the speed changes along the river, so each pattern is scrolled over a short cycle only, twice, half a cycle
+       apart and jumped to a new place each restart, and the two cross-fade so neither restart is seen */
+    const TF=3.2,f0=TSL.fract(t.div(TF)),f1=TSL.fract(t.div(TF).add(.5)),w0=float(1).sub(abs(f0.mul(2).sub(1))),w1=float(1).sub(w0);
+    const s0=f0.mul(TF).mul(aFlow),s1=f1.mul(TF).mul(aFlow),j0=TSL.floor(t.div(TF)).mul(vec2(.37,1.71)),j1=TSL.floor(t.div(TF).add(.5)).mul(vec2(.61,1.29)).add(vec2(5.3,2.9));
+    const m=vec2(q.x.mul(2.5),q.y),lay=(s,j)=>({a:m.mul(.6).sub(vec2(0,s.mul(.55))).add(j),b:m.mul(1.45).add(3).sub(vec2(0,s.mul(1.05))).add(j),c:m.mul(3.4).add(7).sub(vec2(0,s.mul(1.9))).add(j)}),L0=lay(s0,j0),L1=lay(s1,j1);
+    const hf1=p=>vn(p.a).add(vn(p.b).mul(.5)).add(vn(p.c).mul(.22)),e=.05,o=(L,x)=>({a:L.a.add(x),b:L.b.add(x),c:L.c.add(x)});
+    const hf=x=>hf1(o(L0,x)).mul(w0).add(hf1(o(L1,x)).mul(w1)),h0=hf(vec2(0));
+    const dx=hf(vec2(e,0)).sub(h0),dz=hf(vec2(0,e)).sub(h0);
     // wading: the current piles up against your legs, parts round them and trails a widening white wake downstream; moving, rings spread
     const wd=wp.xz.sub(U.uWade.xy),fd=U.uWade.zw,al=dot(wd,fd),lt=dot(wd,vec2(fd.y.negate(),fd.x)),wr=length(wd),sq=x=>x.mul(x);
     const pil=U.uWadeK.mul(TSL.exp(sq(lt.div(.32)).negate())).mul(TSL.exp(sq(al.add(.18).div(.26)).negate()));
@@ -117,8 +123,11 @@ const freshMat=new THREE.MeshBasicNodeMaterial({transparent:true,depthWrite:fals
     const body=vec3(.018,.05,.035).mul(U.uDay.add(.05));
     const col=mix(body,grey(skyBase(Rf)),F).add(U.uSunDisc.mul(pow(max(dot(Rf,U.uSunDir),0),220).mul(.25))).toVar();
     col.assign(mix(col,vec3(.5,.56,.58).mul(U.uDay.add(.08)),aFoam.mul(.45)));            // falling, churning water is white, not a mirror
-    const streak=vn(vec2(q.x.mul(9),q.y.mul(.9).sub(t.mul(aFlow).mul(.9)))).mul(.6).add(vn(vec2(q.x.mul(20),q.y.mul(2.2).sub(t.mul(aFlow).mul(1.6)))).mul(.4)); // foam lines drawn out down the flow, broken, not ruled
-    const fine=vn(vec2(q.x.mul(41),q.y.mul(5).sub(t.mul(aFlow).mul(4.2))));
+    const stk=(s,j)=>vn(vec2(q.x.mul(9),q.y.mul(.9).sub(s.mul(.9))).add(j)).mul(.6).add(vn(vec2(q.x.mul(20),q.y.mul(2.2).sub(s.mul(1.6))).add(j)).mul(.4));
+    const fn=(s,j)=>vn(vec2(q.x.mul(41),q.y.mul(5).sub(s.mul(4.2))).add(j));
+    const ctr=x=>x.sub(.5).mul(TSL.inverseSqrt(w0.mul(w0).add(w1.mul(w1)))).add(.5);           // blending two noises flattens them: restore the contrast
+    const streak=ctr(stk(s0,j0).mul(w0).add(stk(s1,j1).mul(w1)));    // foam lines drawn out down the flow, broken, not ruled
+    const fine=ctr(fn(s0,j0).mul(w0).add(fn(s1,j1).mul(w1)));
     const foam=clamp(aFoam.mul(sstep(.38,.72,streak.mul(.75).add(fine.mul(.35)))).add(pow(aFoam,3).mul(sstep(.3,.62,streak)).mul(.9))
       .add(pil.mul(.9)).add(wk.mul(sstep(.25,.62,fine.mul(.6).add(streak.mul(.5)))).mul(.95)),0,1); // strong broken water (round rocks, your legs) stays white, in streaks
     col.assign(mix(col,vec3(.9,.93,.95).mul(U.uDay.add(.1)),foam.mul(.9)));

@@ -22,12 +22,38 @@ const windU=TSL.uniform(0);
 /* Wind: a steady trade wind from the east-north-east with gusts that travel across the island as bands.
    windAt(p) gives the horizontal push at world position p (metres, xz) and how gusty it is there (0–1). */
 const WIND={dir:TSL.uniform(new THREE.Vector2(-.86,.51)),strength:TSL.uniform(.5),player:TSL.uniform(new THREE.Vector3(0,-99,0)),
-  animals:[0,1,2,3].map(()=>TSL.uniform(new THREE.Vector4(0,-99,0,.3)))};   // the four animals nearest you: where they are, and how wide they push
-const windAt=(p)=>{const {vec3,sin,dot,pow}=TSL;const t=U.uTime,dir=WIND.dir;
-  const gust=sstep(.38,.82,vn(p.mul(.028).sub(dir.mul(t.mul(.23)))));                   // gust bands about 30 m apart, moving ~8 m/s
+  animals:[0,1,2,3].map(()=>TSL.uniform(new THREE.Vector4(0,-99,0,.3))),   // the four animals nearest you: where they are, and how wide they push
+  whirl:[0,1].map(()=>TSL.uniform(new THREE.Vector4(0,-9999,3,0))),        // whirls of wind: where (x, z), how wide, how strong and which way round
+  veer:0,guide:false};
+/* After Ghost of Tsushima's wind ("Blowing from the West", GDC 2021): a steady wind, gust fronts that travel downwind, and small
+   vortices ("vorticles") carried along in it that twist the grass and lift leaves into a spiral as they pass. */
+const windAt=(p)=>{const {vec2,vec3,sin,dot,length,exp,abs}=TSL;const t=U.uTime,dir=WIND.dir;
+  const g0=sstep(.38,.82,vn(p.mul(.028).sub(dir.mul(t.mul(.23))))),gust0=g0;           // gust bands about 30 m apart, moving ~8 m/s
   const flutter=sin(t.mul(2.6).add(dot(p,dir).mul(.8)).add(vn(p.mul(.6)).mul(6))).mul(.22);
-  const amount=WIND.strength.mul(gust.mul(1.15).add(.32).add(flutter));
-  return vec3(dir.x.mul(amount),dir.y.mul(amount),gust);};
+  const amount=WIND.strength.mul(g0.mul(1.15).add(.32).add(flutter));
+  let push=vec2(dir.x.mul(amount),dir.y.mul(amount)),gust=gust0;
+  for(const w of WIND.whirl){const d=p.sub(w.xy),r=length(d),e=exp(r.div(w.z).pow(2).negate());
+    push=push.add(vec2(d.y.negate(),d.x).div(r.add(.4)).mul(w.w).mul(e));gust=gust.add(abs(w.w).mul(e).mul(.5));}   // round the eye, strongest at its edge
+  return vec3(push.x,push.y,gust.min(1));};
+// the same wind on the CPU, for leaves, rain, smoke and spray: {x, z} push and how gusty
+const windAtC=(x,z,o={x:0,z:0,g:0})=>{const t=U.uTime.value,d=WIND.dir.value,gust=smooth(.38,.82,vnC(x*.028-d.x*t*.23,z*.028-d.y*t*.23)),a=WIND.strength.value*(gust*1.15+.32);
+  o.x=d.x*a;o.z=d.y*a;o.g=gust;for(const u of WIND.whirl){const w=u.value,dx=x-w.x,dz=z-w.y,r=Math.hypot(dx,dz),e=Math.exp(-((r/w.z)**2));o.x+=-dz/(r+.4)*w.w*e;o.z+=dx/(r+.4)*w.w*e;o.g=Math.min(1,o.g+Math.abs(w.w)*e*.5);}
+  return o;};
+/* how hard it blows: the trades freshen through the afternoon and fall light at night; minutes-long lulls and freshenings; a squall
+   front ahead of rain, the wind veering as it comes; whirls run downwind on blustery days */
+const WS={t:0,wh:[{on:false},{on:false}]};
+function windTick(dt){WS.t+=dt;const h=W.clock.h,day=smooth(7,11,h)*smooth(19.5,16,h),lull=vnC(WS.t/40,3.7);
+  const pre=W.rainLeft<=0&&W.rainIn<45&&W.clock.phase!=='night'?smooth(45,8,W.rainIn):0;
+  const want=Math.max((.32+.28*day)*(.7+.6*lull)+pre*.75+U.uCover.value*.55,WIND.guide?.85:0);
+  WIND.strength.value=lerp(WIND.strength.value,want,1-Math.exp(-dt*.5));
+  WIND.veer=(vnC(WS.t/90,9.1)-.5)*.5+pre*.3;                                              // a few degrees either way; the squall swings it round
+  const s=WIND.strength.value,wd=WIND.dir.value;
+  for(let i=0;i<2;i++){const w=WS.wh[i],u=WIND.whirl[i].value;
+    if(!w.on){if(s>.55&&state==='play'&&Math.random()<dt*.05*(s-.4)){const side=(Math.random()-.5)*30,up=22+Math.random()*16;   // upwind of you, to come past
+        Object.assign(w,{on:true,x:player.x-wd.x*up-wd.y*side,z:player.z-wd.y*up+wd.x*side,R:2.5+Math.random()*2.5,S:(Math.random()<.5?-1:1)*(1.1+Math.random()*.9),t:0,life:9+Math.random()*7});}
+      else{u.set(0,-9999,3,0);continue;}}
+    w.t+=dt;w.x+=wd.x*s*5*dt;w.z+=wd.y*s*5*dt;const k=Math.sin(Math.PI*clamp(w.t/w.life,0,1));if(w.t>w.life){w.on=false;u.set(0,-9999,3,0);continue;}
+    u.set(w.x,w.z,w.R,w.S*k*(.6+s*.6));}}
 const palmSpots=(()=>{
   // the three by the lanai hold the hammock, so they move with it; the rest move out with the island
   const old=[[5.2,23.4,8.6],[14.5,24.9,7.6],[14.7,28.9,8.2],[-14,31,9],[-23,22,7.4],[21,35,8.4],[29,17,9.2],[-7,13,8],[19,-3,7],[-30,-9,8.8],[3,-34,9.4],[31,-22,7.8],[-12,-28,8.3]];

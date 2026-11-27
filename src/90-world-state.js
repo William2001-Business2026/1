@@ -2,7 +2,7 @@
 const SAVE_KEY='halemoku-island-1';
 const W={seen:{},day:0,inv:[],sel:-1,basket:false,items:[],plots:[],pieces:[],fires:{},notes:{},flags:{},
   chick:{fed:.45,egg:0,man:0,bold:false},goat:{fed:.4,trust:0,milk:0},buff:{until:0,speed:1,carry:0},
-  clock:{h:17.1,fast:false,phase:'golden'},stamp:Date.now(),rainIn:500,rainLeft:0,nodes:{wash:0,stone:0,frond:0,nut:0,flower:0}};
+  clock:{h:17.1,fast:false,phase:'golden'},stamp:Date.now(),rainIn:500,rainLeft:0,fauna:{},nodes:{wash:0,stone:0,frond:0,nut:0,flower:0}};
 const SEEP=enlarge(-22,6),GROVE=enlarge(-8,-22),OLDPLOT=enlarge(17,13),CHICKHOME=enlarge(21,9),CHILIPLOT=enlarge(12,2);
 const season=()=>Math.floor(W.day/4)%2;            // 0 dry, 1 wet
 const nowS=()=>Date.now()/1000;
@@ -202,10 +202,10 @@ const GUIDE=(()=>{
      flora:[E('Koa','Acacia koa','The tallest trees of the forest.',['watch'],'Koa'),E('ʻŌhiʻa lehua','with red lehua blossoms','The heart of the forest; the birds follow its flowers.',['watch'],'ʻŌhiʻa lehua'),
        E('Hāpuʻu','tree fern','The understorey: fronds at head height.',['watch'],'Hāpuʻu (tree fern)'),E('Kukui','candlenut','Pale silvery-green leaves; its oily nuts once lit lamps.',['watch'],'Kukui (candlenut)'),
        E('ʻŌhiʻa ʻai','mountain apple','Glossy leaves and red fruit.',['watch'],'ʻŌhiʻa ʻai (mountain apple)'),E('Banyan','an introduced giant','Two great banyans with hanging aerial roots that thicken into new trunks.',['watch'],'Banyan')],
-     fauna:[E('Puaʻa','wild pig','Roots through the forest floor. Bolts at about 13 m unless you creep (Shift). Strike, then butcher it (E) for pork.',['hunt','food'],'Puaʻa (wild pig)'),
+     fauna:[E('Puaʻa','wild pig','Roots through the forest floor. Bolts at about 13 m unless you creep (Shift). Strike, then butcher it (E) for pork. A sow with piglets stands her ground: she grunts a warning, then charges and can knock you down.',['hunt','food'],'Puaʻa (wild pig)'),
        E('Moa','red jungle fowl','Wild descendants of the birds the voyagers brought. Skittish.',['hunt','food'],'Moa (jungle fowl)'),
-       E('Nēnē','Hawaiian goose','Grazes in pairs on the open grass near the forest. Hawaiʻi’s state bird.',['hunt','food'],'Nēnē (Hawaiian goose)'),
-       E('Manakuke','small Indian mongoose','Darts across clearings; an introduced predator.',['watch'],'Manakuke (mongoose)'),
+       E('Nēnē','Hawaiian goose','Grazes in pairs on the open grass near the forest. Hawaiʻi’s state bird. In the wet season the pair raise goslings, and hiss and rush at you if you come close.',['hunt','food'],'Nēnē (Hawaiian goose)'),
+       E('Manakuke','small Indian mongoose','Darts across clearings; an introduced predator. By day it stalks hens, nēnē and their young.',['watch'],'Manakuke (mongoose)'),
        E('ʻIʻiwi','scarlet honeycreeper','Scarlet with black wings and a curved bill made for lehua flowers.',['watch','protected'],'ʻIʻiwi (scarlet honeycreeper)'),
        E('ʻApapane','crimson honeycreeper','Deep crimson; its trills fill the canopy.',['watch','protected'],'ʻApapane (crimson honeycreeper)'),
        E('Pueo','Hawaiian short-eared owl','Perches by day and moves to another tree if you come too close. Calls after dark.',['watch','protected'],'Pueo (Hawaiian owl)'),
@@ -213,7 +213,7 @@ const GUIDE=(()=>{
        E("Jackson's chameleon",'introduced','Green, sitting still in the branches.',['watch'],"Jackson's chameleon"),
        E('Moʻo','gecko','Runs up and down the trunks.',['watch'],'Moʻo (gecko)'),
        E('Nananana makakiʻi','happy-face spider','Tiny and yellow, under fern leaves; each one’s markings are its own.',['watch'],'Nananana makakiʻi (happy-face spider)')],
-     todo:['Hunt with the bamboo spear: approach slowly (Shift), strike, then butcher what you take (E) and roast the meat at the fire.',
+     todo:['Hunt with the bamboo spear: approach slowly (Shift), strike, then butcher what you take (E) and roast the meat at the fire.','Give mothers with young a wide berth: back away when one stops and stares.',
        'Watch for the honeycreepers in the flowering ʻōhiʻa, and for bats over the river at dusk.','Gather fronds and bamboo with the axe.']},
     {id:'sea',t:'Lalo o ke Kai',s:'under the sea',intro:'A fringing reef rings the island 15–65 m offshore, 2–4 m down, then drops away to 18 m. Swim out until your feet leave the bottom and press C to dive.',
      flora:[E('Pōhaku puna','lobe and finger coral','Lumpy mounds and thickets of blunt fingers, the builders of the reef.',['watch'],null,n=>n.dive),

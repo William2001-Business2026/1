@@ -96,12 +96,12 @@ const FAUNA=(()=>{
       if(h)ch.plans.push({key,n:1,home:h,seed:Math.floor(b*1e9)});yield;}}
   const groups=[];
   function spawnChunk(ch){ch.animals=[];ch.groups=[];
-    for(const P of ch.plans){const sp=SPEC[P.key],r=rng(P.seed),G={key:P.key,sp,home:P.home,members:[],off:[],act:null,goal:null,stT:0,spread:1};
+    for(const P of ch.plans){const sp=SPEC[P.key],r=rng(P.seed),G={id:'f'+P.seed,key:P.key,sp,home:P.home,members:[],off:[],act:null,goal:null,stT:0,spread:1};
       for(let i=0;i<P.n;i++){const a2=i===0?0:r()*6.283,rr=i===0?0:1.2+r()*2.2,off={x:Math.sin(a2)*rr,z:Math.cos(a2)*rr};
         const hx=P.home.x+off.x,hz=P.home.z+off.z,h0={...P.home,x:hx,z:hz,y:P.home.trunk||sp.zone==='perch'||sp.zone==='flit'||sp.zone==='branch'||sp.zone==='leaf'?P.home.y:heightAt(hx,hz)};
         const a=makeOne(P.key,sp,h0,r);a.ch=ch;a.grp=P.n>1||GROUND.includes(sp.zone)?G:null;a.size=i>0&&P.key==='puaa'&&r()<.6?.55+r()*.3:1;   // young pigs follow the sow
         a.g.scale.setScalar(a.size);G.members.push(a);G.off.push(off);ch.animals.push(a);}
-      if(GROUND.includes(sp.zone)){ch.groups.push(G);groups.push(G);}}}
+      if(GROUND.includes(sp.zone)){ch.groups.push(G);groups.push(G);addYoung(G);}}}
   function despawnChunk(ch){for(const a of ch.animals||[]){a.removed=true;scene.remove(a.g);let i=list.indexOf(a);if(i>=0)list.splice(i,1);i=interact.indexOf(a.g);if(i>=0)interact.splice(i,1);}
     for(const G of ch.groups||[]){const i=groups.indexOf(G);if(i>=0)groups.splice(i,1);}ch.animals=ch.groups=null;}
   // ── load and make the animals ──
@@ -125,7 +125,7 @@ const FAUNA=(()=>{
     a.g.position.copy(a.p);scene.add(a.g);
     const px=new THREE.Mesh(geo.box,proxyMat);const sz=sp.len||(sp.skinned==='kao'?1:.45);px.scale.set(sz*.6,Math.max(.12,sz*.6),sz);px.position.y=sz*.3;a.g.add(px);
     a.g.userData.item={label:()=>a.dead?sp.n+', dead':sp.n,get verb(){return a.dead?'butcher it':sp.food&&selKind()==='spear'?'click to strike':'';},
-      e(){if(!a.dead)return;physForget(a.g);a.phys=a.rested=false;give(sp.food[0],sp.food[1]);note('hunt');SFX.chop&&SFX.chop();a.dead=false;a.gone=nowS()+600;a.g.visible=false;},
+      e(){if(!a.dead)return;physForget(a.g);a.phys=a.rested=false;give(sp.food[0],Math.max(1,Math.round(sp.food[1]*(a.size||1))));note('hunt');SFX.chop&&SFX.chop();a.dead=false;a.gone=nowS()+600;a.g.visible=false;if(a.young)loseYoung(a);},
       use(k){if(k!=='spear'||!sp.food||a.dead)return false;handAnim=1;const sneak=keys.ShiftLeft||keys.ShiftRight;
         if(Math.random()<(sneak?.75:.45)){a.dead=true;a.state='dead';a.dieT=0;a.dieSide=Math.random()<.5?1:-1;if(a.acts.die){const d=a.acts.die;d.setLoop(THREE.LoopOnce,1);d.clampWhenFinished=true;d.timeScale=.7;play(a,'die',.15);}SFX.thud&&SFX.thud(.6);note('hunt');
           // a real body: it topples over sideways and tumbles down the slope, then lies where it stops
@@ -196,25 +196,87 @@ const FAUNA=(()=>{
     if(a.state==='walk'||a.state==='trot')a.state='idle';
     if(G.act==='drink'&&G.water){let t=Math.atan2(G.water.wx-a.p.x,G.water.wz-a.p.z)-a.yaw;t=Math.atan2(Math.sin(t),Math.cos(t));a.yaw+=t*Math.min(1,dt*3);a.state='graze';return;} // heads down to the water
     if(G.act==='feed'){a.stT-=dt;if(a.stT<=0){a.state=Math.random()<.7?'graze':'idle';a.stT=2+Math.random()*5;}}else a.state='idle';}
+  /* ── the life of a group: births, young that keep to their mother, mothers that stand their ground, and the hunt ──
+     After RDR2's living world: animals breed and raise young, defend them and are hunted. Steering after Craig Reynolds ("Steering
+     Behaviors for Autonomous Characters", GDC 1999) as gathered in Yuka (MIT, github.com/Mugen87/yuka): separation inside a group,
+     following an offset behind the mother, pursuit for the charge and the chase. */
+  const BREED={puaa:{p:.3,litter:[2,4],cap:5,start:.38,grow:24,n:'A sow has farrowed'},kao:{p:.22,litter:[1,2],cap:2,start:.45,grow:20,n:'A nanny goat has kidded'},
+    kia:{p:.14,litter:[1,1],cap:1,start:.5,grow:24,n:'A hind has dropped a fawn'},moa:{p:.32,litter:[3,5],cap:6,start:.3,grow:12,n:'A hen has brought out her chicks'},
+    nene:{p:.25,litter:[2,3],cap:3,start:.35,grow:16,wet:true,n:'The nēnē pair have goslings'}};   // nēnē nest in the wet season, the others the year round
+  const ageOf=r=>W.day+W.clock.h/24-r.b,sizeOf=(B,r)=>lerp(B.start,1,clamp(ageOf(r)/B.grow,0,1));
+  function youngOne(G,rec){const B=BREED[G.key],mom=G.members[0];if(!mom)return null;const an=Math.random()*6.283,h0={x:mom.p.x+Math.sin(an)*.6,z:mom.p.z+Math.cos(an)*.6,y:0};h0.y=heightAt(h0.x,h0.z);
+    const a=makeOne(G.key,G.sp,h0);a.ch=mom.ch;a.grp=G;a.young=rec;a.mom=mom;a.size=sizeOf(B,rec);a.g.scale.setScalar(a.size);
+    G.members.push(a);G.off.push({x:Math.sin(an)*.6,z:Math.cos(an)*.6});if(a.ch&&a.ch.animals)a.ch.animals.push(a);return a;}
+  function addYoung(G){const R=W.fauna&&W.fauna[G.id];if(!R||!BREED[G.key])return;for(const rec of R.y)youngOne(G,rec);}
+  function loseYoung(a){const R=W.fauna&&a.grp&&W.fauna[a.grp.id];if(R)R.y=R.y.filter(r=>r!==a.young);a.gone=1e15;a.g.visible=false;}
+  // once a day each group may breed, if it has room for a litter; the grown young leave to find their own ground
+  function breedTick(G,force){const B=BREED[G.key];if(!B||!G.id||!G.members[0]||G.members[0].dead)return;W.fauna=W.fauna||{};const R=W.fauna[G.id]||(W.fauna[G.id]={d:-1,y:[]});
+    if(R.d===W.day&&!force)return;R.d=W.day;R.y=R.y.filter(r=>ageOf(r)<B.grow);
+    if(!force&&(B.wet&&!season()||Math.random()>B.p))return;
+    const n=B.litter[0]+Math.floor(Math.random()*(B.litter[1]-B.litter[0]+1));if(R.y.length+n>B.cap)return;
+    for(let i=0;i<n;i++){const rec={b:W.day+W.clock.h/24};R.y.push(rec);youngOne(G,rec);}
+    const L=G.members[0];if(Math.hypot(L.p.x-player.x,L.p.z-player.z)<60&&state==='play')toast(B.n+'.',3);}
+  // a young one keeps to its mother's flank, a little behind her, and does what she does
+  function follow(a,dt){const m=a.mom;if(!m||m.dead||m.gone)return false;const L=(m.sp.len||.6),side=a.phase>3.14?1:-1,sy=Math.sin(m.yaw),cy=Math.cos(m.yaw),bk=.45+(a.phase*1.7%1)*.5,sd=.25+(a.phase*2.3%1)*.25;   // each its own place
+    const bx=m.p.x-sy*bk*L+cy*side*sd*L,bz=m.p.z-cy*bk*L-sy*side*sd*L,d=Math.hypot(bx-a.p.x,bz-a.p.z);a.rest=m.rest||0;
+    if(d>.45){a.tx=bx;a.tz=bz;a.state=d>3?'trot':'walk';return true;}
+    if(a.state==='walk'||a.state==='trot')a.state='idle';a.stT-=dt;if(a.stT<=0){a.state=m.state==='graze'||Math.random()<.4?'graze':'idle';a.stT=1+Math.random()*3;}return true;}
+  // a mother (or the cock of a hen's brood) with young near: watches you, warns, then charges; a sow bowls you over, a billy butts,
+  // a nēnē or a hen only rushes a few steps, hissing or clucking
+  const DEF={puaa:{r:6.5,warn:1.5,spd:5.4,hit:'down',v:'grunt'},kao:{r:4,warn:1.1,spd:4.2,hit:'butt',v:'bleat'},nene:{r:4.5,warn:.9,spd:2.4,v:'nene'},moa:{r:3,warn:.6,spd:3.2,v:'cluck'}};
+  const hasYoung=G=>G.members.some(m=>(m.young||m.size<.9)&&!m.dead&&!m.gone);
+  function knock(a,kind){const dx=player.x-a.p.x,dz=player.z-a.p.z,l=Math.hypot(dx,dz)||1,V=player.mv||(player.mv={x:0,z:0});SFX.thud&&SFX.thud(.9);STAM.v=Math.max(0,STAM.v-8);
+    if(kind==='down'){V.x=dx/l*6;V.z=dz/l*6;V.ax=V.az=0;const vy=player.vy;player.vy=3;const ok=RAG.start();player.vy=vy;if(!ok){hero.stagHard=true;hero.stagT=.9;}toast('The sow bowls you over. Keep clear of her young.',3);}
+    else{V.x=dx/l*3.8;V.z=dz/l*3.8;V.ax=V.az=0;hero.stagHard=false;hero.stagT=.6;toast('Butted. He stands over his kid.',2.6);}}
+  function defend(a,dt,pd){const D=DEF[a.key],G=a.grp;if(!D||!G||a.young||a!==G.members[0]){a.def=null;return false;}
+    a.defCool=Math.max(0,(a.defCool||0)-dt);const R0=Math.max(D.r*1.8,a.sp.flee);
+    if(!a.def){if(a.defCool>0||pd>R0||player.mode!=='walk'||RAG.on||!hasYoung(G))return false;a.def={ph:'watch',t:0};}
+    const S=a.def;S.t+=dt;let t=Math.atan2(player.x-a.p.x,player.z-a.p.z)-a.yaw;t=Math.atan2(Math.sin(t),Math.cos(t));
+    if(S.ph==='watch'||S.ph==='warn'){a.state='alert';a.alertT=1;a.fleeT=0;a.yaw+=t*Math.min(1,dt*5);
+      if(S.ph==='watch'){if(pd>R0*1.2){a.def=null;return false;}if(pd<D.r){S.ph='warn';S.t=0;LIFE.call(D.v,a.p.x,a.p.y,a.p.z,1.4);}}
+      else{if(pd>D.r*1.6){S.ph='watch';S.t=0;}else if(S.t>D.warn){S.ph='charge';S.t=0;LIFE.call(D.v,a.p.x,a.p.y,a.p.z,1.8);}}return true;}
+    if(S.ph==='charge'){a.state='run';a.tx=player.x;a.tz=player.z;
+      if(pd<.55+(a.sp.len||.6)*.45){S.ph='back';S.t=0;if(D.hit)knock(a,D.hit);else LIFE.call(D.v,a.p.x,a.p.y,a.p.z,1.6);}
+      else if(S.t>(D.hit?3.2:1.2)||pd>D.r*2.5){S.ph='back';S.t=0;}return true;}
+    if(!S.away){const an=Math.atan2(a.p.x-player.x,a.p.z-player.z);a.tx=a.p.x+Math.sin(an)*4;a.tz=a.p.z+Math.cos(an)*4;S.away=1;}   // back off to the young
+    a.state='walk';if(S.t>2.5){a.def=null;a.defCool=14;}return true;}
+  // the mongoose hunts by day: creeps toward a hen, a nēnē or their young, then rushes; the grown birds outrun it, the young may not
+  function hunt(a,dt){a.huntCool=Math.max(0,(a.huntCool||0)-dt);
+    if(!a.prey){if(a.huntCool>0||Math.random()>dt*.15||phaseNow()==='night')return false;let best=null,bd=14;
+      for(const b of list)if((b.key==='moa'||b.key==='nene')&&!b.dead&&!b.gone&&b.g.visible){const d=Math.hypot(b.p.x-a.p.x,b.p.z-a.p.z)*(b.young?.35:1);if(d<bd){bd=d;best=b;}}
+      if(!best){a.huntCool=20;return false;}a.prey=best;a.huntT=0;}
+    const b=a.prey;a.huntT+=dt;const d=Math.hypot(b.p.x-a.p.x,b.p.z-a.p.z);
+    if(b.dead||b.gone||a.huntT>(b.young?9:5)||d>25){a.prey=null;a.huntCool=60+Math.random()*60;return false;}
+    a.tx=b.p.x;a.tz=b.p.z;a.state=d>6&&a.huntT<3?'walk':'run';
+    if(d<7){b.threat={x:a.p.x,z:a.p.z};if(b.fleeT<=0)b.fleeT=2.5;b.state='run';}
+    if(d<.35&&b.young){loseYoung(b);LIFE.call(b.key==='nene'?'nene':'cluck',b.p.x,b.p.y,b.p.z,1.5);a.prey=null;a.huntCool=300;}
+    return true;}
   const ground=(a,dt,pd,sneak)=>{const sp=a.sp,G=a.grp,fr=sneak?sp.sneak:sp.flee;
-    if(a.fleeT>0||pd<fr||a.state==='alert'&&a.alertT<=0&&pd<fr*1.6){
-      if(a.fleeT<=0){a.fleeT=3+Math.random()*2;if(G)for(const m of G.members)if(m!==a&&!m.dead&&m.fleeT<=0){m.fleeT=a.fleeT*(.85+Math.random()*.3);m.fleeJit=(Math.random()-.5)*.8;}} // one bolts, the group bolts
-      a.fleeT-=dt;a.state='run';const th=a.threat||player,ang=Math.atan2(a.p.x-th.x,a.p.z-th.z)+(a.fleeJit||0);if(a.fleeT<=0)a.threat=null;   // away from you, or from what else frightened ita.tx=a.p.x+Math.sin(ang)*8;a.tz=a.p.z+Math.cos(ang)*8;
+    if(defend(a,dt,pd)){}                                                                       // standing over its young
+    else if(a.fleeT>0||pd<fr||a.state==='alert'&&a.alertT<=0&&pd<fr*1.6){
+      if(a.fleeT<=0){a.fleeT=3+Math.random()*2;if(G)for(const m of G.members)if(m!==a&&!m.dead&&m.fleeT<=0&&!m.def){m.fleeT=a.fleeT*(.85+Math.random()*.3);m.fleeJit=(Math.random()-.5)*.8;}} // one bolts, the group bolts
+      a.fleeT-=dt;a.state='run';const th=a.threat||player,ang=Math.atan2(a.p.x-th.x,a.p.z-th.z)+(a.fleeJit||0);if(a.fleeT<=0)a.threat=null;
+      // away from you, or from what else frightened it
+      a.tx=a.p.x+Math.sin(ang)*8;a.tz=a.p.z+Math.cos(ang)*8;
       if(G&&a.fleeT<=0){G.home={x:a.p.x,z:a.p.z,y:a.p.y};G.goal=null;G.water=undefined;G.shade=undefined;}}                       // it settles where it ran to
     else if(pd<fr*1.6&&(a.state!=='alert'||a.alertT>0)){if(a.state!=='alert'){a.state='alert';a.alertT=.8+Math.random()*1.2;}a.alertT-=dt;    // it has noticed you: head up, still, watching
       let t=Math.atan2(player.x-a.p.x,player.z-a.p.z)-a.yaw;t=Math.atan2(Math.sin(t),Math.cos(t));a.yaw+=t*Math.min(1,dt*3);}
-    else{if(a.state==='alert'){a.state='idle';a.stT=1+Math.random()*2;}routine(a,dt);}
-    const moving=a.state==='walk'||a.state==='run'||a.state==='trot',want=moving?(a.state==='run'?sp.speed[1]:a.state==='trot'?lerp(sp.speed[0],sp.speed[1],.4):sp.speed[0])*(a.size<1?.9:1):0;
+    else if(a.key==='manakuke'&&hunt(a,dt)){}
+    else{if(a.state==='alert'){a.state='idle';a.stT=1+Math.random()*2;}if(!(a.young&&follow(a,dt)))routine(a,dt);}
+    const moving=a.state==='walk'||a.state==='run'||a.state==='trot',want=a.def&&a.def.ph==='charge'?DEF[a.key].spd:moving?(a.state==='run'?sp.speed[1]:a.state==='trot'?lerp(sp.speed[0],sp.speed[1],.4):sp.speed[0])*(a.size<1?.9:1):0;
     const spd=a.vel=lerp(a.vel||0,want,Math.min(1,dt*(want>(a.vel||0)?(a.state==='run'?3.5:2):5)));                  // animals have weight: they speed up and pull up
     if(moving||spd>.05){const dx=a.tx-a.p.x,dz=a.tz-a.p.z,d=Math.hypot(dx,dz);if(d<.3){if(a.state==='walk'||a.state==='trot'){a.state='idle';a.stT=2;}}
       else{const st=Math.min(d,spd*dt),nx=a.p.x+dx/d*st,nz=a.p.z+dz/d*st;if(!okGround(nx,nz)){a.tx=a.p.x;a.tz=a.p.z;a.state='idle';if(G)G.goal=null;}
         else{a.p.x=nx;a.p.z=nz;let t=Math.atan2(dx,dz)-a.yaw;t=Math.atan2(Math.sin(t),Math.cos(t));a.yaw+=t*Math.min(1,dt*6);a.walk+=st;FOOT.animal(a);}}}
+    if(G&&G.members.length>1){const rr=(sp.len||.6)*.8;for(const m of G.members){if(m===a||m.dead||m.gone)continue;   // separation: room to stand, young closer in
+      const dx=a.p.x-m.p.x,dz=a.p.z-m.p.z,d=Math.hypot(dx,dz),md=rr*Math.max(a.size||1,m.size||1)*(a.young||m.young?.55:1);
+      if(d<md&&d>1e-3){const k=(md-d)*Math.min(1,dt*4),nx=a.p.x+dx/d*k,nz=a.p.z+dz/d*k;if(okGround(nx,nz)){a.p.x=nx;a.p.z=nz;}}}}
     a.p.y=heightAt(a.p.x,a.p.z);a.speed=spd;
     if(a.mixer&&a.acts.walk){const role=a.state==='run'||a.state==='trot'?(a.acts.trot&&spd<sp.speed[1]*.55?'trot':a.state==='trot'?'walk':'run'):a.state==='walk'?'walk':a.state==='graze'?'graze':a.state==='alert'&&a.acts.alert?'alert':'idle';play(a,role);
       if(role==='walk'||role==='run'||role==='trot'){const v=clipSpeed(a,role)||(role==='walk'?sp.speed[0]:role==='trot'?sp.speed[1]*.45:sp.speed[1]);a.cur.timeScale=clamp(spd/(v*(a.size||1)),.3,2.5);} // feet keep pace with the ground
       else a.cur.timeScale=role==='idle'?1-(a.rest||0)*.75:1;}};
   function tick(dt,t){const sneak=keys.ShiftLeft||keys.ShiftRight,nt=night();
-    for(const G of groups){const L=G.members[0];if(L&&Math.hypot(L.p.x-camera.position.x,L.p.z-camera.position.z)<150)planGroup(G,dt);}
+    for(const G of groups){const L=G.members[0];if(L&&Math.hypot(L.p.x-camera.position.x,L.p.z-camera.position.z)<150){planGroup(G,dt);if(state==='play')breedTick(G);}}
     for(const a of list){const sp=a.sp;
       if(a.gone){if(nowS()<a.gone)continue;a.gone=0;a.p.set(a.home.x,a.home.y,a.home.z);a.g.visible=true;a.g.rotation.set(0,a.yaw,0);a.state='idle';if(a.acts.die){a.acts.die.stop();a.cur=null;play(a,'idle',0);}}
       const dc=Math.hypot(a.p.x-camera.position.x,a.p.z-camera.position.z),far=dc>(sp.zone==='soar'?400:sp.zone==='leaf'||sp.make?30:150);a.g.visible=!far&&!a.gone;if(far&&!a.dead)continue;
@@ -222,7 +284,7 @@ const FAUNA=(()=>{
       if(a.dead){a.dieT=(a.dieT||0)+dt;a.g.position.copy(a.p);
         const k=Math.min(1,a.dieT/.6),e=k*k*(3-2*k);a.g.rotation.set(0,a.yaw,a.dieSide*Math.PI/2*e*.92);a.g.position.y+=(sp.len||.45)*.22*e*(a.size||1)+.03; // legs buckle and it rolls onto its side
         if(a.mixer)a.mixer.update(a.acts.die?dt:dt*(1-k));continue;} // a rigged animal flinches as it goes down
-      a.t+=dt;const pd=Math.hypot(a.p.x-player.x,a.p.z-player.z);if(pd<(sp.zone==='soar'?60:12)&&a.g.visible)W.seen[sp.n]=1;   // counts as seen in the book
+      a.t+=dt;if(a.young){a.size=sizeOf(BREED[a.key],a.young);a.g.scale.setScalar(a.size);}const pd=Math.hypot(a.p.x-player.x,a.p.z-player.z);if(pd<(sp.zone==='soar'?60:12)&&a.g.visible)W.seen[sp.n]=1;   // counts as seen in the book
       if(GROUND.includes(sp.zone))ground(a,dt,pd,sneak);
       else if(sp.zone==='soar'){const R=45+20*Math.sin(a.t*.01+a.phase),an=a.t*.045+a.phase,gy=heightAt(a.home.x,a.home.z);a.p.set(a.home.x+Math.sin(an)*R,Math.max(gy,40)+35+Math.sin(a.t*.07)*6,a.home.z+Math.cos(an)*R);a.yaw=an+Math.PI/2;
         if(a.acts.fly)a.acts.fly.timeScale=Math.sin(a.t*.3+a.phase)>.6?1:0.05;}                                   // mostly soaring, now and then a few wingbeats
@@ -254,7 +316,7 @@ const FAUNA=(()=>{
   }
   const layer=STREAM.layer({name:'fauna',size:FCH,seed:128,prio:2,radius:()=>140+120*FQ,margin:30,build:homes,ready:spawnChunk,dispose:despawnChunk});
   return{list,groups,tick,layer,quality(g){FQ=Math.max(.4,.35+.65*g.grass);},force(p){force=p||null;},make(key,x,z){return makeOne(key,SPEC[key],{x,y:heightAt(x,z),z});},   // make: one animal, for tests
-    get phase(){return phaseNow();},clipV,
+    get phase(){return phaseNow();},clipV,eco:{breedTick,defend,hunt,BREED,DEF},
     get counts(){const n={};for(const a of list)n[a.key]=(n[a.key]||0)+1;return n;},species:Object.keys(SPEC)};
 })();
 

@@ -14,9 +14,11 @@ function updateWeather(dt){
   U.uCover.value=Math.max(raining,W.rainLeft<=0&&W.rainIn<30&&W.clock.phase!=='night'&&!evening.running?(1-W.rainIn/30)*.65:0);
   sun.intensity=sunBase*(1-.75*U.uCover.value)*(U.uUnder.value?.42*Math.exp(-Math.max(0,water.position.y-camera.position.y)*.07):1)*(1-.98*TUBE.st.cave); // sea water swallows sunlight with depth; rock shuts it out of the lava tube
   rainMesh.visible=raining>.02&&TUBE.st.s<3;                                    // no rain a few steps into the lava tube
-  if(rainMesh.visible){rainMesh.material.opacity=raining*.35;const c=camera.position;
-    for(let i=0;i<rainN;i++){let y=rainSeed[i*3+1]-dt*13;if(y<0)y+=10;rainSeed[i*3+1]=y;const x=c.x+rainSeed[i*3],z=c.z+rainSeed[i*3+2],yy=c.y-4+y;
-      rainPos[i*6]=x;rainPos[i*6+1]=yy;rainPos[i*6+2]=z;rainPos[i*6+3]=x+.03;rainPos[i*6+4]=yy+.35;rainPos[i*6+5]=z;}
+  if(rainMesh.visible){rainMesh.material.opacity=raining*.35;const c=camera.position,wa=windAtC(c.x,c.z),vx=wa.x*4.5,vz=wa.z*4.5;   // drops blown sideways, streaks slanted the way they fall
+    for(let i=0;i<rainN;i++){let y=rainSeed[i*3+1]-dt*13;if(y<0)y+=10;rainSeed[i*3+1]=y;
+      let sx=rainSeed[i*3]+vx*dt,sz=rainSeed[i*3+2]+vz*dt;if(sx>9)sx-=18;else if(sx<-9)sx+=18;if(sz>9)sz-=18;else if(sz<-9)sz+=18;rainSeed[i*3]=sx;rainSeed[i*3+2]=sz;
+      const x=c.x+sx,z=c.z+sz,yy=c.y-4+y;
+      rainPos[i*6]=x;rainPos[i*6+1]=yy;rainPos[i*6+2]=z;rainPos[i*6+3]=x+.03-vx*.027;rainPos[i*6+4]=yy+.35;rainPos[i*6+5]=z-vz*.027;}
     rainGeo.attributes.position.needsUpdate=true;
     for(const pc of W.pieces)if(pc.f==='barrel'){const was=pc.d.w>0;pc.d.w=Math.min(20,(pc.d.w||0)+dt/6*raining*(roofs.some(t=>Math.hypot(t.x-pc.x,t.z-pc.z)<1.8)?2:1));if(!was&&pc.d.w>0)recompute();}}
   for(const pc of W.pieces)if(pc.f==='barrel'){const w=pc.g.getObjectByName('water');w.visible=pc.d.w>.2;w.position.y=.1+.65*Math.min(1,(pc.d.w||0)/20);}

@@ -96,6 +96,6 @@ $('v-time').textContent='· golden hour';
 $('s-time').addEventListener('input',e=>{const v=+e.target.value;evening.running=false;W.clock.fast=false;W.clock.h=presetHour(v);applyTime(true);syncSlider();});
 addEventListener('resize',applyGraphics);describeGfx();
 function savePhoto(){
-  post.render();const a=document.createElement('a');a.download='hale-moku-'+Date.now()+'.png';a.href=canvas.toDataURL('image/png');a.click();toast('Photo saved.',2);
+  ATMOS.light();post.render();const a=document.createElement('a');a.download='hale-moku-'+Date.now()+'.png';a.href=canvas.toDataURL('image/png');a.click();toast('Photo saved.',2);
 }
 

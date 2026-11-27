@@ -16,13 +16,15 @@ const LIFE=(()=>{
   const L=Array.from({length:N},()=>({on:false})),M=new THREE.Matrix4(),Q=new THREE.Quaternion(),E=new THREE.Euler(),S=new V3(1,1,1),T=new V3(),C=new THREE.Color();
   const COLS=[[.42,.36,.12],[.55,.42,.15],[.33,.3,.1],[.6,.3,.1],[.25,.32,.1]];
   for(let i=0;i<N;i++){const c=COLS[i%COLS.length];leaves.setColorAt(i,C.setRGB(...c));}
-  let spawnAcc=0;
+  let spawnAcc=0;const WO={x:0,z:0,g:0};
   function leavesTick(dt){const c=camera.position,fw=forestW(c.x,c.z),wd=WIND.dir.value,ws=WIND.strength.value,n=NL();
     spawnAcc+=dt*fw*(1.5+ws*4+(guide?4:0));                    // a leaf or two a second in the forest, more in gusts
     while(spawnAcc>1){spawnAcc-=1;const l=L.find((q,i)=>i<n&&!q.on);if(!l)break;const a=Math.random()*6.283,d=2+Math.random()*16,x=c.x+Math.cos(a)*d-wd.x*4,z=c.z+Math.sin(a)*d-wd.y*4;
       Object.assign(l,{on:true,x,z,y:groundAt(x,z)+4+Math.random()*6,vy:-(.5+Math.random()*.5),ph:Math.random()*6,sp:2+Math.random()*3,rest:0,life:0});}
     let k=0;for(let i=0;i<N;i++){const l=L[i];if(!l.on||i>=n){M.makeScale(0,0,0);leaves.setMatrixAt(i,M);continue;}
-      const gy=groundAt(l.x,l.z)+.01;if(l.y>gy){l.ph+=dt*l.sp;l.x+=(wd.x*ws*1.6+Math.sin(l.ph)*.5)*dt;l.z+=(wd.y*ws*1.6+Math.cos(l.ph*.8)*.5)*dt;l.y=Math.max(gy,l.y+l.vy*dt*(.6+.4*Math.abs(Math.sin(l.ph))));
+      const gy=groundAt(l.x,l.z)+.01,wa=windAtC(l.x,l.z,WO),lift=Math.max(0,Math.hypot(wa.x,wa.z)-ws*1.6)*.9;           // a whirl spins leaves up off the ground
+      if(lift>.3&&l.y<=gy+.02){l.y=gy+.05;l.rest=0;}
+      if(l.y>gy){l.ph+=dt*l.sp;l.x+=(wa.x*1.6+Math.sin(l.ph)*.5)*dt;l.z+=(wa.z*1.6+Math.cos(l.ph*.8)*.5)*dt;l.y=Math.min(gy+9,Math.max(gy,l.y+(l.vy*(.6+.4*Math.abs(Math.sin(l.ph)))+lift)*dt));
         E.set(Math.sin(l.ph)*1.4,l.ph*.7,Math.cos(l.ph*1.3)*1.2);}else{l.rest+=dt;E.set(-Math.PI/2,l.ph,0);if(l.rest>8)l.on=false;}
       if(Math.hypot(l.x-c.x,l.z-c.z)>40)l.on=false;Q.setFromEuler(E);M.compose(T.set(l.x,l.y,l.z),Q,S);leaves.setMatrixAt(i,M);k=i+1;}
     leaves.count=k;leaves.instanceMatrix.needsUpdate=true;}
@@ -35,10 +37,10 @@ const LIFE=(()=>{
   function choose(){const K=known();if(!K.length){toast('Go somewhere first: the wind can only lead you back to places you know.',4);return;}
     gi=(gi+1)%(K.length+1);if(gi===K.length){guide=null;toast('The wind goes back to its own way.',3);return;}guide=K[gi];toast('The wind turns toward '+guide.n+'.',3.5);SFX.page&&SFX.page();}
   function guideTick(dt){for(const q of PL){const p=q.p();if(p&&!W.flags['been_'+q.id]&&Math.hypot(p.x-player.x,p.z-player.z)<40)W.flags['been_'+q.id]=1;}
-    const wv=WIND.dir.value;let want=baseDir;
+    const wv=WIND.dir.value,cv=Math.cos(WIND.veer),sv=Math.sin(WIND.veer);let want=new THREE.Vector2(baseDir.x*cv-baseDir.y*sv,baseDir.x*sv+baseDir.y*cv);
     if(guide){const p=guide.p(),dx=p.x-player.x,dz=p.z-player.z,d=Math.hypot(dx,dz);if(d<30){toast(guide.n[0].toUpperCase()+guide.n.slice(1)+'.',3);guide=null;gi=-1;}
       else want=new THREE.Vector2(dx/d,dz/d);}
-    wv.lerp(want,1-Math.exp(-dt*(guide?1.2:.3))).normalize();if(guide)WIND.strength.value=Math.max(WIND.strength.value,.85);}
+    wv.lerp(want,1-Math.exp(-dt*(guide?1.2:.3))).normalize();WIND.guide=!!guide;}
   // ── animal voices, heard from where the animal is
   const VOICE={nene:'nene',puaa:'grunt',kia:'bark',kao:'bleat',moa:'cluck',manakuke:'chitter'};
   function call(kind,x,y,z,v=1){const c=AU.ctx;if(!c||!AU.amb)return;const pn=c.createPanner();pn.panningModel='equalpower';pn.distanceModel='inverse';pn.refDistance=3;pn.rolloffFactor=1.2;
